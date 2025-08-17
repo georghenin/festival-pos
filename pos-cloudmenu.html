@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Festival POS (Cloud Menu)</title>
+
+  <style>
+    :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--accent:#5b9bff;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b;--card:#0f141e;--border:#1b2230}
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .container{max-width:1100px;margin:0 auto;padding:16px}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .space{height:12px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
+    .btn{border:none;border-radius:12px;padding:12px 14px;color:#fff;background:var(--accent);font:inherit;cursor:pointer}
+    .btn.ok{background:var(--ok)} .btn.warn{background:var(--warn)} .btn.danger{background:var(--danger)} .btn.gray{background:#1e2432;color:#e5e8ee}
+    input,select{font:inherit;background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+    .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#0f1420;color:#95a0ad;font-size:12px}
+    .grid{display:grid;gap:12px}
+    .title{margin:0;font-size:20px}
+    .small{font-size:12px;color:#95a0ad}
+    .hidden{display:none!important}
+    table{width:100%;border-collapse:collapse}
+    td,th{border-bottom:1px solid var(--border);padding:8px;text-align:left}
+  </style>
+
+<style>
+  .layout{display:grid;grid-template-columns:2fr 1.2fr;gap:12px}
+  @media (max-width:900px){.layout{grid-template-columns:1fr}}
+  .catbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .catbtn{padding:10px 12px;border-radius:999px;border:1px solid var(--border);background:#121826;color:#eaf0f6;cursor:pointer}
+  .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+  .item{background:#121826;border:1px solid var(--border);border-radius:14px;padding:10px;cursor:pointer}
+  .item h4{margin:0 0 6px 0;font-size:14px}
+  .right .line{display:flex;justify-content:space-between;gap:8px;align-items:center;border-bottom:1px solid var(--border);padding:8px 0}
+  .qtybtn{padding:6px 10px;border-radius:10px;background:#1e2432;color:#fff;border:1px solid var(--border)}
+  .totals{display:flex;justify-content:space-between;margin-top:8px;font-weight:700;font-size:18px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="row" style="justify-content:space-between">
+    <h2 class="title">Festival POS</h2>
+    <div class="row">
+      <button id="seed" class="btn gray hidden">Seed defaults</button>
+      <span class="pill" id="cashier">Not signed in</span>
+      <button class="btn gray" id="signout" style="display:none">Sign out</button>
+    </div>
+  </div>
+
+  <div id="auth" class="card">
+    <div class="row">
+      <input id="email" type="email" placeholder="Cashier email" style="flex:1;min-width:220px">
+      <input id="pass" type="password" placeholder="Password" style="flex:1;min-width:160px">
+      <button id="login" class="btn">Sign in</button>
+      <button id="create" class="btn gray">Create user</button>
+    </div>
+    <div id="msg" class="small" style="margin-top:8px"></div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="card">
+      <div class="row">
+        <input id="cust" placeholder="Customer name (required)" style="flex:2;border:2px solid #2b7cff">
+        <select id="station">
+          <option value="">Auto route by item</option>
+          <option>Grill</option><option>Fryer</option><option>Drinks</option><option>Pizza</option>
+        </select>
+      </div>
+      <div class="small" id="nameWarn" style="color:#ffb3b3;margin-top:6px;display:none">Name is required</div>
+    </div>
+
+    <div class="layout">
+      <div class="left card">
+        <div class="catbar" id="catbar"></div>
+        <div class="items" id="items"></div>
+      </div>
+      <div class="right card">
+        <div id="cart"></div>
+        <div class="totals">
+          <span>Total</span><span id="total">$0.00</span>
+        </div>
+        <div class="space"></div>
+        <div class="row">
+          <button id="clear" class="btn gray">Clear</button>
+          <button id="submit" class="btn ok" style="flex:1">Submit Order</button>
+        </div>
+        <div class="small" id="status" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+
+<script>
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
+  authDomain: "churchfestivalpos.firebaseapp.com",
+  projectId: "churchfestivalpos",
+  storageBucket: "churchfestivalpos.firebasestorage.app",
+  messagingSenderId: "447909610900",
+  appId: "1:447909610900:web:a54a828bacfa02e7883b81"
+};
+
+
+const DEFAULT_MENU = [
+  {cat:"Grill", name:"Gyro", price:12, station:"Grill", active:true, sort:10},
+  {cat:"Grill", name:"Chicken Souvlaki", price:12, station:"Grill", active:true, sort:20},
+  {cat:"Fryer", name:"Fries", price:5, station:"Fryer", active:true, sort:10},
+  {cat:"Fryer", name:"Falafel (4)", price:6, station:"Fryer", active:true, sort:20},
+  {cat:"Drinks", name:"Water", price:2, station:"Drinks", active:true, sort:10},
+  {cat:"Drinks", name:"Lemonade", price:4, station:"Drinks", active:true, sort:20},
+  {cat:"Pizza", name:"Slice Cheese", price:4, station:"Pizza", active:true, sort:10},
+  {cat:"Pizza", name:"Slice Pepperoni", price:5, station:"Pizza", active:true, sort:20}
+];
+
+const $=s=>document.querySelector(s);
+const appBox = $('#app'), authBox = $('#auth'), cashierEl=$('#cashier'), signout=$('#signout');
+const email=$('#email'), pass=$('#pass'), login=$('#login'), create=$('#create'), msg=$('#msg');
+const catbar=$('#catbar'), itemsEl=$('#items'), cartEl=$('#cart'), totalEl=$('#total');
+const clearBtn=$('#clear'), submitBtn=$('#submit'), statusEl=$('#status'), stationSel=$('#station'), custInp=$('#cust'), nameWarn=$('#nameWarn');
+const seedBtn=$('#seed');
+
+firebase.initializeApp(FIREBASE_CONFIG);
+const db=firebase.firestore(); const auth=firebase.auth();
+
+let MENU=[]; let CART=[]; let CATS=[]; let activeCat='All';
+
+function money(n){return '$'+(n||0).toFixed(2);}
+function setUI(user){ const on=!!user; authBox.classList.toggle('hidden', on); appBox.classList.toggle('hidden', !on); cashierEl.textContent = on? user.email : 'Not signed in'; signout.style.display = on?'inline-flex':'none'; }
+auth.onAuthStateChanged(u=> setUI(u));
+login.onclick = async()=>{ msg.textContent='Signing in...'; try{await auth.signInWithEmailAndPassword(email.value.trim(), pass.value); msg.textContent='Signed in.';}catch(e){msg.textContent=e.message;} };
+create.onclick = async()=>{ msg.textContent='Creating user...'; try{await auth.createUserWithEmailAndPassword(email.value.trim(), pass.value); msg.textContent='User created.';}catch(e){msg.textContent=e.message;} };
+signout.onclick = ()=> auth.signOut();
+
+function loadMenuRealtime(){ db.collection('menu').orderBy('cat').orderBy('sort').onSnapshot(snap=>{ MENU=[]; snap.forEach(d=> MENU.push({id:d.id, ...d.data()})); const active = MENU.filter(m=> m.active!==false); seedBtn.classList.toggle('hidden', active.length!==0); rebuild(active); }); }
+function rebuild(active){ CATS=['All', ...Array.from(new Set(active.map(i=>i.cat)))]; if(!CATS.includes(activeCat)) activeCat='All'; renderCats(); renderItems(active);}
+function renderCats(){ catbar.innerHTML = CATS.map(c=>`<button class="catbtn" data-cat="${c}">${c}</button>`).join(''); catbar.querySelectorAll('button').forEach(b=> b.onclick = ()=>{ activeCat=b.dataset.cat; renderItems(MENU.filter(m=>m.active!==false)); }); }
+function renderItems(list){ const show = list.filter(i=> activeCat==='All' || i.cat===activeCat); itemsEl.innerHTML = show.map(i=>`<div class="item" data-id="${i.id}">
+    <h4>${i.name}</h4><div class="small">${i.cat} • $${(+i.price).toFixed(2)} • ${i.station}</div>
+  </div>`).join('');
+  itemsEl.querySelectorAll('.item').forEach(el=> el.onclick=()=> addById(el.getAttribute('data-id')) );
+}
+function addById(id){ const it = MENU.find(x=>x.id===id); if(!it) return; const ex = CART.find(x=>x.id===id); if(ex) ex.qty++; else CART.push({id:it.id, name:it.name, price:+it.price, qty:1, station:it.station}); renderCart(); }
+function renderCart(){ cartEl.innerHTML = CART.map((l,i)=>`<div class="line">
+    <div><b>${l.name}</b><div class="small">${l.station}</div></div>
+    <div class="row">
+      <button class="qtybtn" data-i="${i}" data-a="-">−</button>
+      <div>${l.qty}</div>
+      <button class="qtybtn" data-i="${i}" data-a="+">+</button>
+      <div style="width:70px;text-align:right">${money(l.qty*l.price)}</div>
+      <button class="qtybtn" data-i="${i}" data-a="x">x</button>
+    </div>
+  </div>`).join('');
+  const tot = CART.reduce((s,l)=> s + l.qty*l.price, 0);
+  totalEl.textContent = money(tot);
+  cartEl.querySelectorAll('.qtybtn').forEach(b=> b.onclick=()=> qtyAction(+b.dataset.i, b.dataset.a) );
+}
+function qtyAction(i,a){ const l = CART[i]; if(!l) return; if(a==='+') l.qty++; if(a==='-') l.qty = Math.max(1, l.qty-1); if(a==='x') CART.splice(i,1); renderCart(); }
+
+async function nextOrderNumber(){ const ref = db.collection('meta').doc('counters'); const res = await db.runTransaction(async t=>{ const snap = await t.get(ref); let n = (snap.exists && snap.data().orderSeq) ? snap.data().orderSeq : 100; n++; t.set(ref, {orderSeq:n}, {merge:true}); return n; }); return res; }
+
+clearBtn.onclick = ()=>{ CART=[]; renderCart(); };
+
+submitBtn.onclick = async()=>{
+  nameWarn.style.display = custInp.value.trim()? 'none':'block';
+  if(!custInp.value.trim()){ custInp.focus(); return; }
+  if(CART.length===0) { statusEl.textContent='Add items first.'; return; }
+  submitBtn.disabled = true; statusEl.textContent='Submitting...';
+  try{
+    const number = await nextOrderNumber();
+    const now = Date.now();
+    const items = CART.map(l=>({name:l.name, qty:l.qty, price:l.price, station:l.station}));
+    const preferred = stationSel.value || null;
+    await db.collection('orders').add({
+      number, items, status:'new', createdAt:now, updatedAt:now,
+      customer:custInp.value.trim(), preferredStation:preferred,
+      cashier: (auth.currentUser?.email)||null, total: CART.reduce((s,l)=>s+l.qty*l.price,0)
+    });
+    CART=[]; renderCart(); statusEl.textContent = 'Order #' + number + ' sent to kitchen.'; custInp.value='';
+  }catch(e){ statusEl.textContent = e.message; }
+  submitBtn.disabled = false;
+};
+
+seedBtn.onclick = async()=>{
+  if(!confirm('Seed default menu items into Firestore?')) return;
+  const batch = db.batch();
+  DEFAULT_MENU.forEach(m=>{ const ref = db.collection('menu').doc(); batch.set(ref, m); });
+  await batch.commit();
+  alert('Menu seeded.');
+};
+
+loadMenuRealtime();
+</script>
+</body></html>
