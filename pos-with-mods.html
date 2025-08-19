@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Festival POS (with Modifiers)</title>
+<style>
+  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--accent:#5b9bff;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b;--card:#0f141e;--border:#1b2230}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .container{max-width:1100px;margin:0 auto;padding:16px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .space{height:12px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
+  .btn{border:none;border-radius:12px;padding:12px 14px;color:#fff;background:var(--accent);font:inherit;cursor:pointer}
+  .btn.ok{background:var(--ok)} .btn.warn{background:var(--warn)} .btn.danger{background:var(--danger)} .btn.gray{background:#1e2432;color:#e5e8ee}
+  input,select{font:inherit;background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+  .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#0f1420;color:#95a0ad;font-size:12px}
+  .layout{display:grid;grid-template-columns:2fr 1.2fr;gap:12px}
+  @media (max-width:900px){.layout{grid-template-columns:1fr}}
+  .catbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .catbtn{padding:10px 12px;border-radius:999px;border:1px solid var(--border);background:#121826;color:#eaf0f6;cursor:pointer}
+  .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+  .item{background:#121826;border:1px solid var(--border);border-radius:14px;padding:10px;cursor:pointer}
+  .item h4{margin:0 0 6px 0;font-size:14px}
+  .right .line{display:flex;justify-content:space-between;gap:8px;align-items:center;border-bottom:1px solid var(--border);padding:8px 0}
+  .small{font-size:12px;color:#95a0ad}
+  .qtybtn{padding:6px 10px;border-radius:10px;background:#1e2432;color:#fff;border:1px solid var(--border)}
+  .totals{display:flex;justify-content:space-between;margin-top:8px;font-weight:700;font-size:18px}
+  /* Modal */
+  .modalWrap{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:16px;z-index:40}
+  .modal{max-width:560px;width:100%;background:#0f141e;border:1px solid var(--border);border-radius:16px}
+  .modalHead{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border)}
+  .modalBody{padding:12px 14px}
+  .optRow{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding:8px 0}
+  .optCtrls{display:flex;gap:6px;align-items:center}
+  .bubble{border:1px solid var(--border);border-radius:999px;padding:4px 8px;color:#c7cfdb}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="row" style="justify-content:space-between">
+    <h2 class="title">Festival POS (with Modifiers)</h2>
+    <div class="row">
+      <span class="pill" id="cashier">Not signed in</span>
+      <button class="btn gray" id="signout" style="display:none">Sign out</button>
+    </div>
+  </div>
+
+  <div id="auth" class="card">
+    <div class="row">
+      <input id="email" type="email" placeholder="Cashier email" style="flex:1;min-width:220px">
+      <input id="pass" type="password" placeholder="Password" style="flex:1;min-width:160px">
+      <button id="login" class="btn">Sign in</button>
+      <button id="create" class="btn gray">Create user</button>
+    </div>
+    <div id="msg" class="small" style="margin-top:8px"></div>
+  </div>
+
+  <div id="app" style="display:none">
+    <div class="card">
+      <div class="row">
+        <input id="cust" placeholder="Customer name (required)" style="flex:2;border:2px solid #2b7cff">
+        <select id="station">
+          <option value="">Auto route by item</option>
+          <option>Grill</option><option>Fryer</option><option>Drinks</option><option>Pizza</option>
+        </select>
+      </div>
+      <div class="small" id="nameWarn" style="color:#ffb3b3;margin-top:6px;display:none">Name is required</div>
+    </div>
+
+    <div class="layout">
+      <div class="left card">
+        <div class="catbar" id="catbar"></div>
+        <div class="items" id="items"></div>
+      </div>
+      <div class="right card">
+        <div id="cart"></div>
+        <div class="totals">
+          <span>Total</span><span id="total">$0.00</span>
+        </div>
+        <div class="space"></div>
+        <div class="row">
+          <button id="clear" class="btn gray">Clear</button>
+          <button id="submit" class="btn ok" style="flex:1">Submit Order</button>
+        </div>
+        <div class="small" id="status" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modifiers Modal -->
+<div class="modalWrap" id="modWrap">
+  <div class="modal">
+    <div class="modalHead">
+      <div>
+        <div id="modTitle"><b>Customize</b></div>
+        <div class="small" id="modRule"></div>
+      </div>
+      <button id="modClose" class="btn gray">Close</button>
+    </div>
+    <div class="modalBody">
+      <div id="modOptions"></div>
+      <div class="row" style="justify-content:space-between;margin-top:12px">
+        <div class="small" id="modRemaining"></div>
+        <div class="row">
+          <span class="bubble" id="modPrice">+$0.00</span>
+          <button id="modAdd" class="btn ok">Add to cart</button>
+        </div>
+      </div>
+      <div id="modWarn" class="small" style="color:#ffb3b3;margin-top:6px;display:none"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+<script>
+/* ---- Firebase (your project) ---- */
+firebase.initializeApp({
+  apiKey: "AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
+  authDomain: "churchfestivalpos.firebaseapp.com",
+  projectId: "churchfestivalpos",
+  storageBucket: "churchfestivalpos.firebasestorage.app",
+  messagingSenderId: "447909610900",
+  appId: "1:447909610900:web:a54a828bacfa02e7883b81"
+});
+const db=firebase.firestore(), auth=firebase.auth();
+
+/* ---- UI refs ---- */
+const $=s=>document.querySelector(s);
+const appBox = $('#app'), authBox = $('#auth'), cashierEl=$('#cashier'), signout=$('#signout');
+const email=$('#email'), pass=$('#pass'), login=$('#login'), create=$('#create'), msg=$('#msg');
+const catbar=$('#catbar'), itemsEl=$('#items'), cartEl=$('#cart'), totalEl=$('#total');
+const clearBtn=$('#clear'), submitBtn=$('#submit'), statusEl=$('#status'), stationSel=$('#station'), custInp=$('#cust'), nameWarn=$('#nameWarn');
+
+/* ---- Auth ---- */
+function setUI(user){const on=!!user; authBox.style.display = on?'none':'block'; appBox.style.display = on?'block':'none'; cashierEl.textContent = on? user.email : 'Not signed in'; signout.style.display = on?'inline-flex':'none';}
+auth.onAuthStateChanged(u=> setUI(u));
+login.onclick = async()=>{ msg.textContent='Signing in...'; try{await auth.signInWithEmailAndPassword(email.value.trim(), pass.value); msg.textContent='Signed in.';}catch(e){msg.textContent=e.message;} };
+create.onclick = async()=>{ msg.textContent='Creating user...'; try{await auth.createUserWithEmailAndPassword(email.value.trim(), pass.value); msg.textContent='User created.';}catch(e){msg.textContent=e.message;} };
+signout.onclick = ()=> auth.signOut();
+
+/* ---- Money / helpers ---- */
+function money(n){return '$'+(Number(n||0)).toFixed(2);}
+function provisionalNumber(){ const d=new Date(); const pad=(n,w=2)=>String(n).padStart(w,'0'); return `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}${pad(Math.floor(d.getMilliseconds()/10))}`; }
+
+/* ---- Menu + Modifiers ---- */
+let MENU=[], CATS=[], activeCat='All', MOD_GROUPS={};
+
+function loadMenuRealtime(){
+  db.collection('menu').orderBy('cat').orderBy('sort').onSnapshot(snap=>{
+    MENU=[]; snap.forEach(d=> MENU.push({id:d.id, ...d.data()}));
+    const active = MENU.filter(m=> m.active!==false);
+    rebuild(active);
+  });
+  // load all modifier groups once (or listen if you like)
+  db.collection('modGroups').get().then(snap=>{
+    MOD_GROUPS={}; snap.forEach(d=> MOD_GROUPS[d.id] = {id:d.id, ...d.data()});
+  });
+}
+function rebuild(active){ CATS=['All', ...Array.from(new Set(active.map(i=>i.cat)))]; if(!CATS.includes(activeCat)) activeCat='All'; renderCats(); renderItems(active); }
+function renderCats(){ catbar.innerHTML = CATS.map(c=>`<button class="catbtn" data-cat="${c}">${c}</button>`).join(''); catbar.querySelectorAll('button').forEach(b=> b.onclick = ()=>{ activeCat=b.dataset.cat; renderItems(MENU.filter(m=>m.active!==false)); }); }
+function renderItems(list){
+  const show = list.filter(i=> activeCat==='All' || i.cat===activeCat);
+  itemsEl.innerHTML = show.map(i=>`<div class="item" data-id="${i.id}">
+    <h4>${i.name}</h4>
+    <div class="small">${i.cat} • ${money(+i.price||0)}${i.modGroupId?' • has options':''}</div>
+  </div>`).join('');
+  itemsEl.querySelectorAll('.item').forEach(el=> el.onclick=()=> addClicked(el.getAttribute('data-id')) );
+}
+
+/* ---- Cart ---- */
+let CART=[];
+function renderCart(){
+  cartEl.innerHTML = CART.map((l,i)=>`<div class="line">
+    <div>
+      <b>${l.name}</b>
+      ${l.mods && l.mods.length? `<div class="small">${l.mods.map(m=>`×${m.qty} ${m.name}`).join(', ')}</div>`:''}
+      <div class="small">${l.station||''}</div>
+    </div>
+    <div class="row">
+      <button class="qtybtn" data-i="${i}" data-a="-">−</button>
+      <div>${l.qty}</div>
+      <button class="qtybtn" data-i="${i}" data-a="+">+</button>
+      <div style="width:70px;text-align:right">${money(l.qty*l.price)}</div>
+      <button class="qtybtn" data-i="${i}" data-a="x">x</button>
+    </div>
+  </div>`).join('');
+  const tot = CART.reduce((s,l)=> s + l.qty*l.price, 0);
+  totalEl.textContent = money(tot);
+  cartEl.querySelectorAll('.qtybtn').forEach(b=> b.onclick=()=> qtyAction(+b.dataset.i, b.dataset.a) );
+}
+function qtyAction(i,a){ const l = CART[i]; if(!l) return; if(a==='+') l.qty++; if(a==='-') l.qty = Math.max(1, l.qty-1); if(a==='x') CART.splice(i,1); renderCart(); }
+
+/* ---- Click add: either simple item or modifiers ---- */
+function addClicked(id){
+  const it = MENU.find(x=>x.id===id);
+  if(!it) return;
+  if(it.modGroupId && MOD_GROUPS[it.modGroupId]){
+    openModModal(it, MOD_GROUPS[it.modGroupId]);
+  }else{
+    addLine({id:it.id, name:it.name, price:+it.price||0, qty:1, station:it.station||'', mods:[]});
+  }
+}
+function addLine(line){ const ex = CART.find(x=> x.id===line.id && JSON.stringify(x.mods||[])===JSON.stringify(line.mods||[])); if(ex) ex.qty++; else CART.push(line); renderCart(); }
+
+/* ---- Modifiers modal logic ---- */
+const modWrap=$('#modWrap'), modOptions=$('#modOptions'), modTitle=$('#modTitle'), modRule=$('#modRule'), modRemaining=$('#modRemaining'), modAdd=$('#modAdd'), modClose=$('#modClose'), modWarn=$('#modWarn'), modPrice=$('#modPrice');
+let currentItem=null, currentGroup=null, picks=[];
+
+function openModModal(item, group){
+  currentItem=item; currentGroup=group;
+  // initialize counts to 0
+  picks = (group.options||[]).map((o,idx)=>({ idx, name:o.name, priceDelta:+(o.priceDelta||0), station:o.station||item.station||'', qty:0, min:+(o.min||0), max:+(o.max||99) }));
+  modTitle.innerHTML = `<b>${item.name}</b> — <span class="small">${group.name||'Customize'}</span>`;
+  if(group.mode==='fixed_total'){ modRule.textContent = `Pick exactly ${group.requiredTotal||0} in any combination.`; }
+  else if(group.minTotal || group.maxTotal){ modRule.textContent = `Pick ${group.minTotal||0}–${group.maxTotal||''} options.`; }
+  else { modRule.textContent = `Pick any options.`; }
+  modWarn.style.display='none';
+  renderOptions();
+  modWrap.style.display='flex';
+}
+function closeMod(){ modWrap.style.display='none'; currentItem=null; currentGroup=null; picks=[]; }
+
+function totalPicked(){ return picks.reduce((s,p)=> s+p.qty, 0); }
+function extraPrice(){ 
+  if(currentGroup.priceMode==='sum_of_options'){
+    const base = +currentItem.basePrice || +currentItem.price || 0;
+    const delta = picks.reduce((s,p)=> s + (p.qty * p.priceDelta), 0);
+    return { total: base + delta, delta: delta };
+  }
+  // fixed item price (ignore deltas)
+  return { total: +currentItem.price||0, delta: 0 };
+}
+function renderOptions(){
+  modOptions.innerHTML = picks.map((p,i)=>`
+    <div class="optRow">
+      <div>${p.name} ${p.priceDelta?`<span class="small">(${p.priceDelta>=0?'+':''}${money(p.priceDelta)})</span>`:''}</div>
+      <div class="optCtrls">
+        <button class="qtybtn" data-i="${i}" data-a="-">−</button>
+        <div>${p.qty}</div>
+        <button class="qtybtn" data-i="${i}" data-a="+">+</button>
+      </div>
+    </div>`).join('');
+  modOptions.querySelectorAll('.qtybtn').forEach(b=> b.onclick=()=> changePick(+b.dataset.i, b.dataset.a) );
+  const tp = totalPicked();
+  const rules = currentGroup;
+  let remainText = '';
+  if(rules.mode==='fixed_total'){
+    const need = (rules.requiredTotal||0) - tp;
+    remainText = need>0 ? `${need} remaining` : (need===0? 'All set' : 'Too many');
+  }else{
+    if(rules.maxTotal) remainText = `${tp}/${rules.maxTotal} selected`;
+    else remainText = `${tp} selected`;
+  }
+  modRemaining.textContent = remainText;
+  const xp = extraPrice();
+  modPrice.textContent = (xp.delta>0? '+':'') + money(xp.delta);
+}
+function changePick(i,a){
+  const rules = currentGroup, p=picks[i]; if(!p) return;
+  if(a==='+'){
+    // per-option max
+    if(p.qty >= p.max) return;
+    // total max
+    if(rules.mode==='fixed_total'){
+      if(totalPicked() >= (rules.requiredTotal||0)) return;
+    }else if(rules.maxTotal){
+      if(totalPicked() >= rules.maxTotal) return;
+    }
+    p.qty++;
+  } else {
+    if(p.qty>Math.max(0,p.min)) p.qty--;
+  }
+  renderOptions();
+}
+modClose.onclick = closeMod;
+
+modAdd.onclick = ()=>{
+  // validate
+  const rules=currentGroup, tp=totalPicked();
+  if(rules.mode==='fixed_total' && tp !== (rules.requiredTotal||0)){
+    modWarn.textContent = `Please pick exactly ${rules.requiredTotal||0}.`;
+    modWarn.style.display='block'; return;
+  }
+  if(rules.minTotal && tp < rules.minTotal){ modWarn.textContent = `Please pick at least ${rules.minTotal}.`; modWarn.style.display='block'; return; }
+
+  const chosen = picks.filter(p=>p.qty>0);
+  if(!chosen.length){ modWarn.textContent = 'Pick at least one option.'; modWarn.style.display='block'; return; }
+
+  const xp = extraPrice();
+  // Build one cart line with components
+  const line = {
+    id: currentItem.id,
+    name: currentItem.name,
+    qty: 1,
+    price: xp.total,                 // fixed or sum
+    station: currentItem.station||'',// optional, not used when splitting by sub-items
+    mods: chosen.map(c=> ({ name:c.name, qty:c.qty, station:c.station, priceDelta:c.priceDelta }))
+  };
+  addLine(line);
+  closeMod();
+};
+
+/* ---- Submit order (time-based number) ---- */
+clearBtn.onclick = ()=>{ CART=[]; renderCart(); };
+
+submitBtn.onclick = async()=>{
+  nameWarn.style.display = custInp.value.trim()? 'none':'block';
+  if(!custInp.value.trim()){ custInp.focus(); return; }
+  if(CART.length===0) { statusEl.textContent='Add items first.'; return; }
+
+  submitBtn.disabled = true; statusEl.textContent='Submitting...';
+  try{
+    const now = Date.now();
+    const number = provisionalNumber(); // instant, zero contention
+    // flatten items for kitchen routing: if a line has mods, expand to individual items by station
+    const items = [];
+    CART.forEach(l=>{
+      if(l.mods && l.mods.length){
+        l.mods.forEach(m=>{
+          items.push({ name: `${l.name} - ${m.name}`, qty: m.qty, price: 0, station: m.station||l.station||'' });
+        });
+      }else{
+        items.push({ name: l.name, qty: l.qty, price: l.price, station: l.station||'' });
+      }
+    });
+
+    await db.collection('orders').add({
+      number,
+      items,
+      status:'new',
+      createdAt:now, updatedAt:now,
+      customer:custInp.value.trim(),
+      preferredStation: stationSel.value || null,
+      cashier: (auth.currentUser?.email)||null,
+      total: CART.reduce((s,l)=> s+l.qty*l.price, 0),
+      rawCart: CART  // stored for reference
+    });
+    CART=[]; renderCart(); statusEl.textContent = 'Order sent to kitchen.';
+    custInp.value='';
+  }catch(e){
+    statusEl.textContent = e.message;
+  }
+  submitBtn.disabled = false;
+};
+
+loadMenuRealtime();
+</script>
+</body></html>
