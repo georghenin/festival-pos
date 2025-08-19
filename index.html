@@ -1,20 +1,74 @@
 <!doctype html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Festival POS</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>
-      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; }
-      a { display:block; margin: .5rem 0; font-size: 1.1rem; }
-    </style>
-  </head>
-  <body>
-    <h1>Festival POS</h1>
-    <p>Choose an app:</p>
-    <a href="pos-cloudmenu.html">POS (cloud menu)</a>
-    <a href="menu-admin.html">Menu Admin</a>
-    <a href="kds-v2.html">Kitchen Display</a>
-    <a href="pickup-v2.html">Pickup Display</a>
-  </body>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Festival POS – Launchpad</title>
+  <style>
+    :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--border:#1b2230;--card:#0f141e}
+    html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    .wrap{max-width:980px;margin:0 auto;padding:24px}
+    h1{margin:0 0 16px 0}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
+    .card h3{margin:0 0 8px 0}
+    a.btn{display:inline-block;margin-top:8px;padding:10px 12px;border-radius:10px;background:#5b9bff;color:#fff;text-decoration:none}
+    .muted{color:var(--muted);font-size:13px}
+    ul{margin:8px 0 0 18px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Festival POS – Launchpad</h1>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Point of Sale</h3>
+      <div class="muted">Use this for taking orders (with customer name + modifiers).</div>
+      <a class="btn" href="pos-with-mods.html">Open POS</a>
+      <ul class="muted">
+        <li>Fallback: <a href="pos-cloudmenu.html">old POS</a></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Kitchen Displays</h3>
+      <div class="muted">Sign in, then choose a station filter (or show all).</div>
+      <a class="btn" href="kds-auth.html">Open Kitchen Display</a>
+      <ul class="muted">
+        <li>Filter examples: <code>kds-auth.html?station=Grill</code>, <code>?station=Fryer</code></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Pickup Screens</h3>
+      <div class="muted">Staff-facing manager (complete/undo) + optional public display.</div>
+      <a class="btn" href="pickup-manage-v2.html">Pickup Manager</a>
+      <ul class="muted">
+        <li>Public board (read-only): <a href="pickup-v3.html">Pickup Display</a></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Admin & Tools</h3>
+      <div class="muted">Manage menu and bulk import.</div>
+      <a class="btn" href="menu-admin.html">Menu Admin</a>
+      <ul class="muted">
+        <li>Bulk import: <a href="menu-importer-min.html">Menu Importer</a></li>
+        <li>Modifiers admin: <a href="mod-groups-admin.html">Modifiers Admin</a></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Debug (optional)</h3>
+      <div class="muted">Use only for troubleshooting; safe to delete.</div>
+      <ul class="muted">
+        <li><a href="debug-menu.html">Debug Menu</a></li>
+        <li><a href="debug-orders.html">Debug Orders</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+</body>
 </html>
+
