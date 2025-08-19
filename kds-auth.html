@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>KDS (with Sign-In, no composite index)</title>
+<style>
+  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--border:#1b2230;--ok:#2fd28f;--danger:#ff6b6b}
+  html,body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0}
+  .top{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .pill{padding:6px 10px;border:1px solid var(--border);border-radius:999px;color:#aab3c0}
+  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:16px;max-height:calc(100vh - 120px);overflow:auto}
+  .ticket{background:#121826;border:1px solid var(--border);border-radius:16px;padding:12px}
+  .small{font-size:12px;color:#aab3c0}
+  .btn{border:none;border-radius:10px;padding:8px 12px;background:var(--ok);color:#0b0e14;cursor:pointer}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .auth{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
+  input{font:inherit;background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  .btn.secondary{background:#1e2432;color:#e5e8ee}
+</style>
+</head>
+<body>
+
+<div class="auth" id="auth">
+  <input id="email" type="email" placeholder="KDS email (or cashier/admin)" style="min-width:220px">
+  <input id="pass" type="password" placeholder="Password" style="min-width:160px">
+  <button id="login" class="btn">Sign in</button>
+  <span id="authMsg" class="small"></span>
+</div>
+
+<div class="top">
+  <div class="row">
+    <b>Kitchen Display</b>
+    <span class="pill" id="stationPill"></span>
+  </div>
+  <div class="row">
+    <span class="pill" id="me">Signed out</span>
+    <span class="pill" id="count">0</span>
+    <button id="all" class="btn secondary">All</button>
+    <button class="btn secondary" data-s="Grill">Grill</button>
+    <button class="btn secondary" data-s="Fryer">Fryer</button>
+    <button class="btn secondary" data-s="Drinks">Drinks</button>
+    <button class="btn secondary" data-s="Pizza">Pizza</button>
+  </div>
+</div>
+
+<div class="board" id="board"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+<script>
+// ---- Firebase (your project) ----
+firebase.initializeApp({
+  apiKey: "AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
+  authDomain: "churchfestivalpos.firebaseapp.com",
+  projectId: "churchfestivalpos",
+  storageBucket: "churchfestivalpos.firebasestorage.app",
+  messagingSenderId: "447909610900",
+  appId: "1:447909610900:web:a54a828bacfa02e7883b81"
+});
+const db=firebase.firestore(), auth=firebase.auth();
+
+// ---- UI refs ----
+const board=document.getElementById('board');
+const count=document.getElementById('count');
+const me=document.getElementById('me');
+const authBox=document.getElementById('auth');
+const email=document.getElementById('email');
+const pass=document.getElementById('pass');
+const login=document.getElementById('login');
+const authMsg=document.getElementById('authMsg');
+const stationPill=document.getElementById('stationPill');
+
+const qs=new URLSearchParams(location.search);
+let station = qs.get('station')||'';
+stationPill.textContent = station?('Station: '+station):'All stations';
+function stationMatch(s){ return !station || s===station; }
+function fmtAgo(ts){ if(!ts) return '—'; const m=Math.floor((Date.now()-ts)/60000); return m<1?'now':m+'m'; }
+
+// ---- Auth ----
+auth.onAuthStateChanged(u=>{
+  if(u){
+    me.textContent = u.email;
+    authBox.style.display='none';
+  }else{
+    me.textContent = 'Signed out';
+    authBox.style.display='flex';
+  }
+});
+login.onclick = async ()=>{
+  authMsg.textContent='Signing in...';
+  try{
+    await auth.signInWithEmailAndPassword(email.value.trim(), pass.value);
+    authMsg.textContent='Signed in';
+  }catch(e){ authMsg.textContent=e.message; }
+};
+
+// ---- Data stream (no composite index required) ----
+// We only orderBy createdAt (asc) and filter status/station on the client.
+let unsub = db.collection('orders').orderBy('createdAt','asc').limit(200).onSnapshot(snap=>{
+  const list=[];
+  snap.forEach(d=>{
+    const o={id:d.id, ...d.data()};
+    if(o.status==='new' || o.status==='in_progress'){
+      const its = station? (o.items||[]).filter(i=>i.station===station) : (o.items||[]);
+      if(its.length>0) list.push({...o, items:its});
+    }
+  });
+  render(list);
+}, err=>{
+  board.innerHTML = `<div class="small">Error: ${err.message}</div>`;
+});
+
+function render(tickets){
+  board.innerHTML = tickets.map(t=>`
+    <div class="ticket">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><b>#${t.number}</b> <span class="small">• ${fmtAgo(t.createdAt)}</span></div>
+        <button class="btn" data-id="${t.id}">Ready</button>
+      </div>
+      ${t.customer?`<div style="margin-top:6px"><b>👤 ${t.customer}</b></div>`:''}
+      <ul style="margin:8px 0 0 16px">
+        ${t.items.map(i=>`<li>×${i.qty} — ${i.name}</li>`).join('')}
+      </ul>
+    </div>
+  `).join('');
+  count.textContent = tickets.length;
+  board.querySelectorAll('button[data-id]').forEach(b=>{
+    b.onclick = async ()=>{
+      try{
+        await db.collection('orders').doc(b.dataset.id)
+          .update({status:'ready', readyAt:Date.now(), updatedAt:Date.now()});
+      }catch(e){
+        alert('Update failed: '+e.message);
+      }
+    };
+  });
+}
+
+// Station buttons
+document.getElementById('all').onclick=()=>{ station=''; stationPill.textContent='All stations'; };
+document.querySelectorAll('button[data-s]').forEach(b=> b.onclick=()=>{ station=b.dataset.s; stationPill.textContent='Station: '+station; });
+</script>
+</body></html>
