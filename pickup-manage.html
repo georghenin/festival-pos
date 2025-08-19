@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Pickup Manager (with Sign-In)</title>
+<style>
+  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--border:#1b2230;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b}
+  html,body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;height:100%}
+  .wrap{height:100vh;display:flex;flex-direction:column}
+  .top{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .grid{flex:1;display:grid;gap:16px;padding:16px;overflow:auto}
+  .tile{background:#121826;border:1px solid var(--border);border-radius:18px;min-height:160px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:12px;display:flex;flex-direction:column}
+  .num{font-size:28px;font-weight:800;letter-spacing:1px;line-height:1;margin-bottom:4px}
+  .cust{font-size:16px;color:#e5e8ee;margin-bottom:8px}
+  .meta{font-size:11px;color:#95a0ad;margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .btn{border:none;border-radius:10px;padding:8px 12px;font:inherit;cursor:pointer}
+  .btn.ok{background:var(--ok);color:#0b0e14}
+  .btn.warn{background:var(--warn);color:#0b0e14}
+  .btn.gray{background:#1e2432;color:#e5e8ee}
+  .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;color:#95a0ad}
+  .auth{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
+  input{font:inherit;background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+</style>
+</head>
+<body>
+<div class="auth" id="auth">
+  <input id="email" type="email" placeholder="Pickup staff email">
+  <input id="pass" type="password" placeholder="Password">
+  <button id="login" class="btn ok">Sign in</button>
+  <span id="authMsg" class="pill">Signed out</span>
+</div>
+
+<div class="wrap">
+  <div class="top">
+    <h2 style="margin:0">Pickup Manager</h2>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span id="count" class="pill">Ready: 0</span>
+      <button id="completeAll" class="btn warn">Complete All Shown</button>
+      <label class="pill" style="display:flex;align-items:center;gap:6px">
+        Columns: <input id="colsInp" type="number" value="4" min="1" max="8" style="width:70px;background:transparent;color:#e5e8ee;border:none">
+      </label>
+      <button id="signOut" class="btn gray">Sign out</button>
+    </div>
+  </div>
+
+  <div id="grid" class="grid"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
+  authDomain: "churchfestivalpos.firebaseapp.com",
+  projectId: "churchfestivalpos",
+  storageBucket: "churchfestivalpos.firebasestorage.app",
+  messagingSenderId: "447909610900",
+  appId: "1:447909610900:web:a54a828bacfa02e7883b81"
+});
+const db=firebase.firestore(), auth=firebase.auth();
+
+// --- UI refs ---
+const grid=document.getElementById('grid');
+const count=document.getElementById('count');
+const colsInp=document.getElementById('colsInp');
+const signOut=document.getElementById('signOut');
+const email=document.getElementById('email');
+const pass=document.getElementById('pass');
+const login=document.getElementById('login');
+const authMsg=document.getElementById('authMsg');
+const authBox=document.getElementById('auth');
+
+// columns via query param or input
+const qs=new URLSearchParams(location.search);
+const cols = Math.max(1, parseInt(qs.get('cols') || colsInp.value, 10));
+grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+colsInp.value = cols;
+colsInp.onchange = ()=> grid.style.gridTemplateColumns = `repeat(${Math.max(1,parseInt(colsInp.value||'4',10))},1fr)`;
+
+// --- Auth ---
+auth.onAuthStateChanged(u=>{
+  if(u){ authMsg.textContent = u.email; authBox.style.display='none'; }
+  else { authMsg.textContent = 'Signed out'; authBox.style.display='flex'; }
+});
+login.onclick = async ()=>{
+  authMsg.textContent='Signing in...';
+  try{ await auth.signInWithEmailAndPassword(email.value.trim(), pass.value); authMsg.textContent='Signed in'; }
+  catch(e){ authMsg.textContent=e.message; }
+};
+signOut.onclick = ()=> auth.signOut();
+
+// --- Helpers ---
+function fmtAgo(ts){ if(!ts) return '—'; const m=Math.floor((Date.now()-ts)/60000); return m<1?'now':m+'m'; }
+
+// NOTE: We only orderBy('readyAt') and filter status on the client → no composite index required.
+let latestReady=0, first=true;
+let currentIds=[];
+
+db.collection('orders').orderBy('readyAt','desc').limit(200).onSnapshot(snap=>{
+  const arr=[];
+  snap.forEach(d=>{
+    const o={id:d.id, ...d.data()};
+    if(o.status==='ready'){ arr.push(o); }
+  });
+  currentIds = arr.map(o=>o.id);
+
+  grid.innerHTML = arr.map(o=>`
+    <div class="tile" data-id="${o.id}">
+      <div class="num">#${o.number}</div>
+      <div class="cust">${o.customer?o.customer:''}</div>
+      <ul style="margin:0 0 8px 18px">
+        ${(o.items||[]).map(i=>`<li>×${i.qty} — ${i.name}${i.station?` <span style='color:#95a0ad'>( ${i.station} )</span>`:''}</li>`).join('')}
+      </ul>
+      <div class="meta">
+        <span>Ready ${fmtAgo(o.readyAt)}</span>
+        <span style="display:flex;gap:6px">
+          <button class="btn ok" data-complete="${o.id}">Complete</button>
+          <button class="btn gray" data-revert="${o.id}" title="Send back to kitchen">Back</button>
+          <!-- Optional hard delete:
+          <button class="btn danger" data-delete="${o.id}">Delete</button>
+          -->
+        </span>
+      </div>
+    </div>
+  `).join('');
+
+  count.textContent = 'Ready: ' + arr.length;
+
+  // attach handlers
+  grid.querySelectorAll('[data-complete]').forEach(b=> b.onclick = ()=> completeOrder(b.dataset.complete));
+  grid.querySelectorAll('[data-revert]').forEach(b=> b.onclick = ()=> revertOrder(b.dataset.revert));
+  grid.querySelectorAll('[data-delete]').forEach(b=> b.onclick = ()=> deleteOrder(b.dataset.delete));
+
+  const newest = arr.reduce((m,o)=>Math.max(m, o.readyAt||0),0);
+  if(!first && newest>latestReady){ /* could chime here if you want */ }
+  latestReady=Math.max(latestReady, newest); first=false;
+}, err=>{
+  grid.innerHTML = `<div style="color:#95a0ad">Error: ${err.message}</div>`;
+});
+
+async function completeOrder(id){
+  if(!auth.currentUser){ alert('Sign in first.'); return; }
+  try{
+    await db.collection('orders').doc(id).update({
+      status:'picked_up',
+      pickedUpAt: Date.now(),
+      updatedAt: Date.now()
+    });
+  }catch(e){ alert('Complete failed: '+e.message); }
+}
+async function revertOrder(id){
+  if(!auth.currentUser){ alert('Sign in first.'); return; }
+  try{
+    await db.collection('orders').doc(id).update({
+      status:'in_progress',
+      updatedAt: Date.now()
+    });
+  }catch(e){ alert('Revert failed: '+e.message); }
+}
+async function deleteOrder(id){
+  if(!auth.currentUser){ alert('Sign in first.'); return; }
+  if(!confirm('Delete this order permanently?')) return;
+  try{ await db.collection('orders').doc(id).delete(); }
+  catch(e){ alert('Delete failed: '+e.message); }
+}
+
+document.getElementById('completeAll').onclick = async ()=>{
+  if(!auth.currentUser){ alert('Sign in first.'); return; }
+  if(!currentIds.length){ alert('Nothing to complete.'); return; }
+  if(!confirm('Mark ALL shown orders as completed?')) return;
+  try{
+    // Do in chunks to avoid batch size limits (<= 500)
+    for(let i=0;i<currentIds.length;i+=400){
+      const chunk = currentIds.slice(i, i+400);
+      const batch = db.batch();
+      chunk.forEach(id=>{
+        batch.update(db.collection('orders').doc(id), { status:'picked_up', pickedUpAt: Date.now(), updatedAt: Date.now() });
+      });
+      await batch.commit();
+    }
+  }catch(e){ alert('Bulk complete failed: '+e.message); }
+};
+</script>
+</body></html>
