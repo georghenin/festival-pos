@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Modifiers Admin</title>
+<style>
+  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--border:#1b2230;--card:#0f141e;--acc:#5b9bff;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  .wrap{max-width:1100px;margin:0 auto;padding:16px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px}
+  input,select,textarea{font:inherit;background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  .btn{border:none;border-radius:10px;padding:10px 12px;cursor:pointer}
+  .btn.acc{background:var(--acc);color:#fff}
+  .btn.ok{background:var(--ok);color:#0b0e14}
+  .btn.gray{background:#1e2432;color:#e5e8ee}
+  .btn.danger{background:var(--danger);color:#0b0e14}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid var(--border);padding:8px;text-align:left}
+  .small{color:var(--muted);font-size:12px}
+  .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;color:#95a0ad}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="row" style="justify-content:space-between">
+    <h2>Modifiers Admin</h2>
+    <span id="me" class="pill">Signed out</span>
+  </div>
+
+  <div id="auth" class="card">
+    <div class="row">
+      <input id="email" type="email" placeholder="Admin email">
+      <input id="pass" type="password" placeholder="Password">
+      <button id="login" class="btn acc">Sign in</button>
+    </div>
+    <div id="authMsg" class="small"></div>
+  </div>
+
+  <div id="app" style="display:none">
+    <!-- Create / edit group -->
+    <div class="card">
+      <h3 style="margin:0 0 8px 0">Create / Edit Modifier Group</h3>
+      <div class="row">
+        <input id="gName" placeholder="Group name (e.g., BBQ Combo Picks)" style="flex:2;min-width:220px">
+        <select id="gMode">
+          <option value="fixed_total">Fixed total (pick exactly N)</option>
+          <option value="free_picks">Free picks (min/max)</option>
+        </select>
+        <input id="gRequired" type="number" min="0" placeholder="Required total (N)">
+        <input id="gMin" type="number" min="0" placeholder="Min picks">
+        <input id="gMax" type="number" min="0" placeholder="Max picks">
+        <select id="gPriceMode">
+          <option value="fixed_item_price">Price: item price (ignore deltas)</option>
+          <option value="sum_of_options">Price: base + option deltas</option>
+        </select>
+      </div>
+      <div class="small" style="margin-top:6px">For fixed total, use “Required total”. For free picks, use Min/Max.</div>
+
+      <h4 style="margin:12px 0 6px 0">Options</h4>
+      <table id="optTable">
+        <thead><tr><th>Name</th><th>Price Δ</th><th>Station</th><th>Min</th><th>Max</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="row" style="margin-top:8px">
+        <input id="oName" placeholder="Option name" style="flex:2;min-width:200px">
+        <input id="oDelta" type="number" placeholder="Price Δ (e.g., 0, 1, -0.5)" step="0.01" style="width:140px">
+        <input id="oStation" placeholder="Station (e.g., Grill)" style="width:160px">
+        <input id="oMin" type="number" placeholder="Min" style="width:100px">
+        <input id="oMax" type="number" placeholder="Max" style="width:100px">
+        <button id="addOpt" class="btn gray">Add option</button>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <button id="saveGroup" class="btn ok">Save group</button>
+        <button id="newGroup" class="btn gray">New group</button>
+        <button id="deleteGroup" class="btn danger">Delete group</button>
+        <span id="gMsg" class="small"></span>
+      </div>
+    </div>
+
+    <!-- Groups list -->
+    <div class="card">
+      <h3 style="margin:0 0 8px 0">Existing Groups</h3>
+      <table id="groupsTable">
+        <thead><tr><th>Name</th><th>Mode</th><th>Price mode</th><th>Options</th><th>ID</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- Assign to items -->
+    <div class="card">
+      <h3 style="margin:0 0 8px 0">Assign Groups to Menu Items</h3>
+      <div class="small">Pick a group for each item that needs a modifier popup, then click Save.</div>
+      <table id="itemsTable">
+        <thead><tr><th>Cat</th><th>Item</th><th>Price</th><th>Current Group</th><th>Set Group</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="row" style="margin-top:12px">
+        <button id="saveItems" class="btn ok">Save assignments</button>
+        <span id="iMsg" class="small"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+<script>
+/* Firebase */
+firebase.initializeApp({
+  apiKey: "AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
+  authDomain: "churchfestivalpos.firebaseapp.com",
+  projectId: "churchfestivalpos",
+  storageBucket: "churchfestivalpos.firebasestorage.app",
+  messagingSenderId: "447909610900",
+  appId: "1:447909610900:web:a54a828bacfa02e7883b81"
+});
+const db=firebase.firestore(), auth=firebase.auth();
+
+/* Admin emails (same as rules) */
+const ADMINS = ["smsmofri@gmail.com","george.henin98@gmail.com"];
+
+/* UI refs */
+const me=document.getElementById('me'), authBox=document.getElementById('auth'), app=document.getElementById('app');
+const email=document.getElementById('email'), pass=document.getElementById('pass'), login=document.getElementById('login'), authMsg=document.getElementById('authMsg');
+
+const gName=document.getElementById('gName'), gMode=document.getElementById('gMode'), gRequired=document.getElementById('gRequired'), gMin=document.getElementById('gMin'), gMax=document.getElementById('gMax'), gPriceMode=document.getElementById('gPriceMode');
+const optBody=document.querySelector('#optTable tbody'); const addOpt=document.getElementById('addOpt'); const oName=document.getElementById('oName'), oDelta=document.getElementById('oDelta'), oStation=document.getElementById('oStation'), oMin=document.getElementById('oMin'), oMax=document.getElementById('oMax');
+const gMsg=document.getElementById('gMsg'), groupsBody=document.querySelector('#groupsTable tbody'), saveGroup=document.getElementById('saveGroup'), newGroup=document.getElementById('newGroup'), deleteGroup=document.getElementById('deleteGroup');
+const itemsBody=document.querySelector('#itemsTable tbody'), saveItems=document.getElementById('saveItems'), iMsg=document.getElementById('iMsg');
+
+let GROUPS={}, CURRENT_ID=null, OPTIONS=[], MENU=[];
+
+auth.onAuthStateChanged(u=>{
+  if(u && ADMINS.includes(u.email)){ me.textContent=u.email; authBox.style.display='none'; app.style.display='block'; loadAll(); }
+  else { me.textContent='Signed out'; authBox.style.display='block'; app.style.display='none'; }
+});
+login.onclick = async()=>{ authMsg.textContent='Signing in...'; try{ await auth.signInWithEmailAndPassword(email.value.trim(), pass.value); authMsg.textContent='Signed in'; } catch(e){ authMsg.textContent=e.message; } };
+
+function loadAll(){
+  db.collection('modGroups').orderBy('name').onSnapshot(s=>{
+    GROUPS={}; s.forEach(d=> GROUPS[d.id] = {id:d.id, ...d.data()}); renderGroups(); renderItems(); 
+  });
+  db.collection('menu').orderBy('cat').orderBy('sort').onSnapshot(s=>{
+    MENU=[]; s.forEach(d=> MENU.push({id:d.id, ...d.data()})); renderItems();
+  });
+}
+
+function renderGroups(){
+  groupsBody.innerHTML = Object.values(GROUPS).map(g=>{
+    const optCount=(g.options||[]).length;
+    return `<tr>
+      <td>${g.name||''}</td>
+      <td>${g.mode||''}${g.requiredTotal?` (${g.requiredTotal})`:''}${g.minTotal?` min ${g.minTotal}`:''}${g.maxTotal?` max ${g.maxTotal}`:''}</td>
+      <td>${g.priceMode||''}</td>
+      <td>${optCount}</td>
+      <td class="small">${g.id}</td>
+      <td><button class="btn gray" data-edit="${g.id}">Edit</button></td>
+    </tr>`;
+  }).join('');
+  groupsBody.querySelectorAll('[data-edit]').forEach(b=> b.onclick=()=> editGroup(b.dataset.edit));
+}
+
+function editGroup(id){
+  const g=GROUPS[id]; if(!g) return;
+  CURRENT_ID=id;
+  gName.value = g.name||'';
+  gMode.value = g.mode||'fixed_total';
+  gPriceMode.value = g.priceMode||'fixed_item_price';
+  gRequired.value = g.requiredTotal||'';
+  gMin.value = g.minTotal||'';
+  gMax.value = g.maxTotal||'';
+  OPTIONS = (g.options||[]).map(o=> ({name:o.name||'', priceDelta:+(o.priceDelta||0), station:o.station||'', min:+(o.min||0), max:+(o.max||0)}));
+  renderOpts();
+}
+
+function renderOpts(){
+  optBody.innerHTML = OPTIONS.map((o,i)=>`
+    <tr>
+      <td><input data-i="${i}" data-k="name" value="${o.name}"></td>
+      <td><input data-i="${i}" data-k="priceDelta" type="number" step="0.01" value="${o.priceDelta}"></td>
+      <td><input data-i="${i}" data-k="station" value="${o.station}"></td>
+      <td><input data-i="${i}" data-k="min" type="number" value="${o.min}"></td>
+      <td><input data-i="${i}" data-k="max" type="number" value="${o.max}"></td>
+      <td><button class="btn danger" data-del="${i}">Remove</button></td>
+    </tr>
+  `).join('');
+  optBody.querySelectorAll('input').forEach(inp=>{
+    inp.onchange = ()=>{ const i=+inp.dataset.i, k=inp.dataset.k; let v=inp.value; if(k==='priceDelta'||k==='min'||k==='max') v=+v; OPTIONS[i][k]=v; };
+  });
+  optBody.querySelectorAll('[data-del]').forEach(b=> b.onclick=()=>{ OPTIONS.splice(+b.dataset.del,1); renderOpts(); });
+}
+
+addOpt.onclick = ()=>{
+  OPTIONS.push({name:oName.value.trim(), priceDelta:+(oDelta.value||0), station:oStation.value.trim(), min:+(oMin.value||0), max:+(oMax.value||0)});
+  oName.value=''; oDelta.value=''; oStation.value=''; oMin.value=''; oMax.value='';
+  renderOpts();
+};
+
+newGroup.onclick = ()=>{ CURRENT_ID=null; gName.value=''; gMode.value='fixed_total'; gPriceMode.value='fixed_item_price'; gRequired.value=''; gMin.value=''; gMax.value=''; OPTIONS=[]; renderOpts(); gMsg.textContent=''; };
+
+saveGroup.onclick = async()=>{
+  gMsg.textContent='Saving...';
+  const payload = {
+    name: gName.value.trim(),
+    mode: gMode.value,
+    priceMode: gPriceMode.value,
+    requiredTotal: gRequired.value? +gRequired.value : null,
+    minTotal: gMin.value? +gMin.value : null,
+    maxTotal: gMax.value? +gMax.value : null,
+    options: OPTIONS
+  };
+  try{
+    if(CURRENT_ID){ await db.collection('modGroups').doc(CURRENT_ID).set(payload,{merge:true}); }
+    else { const doc=await db.collection('modGroups').add(payload); CURRENT_ID=doc.id; }
+    gMsg.textContent='Saved.';
+  }catch(e){ gMsg.textContent=e.message; }
+};
+
+deleteGroup.onclick = async()=>{
+  if(!CURRENT_ID) { gMsg.textContent='No group selected.'; return; }
+  if(!confirm('Delete this group?')) return;
+  try{
+    await db.collection('modGroups').doc(CURRENT_ID).delete();
+    CURRENT_ID=null; newGroup.click();
+  }catch(e){ gMsg.textContent=e.message; }
+};
+
+function renderItems(){
+  if(!MENU.length) { itemsBody.innerHTML=''; return; }
+  const groupOptions = ['<option value="">(none)</option>'].concat(
+    Object.values(GROUPS).map(g=> `<option value="${g.id}">${g.name}</option>`)
+  ).join('');
+  itemsBody.innerHTML = MENU.map(m=>`
+    <tr>
+      <td>${m.cat||''}</td>
+      <td>${m.name||''}</td>
+      <td>${(m.price!=null)?('$'+Number(m.price).toFixed(2)):'—'}</td>
+      <td class="small">${m.modGroupId? (GROUPS[m.modGroupId]?.name || m.modGroupId) : '(none)'}</td>
+      <td>
+        <select data-id="${m.id}">${groupOptions}</select>
+      </td>
+    </tr>
+  `).join('');
+  // Preselect current group
+  itemsBody.querySelectorAll('select[data-id]').forEach(sel=>{
+    const it = MENU.find(x=> x.id===sel.dataset.id);
+    sel.value = it?.modGroupId || '';
+  });
+}
+
+saveItems.onclick = async()=>{
+  iMsg.textContent='Saving...';
+  try{
+    const sels=[...itemsBody.querySelectorAll('select[data-id]')];
+    for(const sel of sels){
+      const id=sel.dataset.id, val=sel.value || null;
+      await db.collection('menu').doc(id).set({ modGroupId: val }, { merge:true });
+    }
+    iMsg.textContent='Saved.';
+  }catch(e){ iMsg.textContent=e.message; }
+};
+</script>
+</body>
+</html>
