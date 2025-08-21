@@ -8,7 +8,7 @@
   :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--accent:#5b9bff;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b;--card:#0f141e;--border:#1b2230}
   *{box-sizing:border-box}
   html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-  .container{max-width:1100px;margin:0 auto;padding:16px}
+  .container{max-width:1200px;margin:0 auto;padding:16px}
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
   .space{height:12px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
@@ -21,10 +21,13 @@
   td,th{border-bottom:1px solid var(--border);padding:8px;text-align:left;vertical-align:middle}
   .small{font-size:12px;color:var(--muted)}
   .right{display:flex;gap:8px;justify-content:flex-end}
-  .w120{width:120px}.w160{width:160px}.w220{width:220px}
+  .w120{width:120px}.w160{width:160px}.w220{width:220px}.w260{width:260px}
   .center{text-align:center}
   .search{flex:1;min-width:200px}
   .thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;background:#0b101a;border:1px solid var(--border)}
+  .badge{display:inline-block;background:#1d2331;border:1px solid var(--border);color:#dbe5f6;font-size:11px;border-radius:999px;padding:2px 8px}
+  select[multiple]{height:46px}
+  .tip{color:#aeb7c6}
 </style>
 </head>
 <body>
@@ -55,16 +58,19 @@
       <div class="row">
         <input id="name" placeholder="Item name" style="flex:2">
         <input id="price" type="number" step="0.01" placeholder="Price" class="w120">
-        <!-- dynamically populated -->
         <select id="station" class="w160"></select>
         <input id="img" placeholder="Image URL (optional)" class="w220">
         <label class="row" style="gap:6px"><input id="active" type="checkbox" checked> Active</label>
         <button id="add" class="btn ok" title="Admins only">Add</button>
         <input id="search" class="search" placeholder="Search name/station…">
       </div>
-      <div class="small" style="margin-top:6px">
-        Items show in the POS alphabetically by <b>Name</b>. Image should be a small thumbnail (≈200–300px wide).
+      <div class="row">
+        <label>Modifier groups:
+          <select id="modSelect" class="w260" multiple></select>
+        </label>
+        <span class="small tip">Hold ⌘ (Mac) / Ctrl (Windows) to select multiple. Edit groups in <b>mod-groups-admin.html</b>.</span>
       </div>
+      <div class="small" style="margin-top:6px">Items show alphabetically by <b>Name</b>. Images should be small thumbnails (≈200–300px wide).</div>
     </div>
 
     <div class="space"></div>
@@ -78,6 +84,7 @@
             <th>Name</th>
             <th>Price</th>
             <th>Station</th>
+            <th>Mods</th>
             <th class="center">Active</th>
             <th class="right">Actions</th>
           </tr>
@@ -114,6 +121,7 @@ const $ = s => document.querySelector(s);
 const authBox = $('#auth'), appBox = $('#app'), me = $('#me'), signout = $('#signout'), msg = $('#msg');
 const email = $('#email'), pass = $('#pass'), login = $('#login'), create = $('#create');
 const nameEl = $('#name'), priceEl = $('#price'), stationEl = $('#station'), imgEl = $('#img'), activeEl = $('#active'), addBtn = $('#add');
+const modSelect = $('#modSelect');
 const tableBody = document.querySelector('#table tbody');
 const search = $('#search'), empty = $('#empty');
 
@@ -123,8 +131,9 @@ const auth = firebase.auth();
 
 let IS_ADMIN = false;
 let STATIONS_ALL = ['Grill','Fryer','Drinks','Pizza']; // fallback
-let ALL = [];   // all menu items from Firestore
-let VIEW = [];  // filtered view
+let ALL = [];       // menu items
+let VIEW = [];      // filtered
+let MOD_GROUPS = []; // [{id,name}...]
 
 function computeIsAdmin(u){
   return !!(u && u.email) && ADMIN_SET.has(String(u.email).toLowerCase());
@@ -162,10 +171,20 @@ async function loadStations(){
       STATIONS_ALL = conf.stations;
     }
   }catch(e){ /* keep fallback */ }
-  // Populate the Add form select
   stationEl.innerHTML = STATIONS_ALL.map(s=>`<option>${s}</option>`).join('');
 }
-loadStations();
+
+// ---- Load Mod Groups for selection ----
+function loadModGroups(){
+  db.collection('mod_groups').orderBy('name').onSnapshot(snap=>{
+    MOD_GROUPS = [];
+    snap.forEach(d=> MOD_GROUPS.push({id:d.id, name:(d.data().name||'(unnamed)')}));
+    // fill add-form multi-select
+    modSelect.innerHTML = MOD_GROUPS.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+    // Re-render table so inline editors (when opened) see latest list
+    renderTable();
+  });
+}
 
 // ---- Live list, alphabetically by name ----
 function loadMenu(){
@@ -185,14 +204,26 @@ function applyFilter(){
 }
 search.oninput = applyFilter;
 
+// ---- Helpers ----
+function esc(v){ return String(v??'').replace(/"/g,'&quot;'); }
+function namesFor(ids){
+  const set=new Set(ids||[]);
+  const look = MOD_GROUPS.filter(g=> set.has(g.id)).map(g=>g.name);
+  return look;
+}
+
 // ---- Render table (inline edit; no popups) ----
 function trDisplay(m){
+  const modNames = namesFor(m.modGroupIds||[]);
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td>${m.img ? `<img class="thumb" src="${m.img}" alt="">` : `<div class="thumb"></div>`}</td>
     <td>${m.name || ''}</td>
     <td>$${Number(m.price || 0).toFixed(2)}</td>
     <td>${m.station || ''}</td>
+    <td title="${esc(modNames.join(', '))}">
+      ${ (m.modGroupIds && m.modGroupIds.length) ? `<span class="badge">${m.modGroupIds.length} group(s)</span>` : `<span class="small tip">—</span>`}
+    </td>
     <td class="center">${m.active !== false ? 'Yes' : 'No'}</td>
     <td class="right">
       <button class="btn gray" data-edit="${m.id}">Edit</button>
@@ -203,9 +234,13 @@ function trDisplay(m){
   tr.querySelector('[data-del]').onclick = () => delItem(m.id);
   return tr;
 }
-function esc(v){ return String(v??'').replace(/"/g,'&quot;'); }
+
 function trEdit(m){
   const tr = document.createElement('tr');
+  const modOptions = MOD_GROUPS.map(g=>{
+    const sel = (m.modGroupIds||[]).includes(g.id) ? 'selected' : '';
+    return `<option value="${g.id}" ${sel}>${g.name}</option>`;
+  }).join('');
   tr.innerHTML = `
     <td>
       <img class="thumb" src="${m.img ? esc(m.img) : ''}" alt="" onerror="this.src='';">
@@ -216,6 +251,9 @@ function trEdit(m){
       <select class="w160" data-k="station">
         ${STATIONS_ALL.map(s => `<option ${s===(m.station||'')?'selected':''}>${s}</option>`).join('')}
       </select>
+    </td>
+    <td>
+      <select multiple class="w260" data-k="mods">${modOptions}</select>
     </td>
     <td class="center"><input type="checkbox" data-k="active" ${m.active!==false?'checked':''}></td>
     <td class="right">
@@ -231,12 +269,14 @@ function trEdit(m){
   tr.querySelector('[data-save]').onclick = async () => {
     if (!IS_ADMIN) { alert('Not an admin.'); return; }
     const get = k => tr.querySelector(`[data-k="${k}"]`);
+    const selectedMods = [...get('mods').selectedOptions].map(o=>o.value);
     const payload = {
       name: get('name').value.trim(),
       price: parseFloat(get('price').value),
       station: get('station').value,
       active: tr.querySelector('[data-k="active"]').checked,
-      img: (get('img').value || '').trim() || null
+      img: (get('img').value || '').trim() || null,
+      modGroupIds: selectedMods
     };
     if (!payload.name || !(payload.price>=0)) { alert('Name & valid price required.'); return; }
     try { await db.collection('menu').doc(m.id).update(payload); }
@@ -261,17 +301,19 @@ function renderTable(){
 // ---- Add item ----
 addBtn.onclick = async () => {
   if (!IS_ADMIN) { alert('Not an admin.'); return; }
+  const selectedMods = [...modSelect.selectedOptions].map(o=>o.value);
   const m = {
     name: (nameEl.value || '').trim(),
     price: parseFloat(priceEl.value),
     station: stationEl.value,
     active: !!activeEl.checked,
-    img: (imgEl.value || '').trim() || null
+    img: (imgEl.value || '').trim() || null,
+    modGroupIds: selectedMods
   };
   if (!m.name || !(m.price >= 0)) { alert('Fill name & price.'); return; }
   try {
     await db.collection('menu').add(m);
-    nameEl.value = ''; priceEl.value = ''; imgEl.value = '';
+    nameEl.value = ''; priceEl.value = ''; imgEl.value = ''; modSelect.selectedIndex=-1;
   } catch (e) {
     alert(e.message);
   }
@@ -286,6 +328,8 @@ async function delItem(id){
 }
 
 // start
+loadStations();
+loadModGroups();
 loadMenu();
 </script>
 </body>
