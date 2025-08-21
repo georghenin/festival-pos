@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>KDS (Auth + Stations + Sound + Completed)</title>
+<title>KDS (Auth + Stations + Sound + Completed & Picked Up)</title>
 <style>
   :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--border:#1b2230;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b}
   html,body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0}
@@ -17,10 +17,13 @@
   .btn.primary{background:var(--ok);color:#0b0e14}
   .btn.secondary{background:#1e2432;color:#e5e8ee}
   .btn.danger{background:var(--danger);color:#0b0e14}
-  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:16px;max-height:calc(100vh - 180px);overflow:auto}
+  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:16px;max-height:calc(100vh - 200px);overflow:auto}
   .ticket{background:#121826;border:1px solid var(--border);border-radius:16px;padding:12px}
   .small{font-size:12px;color:#aab3c0}
   .num{font-weight:800}
+  .seg{display:flex;gap:6px;padding:6px;border:1px solid var(--border);border-radius:999px}
+  .seg button{background:#0f1420;color:#e5e8ee;border:1px solid var(--border);padding:6px 10px;border-radius:999px;cursor:pointer}
+  .seg button.active{outline:2px solid var(--ok)}
 </style>
 </head>
 <body>
@@ -49,6 +52,15 @@
     </label>
     <button id="stationBtn" class="btn secondary">Stations…</button>
     <span class="pill" id="me">Signed out</span>
+  </div>
+</div>
+
+<!-- Completed filters -->
+<div id="completedControls" class="row" style="padding:8px 16px;display:none">
+  <div class="seg">
+    <button id="showReady" class="active">Ready</button>
+    <button id="showPicked">Picked Up</button>
+    <button id="showBoth">Both</button>
   </div>
 </div>
 
@@ -84,13 +96,25 @@ const stationBtn=document.getElementById('stationBtn');
 const soundToggle=document.getElementById('soundToggle');
 const tabActive=document.getElementById('tabActive');
 const tabCompleted=document.getElementById('tabCompleted');
+const completedControls=document.getElementById('completedControls');
+const btnReady=document.getElementById('showReady');
+const btnPicked=document.getElementById('showPicked');
+const btnBoth=document.getElementById('showBoth');
+
+// ---- Stations config (from Firestore settings) ----
+let STATIONS_ALL=['Grill','Fryer','Drinks','Pizza'];
+db.collection('settings').doc('config').get().then(d=>{
+  const conf=d.data(); if(conf && Array.isArray(conf.stations) && conf.stations.length){ STATIONS_ALL=conf.stations; initStationUI(); }
+});
 
 // ---- Stations (URL + localStorage) ----
-const STATIONS_ALL=['Grill','Fryer','Drinks','Pizza'];
 const qs=new URLSearchParams(location.search);
 const urlStations=(qs.get('station')||'').trim();
 let ALLOW = new Set();
 
+function initStationUI(){
+  updateStationPill();
+}
 if(urlStations){
   urlStations.split(',').map(s=>s.trim()).filter(Boolean).forEach(s=> ALLOW.add(s));
 }else{
@@ -167,8 +191,19 @@ login.onclick = async ()=>{
 let mode='active'; // 'active' | 'completed'
 let unsub=null;
 
-tabActive.onclick = ()=>{ mode='active'; tabActive.classList.add('active'); tabCompleted.classList.remove('active'); subscribe(); };
-tabCompleted.onclick = ()=>{ mode='completed'; tabCompleted.classList.add('active'); tabActive.classList.remove('active'); subscribe(); };
+tabActive.onclick = ()=>{ mode='active'; tabActive.classList.add('active'); tabCompleted.classList.remove('active'); completedControls.style.display='none'; subscribe(); };
+tabCompleted.onclick = ()=>{ mode='completed'; tabCompleted.classList.add('active'); tabActive.classList.remove('active'); completedControls.style.display='flex'; subscribe(); };
+
+// Completed filters
+let completedFilter='ready'; // 'ready' | 'picked' | 'both'
+btnReady.onclick = ()=>{ completedFilter='ready'; setSeg(); subscribe(); };
+btnPicked.onclick = ()=>{ completedFilter='picked'; setSeg(); subscribe(); };
+btnBoth.onclick = ()=>{ completedFilter='both'; setSeg(); subscribe(); };
+function setSeg(){
+  btnReady.classList.toggle('active', completedFilter==='ready');
+  btnPicked.classList.toggle('active', completedFilter==='picked');
+  btnBoth.classList.toggle('active', completedFilter==='both');
+}
 
 let lastSeenCreatedAt=0, firstLoadActive=true;
 
@@ -176,7 +211,6 @@ function subscribe(){
   if(unsub) unsub();
 
   if(mode==='active'){
-    // Show orders the kitchen is working on (new/in_progress)
     unsub = db.collection('orders')
       .orderBy('createdAt','asc')
       .limit(200)
@@ -186,7 +220,6 @@ function subscribe(){
         snap.forEach(d=>{
           const o={id:d.id, ...d.data()};
           if((o.status==='new' || o.status==='in_progress') && (o.items||[]).length){
-            // filter by station(s)
             const its=(o.items||[]).filter(i=>stationMatch(i));
             if(its.length) list.push({...o, items:its});
           }
@@ -196,24 +229,31 @@ function subscribe(){
         const hasNew = !firstLoadActive && newest>lastSeenCreatedAt;
         lastSeenCreatedAt=newest; firstLoadActive=false;
         if(hasNew) ding();
-      }, err=> showErr(err));
+      }, showErr);
   } else {
-    // Completed = orders the kitchen marked Ready (recent history)
-    // We order by readyAt desc to avoid composite index needs; filter client-side.
+    // Pull both timestamps streams independently; filter client-side to avoid composite index
     unsub = db.collection('orders')
-      .orderBy('readyAt','desc')
-      .limit(200)
+      .orderBy('updatedAt','desc')
+      .limit(300)
       .onSnapshot(snap=>{
         const hist=[];
         snap.forEach(d=>{
           const o={id:d.id, ...d.data()};
-          if(o.status==='ready' && o.readyAt){ // "previously completed" by kitchen
+          const isReady = (o.status==='ready' && o.readyAt);
+          const isPicked = (o.status==='picked_up' && o.pickedUpAt);
+          if(
+            (completedFilter==='ready'  && isReady) ||
+            (completedFilter==='picked' && isPicked) ||
+            (completedFilter==='both'   && (isReady || isPicked))
+          ){
             const its=(o.items||[]).filter(i=>stationMatch(i));
             if(its.length) hist.push({...o, items:its});
           }
         });
+        // sort newest first by whichever timestamp exists
+        hist.sort((a,b)=> (b.pickedUpAt||b.readyAt||0) - (a.pickedUpAt||a.readyAt||0));
         renderCompleted(hist);
-      }, err=> showErr(err));
+      }, showErr);
   }
 }
 
@@ -247,30 +287,41 @@ function renderActive(tickets){
 }
 
 function renderCompleted(hist){
-  board.innerHTML = hist.map(t=>`
+  board.innerHTML = hist.map(t=>{
+    const when = t.pickedUpAt || t.readyAt;
+    const label = t.status==='picked_up' ? 'Picked ' : 'Ready ';
+    const action = t.status==='picked_up'
+      ? `<button class="btn danger" data-reopen="${t.id}" title="Return to Ready">Return</button>`
+      : `<button class="btn secondary" data-reopen="${t.id}" title="Send back to kitchen">Reopen</button>`;
+    return `
     <div class="ticket">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><span class="num">#${t.number}</span> <span class="small">• Ready ${fmtAgo(t.readyAt)}</span></div>
-        <button class="btn secondary" data-reopen="${t.id}" title="Send back to kitchen">Reopen</button>
+        <div><span class="num">#${t.number}</span> <span class="small">• ${label}${fmtAgo(when)}</span></div>
+        ${action}
       </div>
       ${t.customer?`<div style="margin-top:6px"><b>👤 ${t.customer}</b></div>`:''}
       <ul style="margin:8px 0 0 16px">
         ${t.items.map(i=>`<li>×${i.qty} — ${i.name}${i.station?` <span class="small">(${i.station})</span>`:''}</li>`).join('')}
       </ul>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
   count.textContent = hist.length;
   board.querySelectorAll('button[data-reopen]').forEach(b=>{
     b.onclick = async ()=>{
       try{
+        const doc=await db.collection('orders').doc(b.dataset.reopen).get();
+        const wasPicked = doc.exists && doc.data().status==='picked_up';
         await db.collection('orders').doc(b.dataset.reopen)
-          .update({status:'in_progress', updatedAt:Date.now()});
+          .update(wasPicked
+            ? {status:'ready', updatedAt:Date.now()}
+            : {status:'in_progress', updatedAt:Date.now()}
+          );
       }catch(e){ alert('Reopen failed: '+e.message); }
     };
   });
 }
 
-// Start on Active
+// Start
 subscribe();
 </script>
 </body></html>
