@@ -1,74 +1,132 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Festival POS – Launchpad</title>
-  <style>
-    :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--border:#1b2230;--card:#0f141e}
-    html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
-    .wrap{max-width:980px;margin:0 auto;padding:24px}
-    h1{margin:0 0 16px 0}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
-    .card h3{margin:0 0 8px 0}
-    a.btn{display:inline-block;margin-top:8px;padding:10px 12px;border-radius:10px;background:#5b9bff;color:#fff;text-decoration:none}
-    .muted{color:var(--muted);font-size:13px}
-    ul{margin:8px 0 0 18px}
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Festival POS – Launchpad</title>
+<style>
+  :root{
+    --bg:#0d0f13; --card:#0f141e; --fg:#f5f7fa; --muted:#95a0ad;
+    --border:#1b2230; --accent:#5b9bff; --ok:#2fd28f; --warn:#ffb020; --danger:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px}
+  h1{margin:0 0 8px 0;font-size:28px}
+  .sub{color:var(--muted);margin:0 0 18px 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
+  .card h3{margin:0 0 8px 0}
+  .muted{color:var(--muted);font-size:13px}
+  a.btn{display:inline-block;margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--accent);color:#fff;text-decoration:none}
+  code{font-family:ui-monospace,monospace;font-size:12px;background:#0b101a;border:1px solid #1b2230;border-radius:8px;padding:2px 6px;color:#dbe5f6}
+  footer{margin-top:20px;color:var(--muted);font-size:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .pill{display:inline-block;border:1px solid var(--border);background:#0f1420;color:#a7b0bd;border-radius:999px;padding:6px 10px}
+  .status{margin:0 0 20px 0;display:flex;gap:12px;flex-wrap:wrap}
+  .status span{padding:6px 12px;border-radius:999px;font-size:13px}
+  .ok{background:var(--ok);color:#fff}
+  .warn{background:var(--warn);color:#000}
+  .danger{background:var(--danger);color:#fff}
+</style>
 </head>
 <body>
 <div class="wrap">
   <h1>Festival POS – Launchpad</h1>
+  <p class="sub">Tap a tile below on each iPad to open the correct screen. For best results, in Safari use <b>Share → Add to Home Screen</b>.</p>
+
+  <!-- Status Pills -->
+  <div class="status">
+    <span id="conn" class="warn">Checking Firestore…</span>
+    <span id="auth" class="warn">Checking Auth…</span>
+    <span id="net" class="warn">Checking Network…</span>
+  </div>
 
   <div class="grid">
+    <!-- POS -->
     <div class="card">
-      <h3>Point of Sale</h3>
-      <div class="muted">Use this for taking orders (with customer name + modifiers).</div>
-      <a class="btn" href="pos-with-mods.html">Open POS</a>
-      <ul class="muted">
-        <li>Fallback: <a href="pos-cloudmenu.html">old POS</a></li>
-      </ul>
+      <h3>Point of Sale (POS)</h3>
+      <p class="muted">Cashier order entry. Supports customer name, station filter, and (optionally) modifiers & item images.</p>
+      <a class="btn" href="pos-cloudmenu.html">Open POS</a>
     </div>
 
+    <!-- KDS -->
     <div class="card">
-      <h3>Kitchen Displays</h3>
-      <div class="muted">Sign in, then choose a station filter (or show all).</div>
-      <a class="btn" href="kds-auth.html">Open Kitchen Display</a>
-      <ul class="muted">
-        <li>Filter examples: <code>kds-auth.html?station=Grill</code>, <code>?station=Fryer</code></li>
-      </ul>
+      <h3>Kitchen Display (KDS)</h3>
+      <p class="muted">Each iPad can show specific stations and play a sound on new tickets.</p>
+      <a class="btn" href="kds-v2.html">Open KDS</a>
     </div>
 
+    <!-- Pickup Manager -->
     <div class="card">
-      <h3>Pickup Screens</h3>
-      <div class="muted">Staff-facing manager (complete/undo) + optional public display.</div>
-      <a class="btn" href="pickup-manage-v2.html">Pickup Manager</a>
-      <ul class="muted">
-        <li>Public board (read-only): <a href="pickup-v3.html">Pickup Display</a></li>
-      </ul>
+      <h3>Pickup Manager</h3>
+      <p class="muted">Marks orders Ready → Picked Up (or Undo). Plays a sound on new Ready orders.</p>
+      <a class="btn" href="pickup-manage.html">Open Pickup Manager</a>
     </div>
 
+    <!-- Menu Admin -->
     <div class="card">
-      <h3>Admin & Tools</h3>
-      <div class="muted">Manage menu and bulk import.</div>
-      <a class="btn" href="menu-admin.html">Menu Admin</a>
-      <ul class="muted">
-        <li>Bulk import: <a href="menu-importer-min.html">Menu Importer</a></li>
-        <li>Modifiers admin: <a href="mod-groups-admin.html">Modifiers Admin</a></li>
-      </ul>
+      <h3>Menu Admin</h3>
+      <p class="muted">Manage menu items. Inline edit for <b>Name</b>, <b>Price</b>, <b>Station</b>, <b>Active</b>. Admin sign-in required.</p>
+      <a class="btn" href="menu-admin.html">Open Menu Admin</a>
     </div>
 
+    <!-- Modifiers Admin -->
     <div class="card">
-      <h3>Debug (optional)</h3>
-      <div class="muted">Use only for troubleshooting; safe to delete.</div>
-      <ul class="muted">
-        <li><a href="debug-menu.html">Debug Menu</a></li>
-        <li><a href="debug-orders.html">Debug Orders</a></li>
-      </ul>
+      <h3>Modifiers Admin</h3>
+      <p class="muted">Create/edit modifier groups (e.g., “Pick 3 meats”), then assign to items.</p>
+      <a class="btn" href="mod-groups-admin.html">Open Modifiers Admin</a>
+    </div>
+
+    <!-- Optional Public Pickup -->
+    <div class="card">
+      <h3>Pickup Display (Public)</h3>
+      <p class="muted">Read-only board for customers. Shows Ready orders and names. Optional use.</p>
+      <a class="btn" href="pickup-v3.html">Open Public Pickup</a>
     </div>
   </div>
+
+  <footer>
+    <span class="pill">Firebase: <b>churchfestivalpos</b></span>
+    <span class="muted">Tip: If an iPad looks stale, pull down to refresh.</span>
+  </footer>
 </div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+<script>
+const config = {
+  apiKey: "AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
+  authDomain: "churchfestivalpos.firebaseapp.com",
+  projectId: "churchfestivalpos"
+};
+firebase.initializeApp(config);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+// Firestore quick check
+db.collection("menu").limit(1).get()
+  .then(()=> document.getElementById("conn").textContent="Firestore OK")
+  .then(()=> document.getElementById("conn").className="ok")
+  .catch(()=> document.getElementById("conn").className="danger");
+
+// Auth quick check
+auth.onAuthStateChanged(u=>{
+  const el = document.getElementById("auth");
+  if(u){ el.textContent = "Signed in: "+u.email; el.className="ok"; }
+  else { el.textContent = "Not signed in"; el.className="warn"; }
+});
+
+// Network quick check
+function updateNet(){
+  const el=document.getElementById("net");
+  if(navigator.onLine){ el.textContent="Online"; el.className="ok"; }
+  else { el.textContent="Offline"; el.className="danger"; }
+}
+window.addEventListener("online", updateNet);
+window.addEventListener("offline", updateNet);
+updateNet();
+</script>
 </body>
 </html>
-
