@@ -1,28 +1,26 @@
 <!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Menu Admin</title>
-
-  <style>
-    :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--accent:#5b9bff;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b;--card:#0f141e;--border:#1b2230}
-    *{box-sizing:border-box}
-    html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-    .container{max-width:1100px;margin:0 auto;padding:16px}
-    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    .space{height:12px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
-    .btn{border:none;border-radius:12px;padding:12px 14px;color:#fff;background:var(--accent);font:inherit;cursor:pointer}
-    .btn.ok{background:var(--ok)} .btn.warn{background:var(--warn)} .btn.danger{background:var(--danger)} .btn.gray{background:#1e2432;color:#e5e8ee}
-    input,select{font:inherit;background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:12px;padding:12px 14px}
-    .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#0f1420;color:#95a0ad;font-size:12px}
-    .grid{display:grid;gap:12px}
-    .title{margin:0;font-size:20px}
-    .small{font-size:12px;color:#95a0ad}
-    .hidden{display:none!important}
-    table{width:100%;border-collapse:collapse}
-    td,th{border-bottom:1px solid var(--border);padding:8px;text-align:left}
-  </style>
-
+<style>
+  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--accent:#5b9bff;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b;--card:#0f141e;--border:#1b2230}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .container{max-width:1100px;margin:0 auto;padding:16px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .space{height:12px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
+  .btn{border:none;border-radius:12px;padding:12px 14px;color:#fff;background:var(--accent);font:inherit;cursor:pointer}
+  .btn.ok{background:var(--ok)} .btn.warn{background:var(--warn)} .btn.danger{background:var(--danger)} .btn.gray{background:#1e2432;color:#e5e8ee}
+  input,select{font:inherit;background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+  .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#0f1420;color:#95a0ad;font-size:12px}
+  .hidden{display:none!important}
+  table{width:100%;border-collapse:collapse}
+  td,th{border-bottom:1px solid var(--border);padding:8px;text-align:left}
+  .small{font-size:12px;color:var(--muted)}
+</style>
 </head>
 <body>
 <div class="container">
@@ -34,21 +32,23 @@
     </div>
   </div>
 
+  <!-- Auth -->
   <div id="auth" class="card">
     <div class="row">
       <input id="email" type="email" placeholder="Admin email" style="flex:1;min-width:220px">
       <input id="pass" type="password" placeholder="Password" style="flex:1;min-width:160px">
       <button id="login" class="btn">Sign in</button>
-      <button id="create" class="btn gray">Create user</button>
+      <button id="create" class="btn gray" title="Admins only">Create user</button>
     </div>
     <div id="msg" class="small" style="margin-top:8px"></div>
   </div>
 
+  <!-- App -->
   <div id="app" class="hidden">
     <div class="card">
       <div class="row">
-        <input id="cat" placeholder="Category (Grill)" style="flex:1">
-        <input id="name" placeholder="Item name (Gyro)" style="flex:2">
+        <input id="cat" placeholder="Category (e.g., Grill)" style="flex:1">
+        <input id="name" placeholder="Item name (e.g., Gyro)" style="flex:2">
       </div>
       <div class="space"></div>
       <div class="row">
@@ -58,28 +58,31 @@
         </select>
         <input id="sort" type="number" placeholder="Sort" value="10" style="width:100px">
         <label class="row" style="gap:6px"><input id="active" type="checkbox" checked> Active</label>
-        <button id="add" class="btn ok">Add</button>
+        <button id="add" class="btn ok" title="Admins only">Add</button>
       </div>
+      <div class="small" style="margin-top:6px">Tip: “Sort” controls the order items appear within a category.</div>
     </div>
 
     <div class="space"></div>
 
     <div class="card">
       <table id="table">
-        <thead><tr><th>Cat</th><th>Name</th><th>Price</th><th>Station</th><th>Sort</th><th>Active</th><th></th></tr></thead>
+        <thead>
+          <tr><th>Cat</th><th>Name</th><th>Price</th><th>Station</th><th>Sort</th><th>Active</th><th></th></tr>
+        </thead>
         <tbody></tbody>
       </table>
     </div>
   </div>
 </div>
 
-
-  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 
 <script>
-
+// ---- Firebase config (your project) ----
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
   authDomain: "churchfestivalpos.firebaseapp.com",
@@ -89,70 +92,144 @@ const FIREBASE_CONFIG = {
   appId: "1:447909610900:web:a54a828bacfa02e7883b81"
 };
 
+// Keep these LOWERCASE
 const ADMIN_EMAILS = ["smsmofri@gmail.com","george.henin98@gmail.com"];
+const ADMIN_SET = new Set(ADMIN_EMAILS.map(e => e.toLowerCase()));
 
-const $=s=>document.querySelector(s);
-const authBox=$('#auth'), appBox=$('#app'), me=$('#me'), signout=$('#signout'), msg=$('#msg');
-const email=$('#email'), pass=$('#pass'), login=$('#login'), create=$('#create');
-const cat=$('#cat'), nameEl=$('#name'), price=$('#price'), station=$('#station'), sort=$('#sort'), active=$('#active'), add=$('#add');
-const tableBody=document.querySelector('#table tbody');
+const $ = s => document.querySelector(s);
+const authBox = $('#auth'), appBox = $('#app'), me = $('#me'), signout = $('#signout'), msg = $('#msg');
+const email = $('#email'), pass = $('#pass'), login = $('#login'), create = $('#create');
+const cat = $('#cat'), nameEl = $('#name'), price = $('#price'), station = $('#station'), sort = $('#sort'), active = $('#active'), add = $('#add');
+const tableBody = document.querySelector('#table tbody');
 
 firebase.initializeApp(FIREBASE_CONFIG);
-const db=firebase.firestore(); const auth=firebase.auth();
+const db = firebase.firestore();
+const auth = firebase.auth();
 
-function setUI(user){ const on=!!user; authBox.classList.toggle('hidden', on); appBox.classList.toggle('hidden', !on); me.textContent = on? user.email : 'Not signed in'; signout.classList.toggle('hidden', !on); }
-auth.onAuthStateChanged(u=> setUI(u));
-login.onclick = async()=>{ msg.textContent='Signing in...'; try{await auth.signInWithEmailAndPassword(email.value.trim(), pass.value); msg.textContent='Signed in.';}catch(e){msg.textContent=e.message;} };
-create.onclick = async()=>{ msg.textContent='Creating user...'; try{await auth.createUserWithEmailAndPassword(email.value.trim(), pass.value); msg.textContent='User created.';}catch(e){msg.textContent=e.message;} };
-signout.onclick = ()=> auth.signOut();
+let IS_ADMIN = false;
+
+function computeIsAdmin(u){
+  return !!(u && u.email) && ADMIN_SET.has(String(u.email).toLowerCase());
+}
+
+function setUI(user){
+  IS_ADMIN = computeIsAdmin(user);
+  const on = !!user;
+  authBox.classList.toggle('hidden', on);
+  appBox.classList.toggle('hidden', !on);
+  me.textContent = on ? user.email : 'Not signed in';
+  signout.classList.toggle('hidden', !on);
+  msg.textContent = (on && !IS_ADMIN) ? 'View-only (not an admin)' : '';
+}
+
+auth.onAuthStateChanged(u => setUI(u));
+
+login.onclick = async () => {
+  msg.textContent = 'Signing in...';
+  try {
+    await auth.signInWithEmailAndPassword(email.value.trim(), pass.value);
+    msg.textContent = 'Signed in.';
+  } catch (e) {
+    msg.textContent = e.message;
+  }
+};
+
+create.onclick = async () => {
+  // Optional: restrict creating users via this page to admins only
+  if (!computeIsAdmin(auth.currentUser)) { msg.textContent = 'Only admins can create users here.'; return; }
+  msg.textContent = 'Creating user...';
+  try {
+    await auth.createUserWithEmailAndPassword(email.value.trim(), pass.value);
+    msg.textContent = 'User created.';
+  } catch (e) {
+    msg.textContent = e.message;
+  }
+};
+
+signout.onclick = () => auth.signOut();
 
 function renderRow(id, m){
-  const tr=document.createElement('tr');
+  const tr = document.createElement('tr');
   tr.innerHTML = `
-    <td>${m.cat}</td>
-    <td>${m.name}</td>
-    <td>$${(+m.price).toFixed(2)}</td>
-    <td>${m.station}</td>
-    <td>${m.sort||0}</td>
-    <td>${m.active!==false?'Yes':'No'}</td>
-    <td><button data-id="${id}" class="btn gray">Edit</button> <button data-del="${id}" class="btn danger">Delete</button></td>
+    <td>${m.cat || ''}</td>
+    <td>${m.name || ''}</td>
+    <td>$${Number(m.price || 0).toFixed(2)}</td>
+    <td>${m.station || ''}</td>
+    <td>${m.sort || 0}</td>
+    <td>${m.active !== false ? 'Yes' : 'No'}</td>
+    <td>
+      <button data-id="${id}" class="btn gray">Edit</button>
+      <button data-del="${id}" class="btn danger">Delete</button>
+    </td>
   `;
-  tr.querySelector('[data-id]').onclick = ()=> editItem(id, m);
-  tr.querySelector('[data-del]').onclick = ()=> delItem(id);
+  tr.querySelector('[data-id]').onclick = () => editItem(id, m);
+  tr.querySelector('[data-del]').onclick = () => delItem(id);
   tableBody.appendChild(tr);
 }
 
 function loadMenu(){
-  db.collection('menu').orderBy('cat').orderBy('sort').onSnapshot(snap=>{
+  db.collection('menu').orderBy('cat').orderBy('sort').onSnapshot(snap => {
     tableBody.innerHTML = '';
-    snap.forEach(d=> renderRow(d.id, d.data()));
+    snap.forEach(d => renderRow(d.id, d.data()));
   });
 }
 
-add.onclick = async()=>{
-  const email = (auth.currentUser && auth.currentUser.email) || "";
-  if(!ADMIN_EMAILS.includes(email)){ alert("Not an admin."); return; }
-  const m={cat:cat.value.trim(), name:nameEl.value.trim(), price:parseFloat(price.value), station:station.value, sort:parseInt(sort.value)||0, active:active.checked};
-  if(!m.cat||!m.name||!(m.price>=0)){ alert('Fill category, name, price.'); return; }
-  await db.collection('menu').add(m);
-  nameEl.value=''; price.value=''; sort.value='10';
+add.onclick = async () => {
+  if (!IS_ADMIN) { alert('Not an admin.'); return; }
+  const m = {
+    cat: (cat.value || '').trim(),
+    name: (nameEl.value || '').trim(),
+    price: parseFloat(price.value),
+    station: station.value,
+    sort: parseInt(sort.value, 10) || 0,
+    active: !!active.checked
+  };
+  if (!m.cat || !m.name || !(m.price >= 0)) { alert('Fill category, name, price.'); return; }
+  try {
+    await db.collection('menu').add(m);
+    nameEl.value = ''; price.value = ''; sort.value = '10';
+  } catch (e) {
+    alert(e.message);
+  }
 };
 
 async function editItem(id, m){
-  const email = (auth.currentUser && auth.currentUser.email) || "";
-  if(!ADMIN_EMAILS.includes(email)){ alert("Not an admin."); return; }
-  const newName = prompt("Edit name", m.name); if(newName===null) return;
-  const newPrice = parseFloat(prompt("Edit price", m.price)); if(!(newPrice>=0)) return;
-  const newActive = confirm("Active? OK=yes, Cancel=no");
-  await db.collection('menu').doc(id).update({name:newName, price:newPrice, active:newActive});
+  if (!IS_ADMIN) { alert('Not an admin.'); return; }
+  const newName = prompt('Edit name', m.name);
+  if (newName === null) return;
+  const p = prompt('Edit price', m.price);
+  if (p === null) return;
+  const newPrice = parseFloat(p);
+  if (!(newPrice >= 0)) return;
+  // Optional: edit station/sort as well
+  const newStation = prompt('Edit station (Grill/Fryer/Drinks/Pizza)', m.station || '') || m.station || '';
+  const srt = prompt('Edit sort (number, bigger = lower)', m.sort || 0);
+  const newSort = (srt === null) ? (m.sort || 0) : (parseInt(srt, 10) || 0);
+  const newActive = confirm('Active? OK=yes, Cancel=no');
+  try {
+    await db.collection('menu').doc(id).update({
+      name: newName,
+      price: newPrice,
+      station: newStation,
+      sort: newSort,
+      active: newActive
+    });
+  } catch (e) {
+    alert(e.message);
+  }
 }
+
 async function delItem(id){
-  const email = (auth.currentUser && auth.currentUser.email) || "";
-  if(!ADMIN_EMAILS.includes(email)){ alert("Not an admin."); return; }
-  if(!confirm('Delete this item?')) return;
-  await db.collection('menu').doc(id).delete();
+  if (!IS_ADMIN) { alert('Not an admin.'); return; }
+  if (!confirm('Delete this item?')) return;
+  try {
+    await db.collection('menu').doc(id).delete();
+  } catch (e) {
+    alert(e.message);
+  }
 }
 
 loadMenu();
 </script>
-</body></html>
+</body>
+</html>
