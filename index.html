@@ -13,7 +13,9 @@
   html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
   .wrap{max-width:1100px;margin:0 auto;padding:24px}
   h1{margin:0 0 8px 0;font-size:28px}
+  h2{margin:18px 0 10px 0;font-size:20px;color:var(--muted)}
   .sub{color:var(--muted);margin:0 0 18px 0}
+  .section{margin-top:8px}
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
   .card h3{margin:0 0 8px 0}
@@ -24,76 +26,93 @@
   .pill{display:inline-block;border:1px solid var(--border);background:#0f1420;color:#a7b0bd;border-radius:999px;padding:6px 10px}
   .status{margin:0 0 20px 0;display:flex;gap:12px;flex-wrap:wrap}
   .status span{padding:6px 12px;border-radius:999px;font-size:13px}
-  .ok{background:var(--ok);color:#fff}
-  .warn{background:var(--warn);color:#000}
-  .danger{background:var(--danger);color:#fff}
+  .ok{background:var(--ok);color:#0b0e14}
+  .warn{background:var(--warn);color:#0b0e14}
+  .danger{background:var(--danger);color:#0b0e14}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Festival POS – Launchpad</h1>
+  <h1>Festival POS – Launchpad <span class="muted" style="font-size:12px">v2025‑08‑20</span></h1>
   <p class="sub">Tap a tile below on each iPad to open the correct screen. For best results, in Safari use <b>Share → Add to Home Screen</b>.</p>
 
-  <!-- Status Pills -->
+  <!-- Quick checks -->
   <div class="status">
     <span id="conn" class="warn">Checking Firestore…</span>
     <span id="auth" class="warn">Checking Auth…</span>
     <span id="net" class="warn">Checking Network…</span>
   </div>
 
-  <div class="grid">
-    <!-- POS -->
-    <div class="card">
-      <h3>Point of Sale (POS)</h3>
-      <p class="muted">Cashier order entry. Supports customer name, station filter, and (optionally) modifiers & item images.</p>
-      <a class="btn" href="pos-cloudmenu.html">Open POS</a>
+  <!-- OPERATIONS -->
+  <div class="section">
+    <h2>Operations</h2>
+    <div class="grid">
+      <!-- POS -->
+      <div class="card">
+        <h3>Point of Sale (POS)</h3>
+        <p class="muted">Cashier order entry. Supports customer name, station filter, and optional item images/modifiers.</p>
+        <a class="btn" href="pos-cloudmenu.html">Open POS</a>
+      </div>
+
+      <!-- KDS (auth) -->
+      <div class="card">
+        <h3>Kitchen Display (KDS)</h3>
+        <p class="muted">Per‑iPad station filters; “Active” + “Completed” views; sound on new tickets.</p>
+        <a class="btn" href="kds-auth.html">Open KDS</a>
+        <ul class="muted">
+          <li>URL filter: <code>kds-auth.html?station=Grill,Fryer</code></li>
+        </ul>
+      </div>
+
+      <!-- Pickup Manager -->
+      <div class="card">
+        <h3>Pickup Manager</h3>
+        <p class="muted">Move orders Ready → Picked Up (or Undo). “All History” view + sound option.</p>
+        <a class="btn" href="pickup-manage.html">Open Pickup Manager</a>
+      </div>
+
+      <!-- Optional: Public Pickup -->
+      <div class="card">
+        <h3>Pickup Display (Public)</h3>
+        <p class="muted">Read‑only board for customers. Shows Ready orders and names.</p>
+        <a class="btn" href="pickup-v3.html">Open Public Pickup</a>
+      </div>
     </div>
-    
-<!-- KDS -->
-<div class="card">
-  <h3>Kitchen Display (KDS)</h3>
-  <p class="muted">Each iPad can show specific stations and play a sound on new tickets.</p>
-  <a class="btn" href="kds-auth.html">Open KDS</a>
-  <ul class="muted">
-    <li>Choose stations in-page: <span class="code">Stations…</span> (saves on that iPad)</li>
-    <li>Or via URL: <span class="code">kds-auth.html?station=Grill,Fryer</span></li>
-    <li>Enable chime: <span class="code">Sound</span> toggle</li>
-  </ul>
-</div>
+  </div>
 
+  <!-- ADMIN -->
+  <div class="section">
+    <h2>Admin</h2>
+    <div class="grid">
+      <!-- Menu Admin -->
+      <div class="card">
+        <h3>Menu Admin</h3>
+        <p class="muted">Manage items: Name, Price, Station, Active, Image URL. Inline editing. Admin sign‑in required.</p>
+        <a class="btn" href="menu-admin.html">Open Menu Admin</a>
+        <ul class="muted">
+          <li>Admins: <code>smsmofri@gmail.com</code>, <code>george.henin98@gmail.com</code></li>
+        </ul>
+      </div>
 
-    <!-- Pickup Manager -->
-    <div class="card">
-      <h3>Pickup Manager</h3>
-      <p class="muted">Marks orders Ready → Picked Up (or Undo). Plays a sound on new Ready orders.</p>
-      <a class="btn" href="pickup-manage.html">Open Pickup Manager</a>
-    </div>
+      <!-- Modifiers Admin -->
+      <div class="card">
+        <h3>Modifiers Admin</h3>
+        <p class="muted">Create/edit modifier groups (e.g., “Pick 3 meats”), then assign to items.</p>
+        <a class="btn" href="mod-groups-admin.html">Open Modifiers Admin</a>
+      </div>
 
-    <!-- Menu Admin -->
-    <div class="card">
-      <h3>Menu Admin</h3>
-      <p class="muted">Manage menu items. Inline edit for <b>Name</b>, <b>Price</b>, <b>Station</b>, <b>Active</b>. Admin sign-in required.</p>
-      <a class="btn" href="menu-admin.html">Open Menu Admin</a>
-    </div>
-
-    <!-- Modifiers Admin -->
-    <div class="card">
-      <h3>Modifiers Admin</h3>
-      <p class="muted">Create/edit modifier groups (e.g., “Pick 3 meats”), then assign to items.</p>
-      <a class="btn" href="mod-groups-admin.html">Open Modifiers Admin</a>
-    </div>
-
-    <!-- Optional Public Pickup -->
-    <div class="card">
-      <h3>Pickup Display (Public)</h3>
-      <p class="muted">Read-only board for customers. Shows Ready orders and names. Optional use.</p>
-      <a class="btn" href="pickup-v3.html">Open Public Pickup</a>
+      <!-- Stations Admin -->
+      <div class="card">
+        <h3>Stations Admin</h3>
+        <p class="muted">Edit the list of kitchen stations (e.g., Grill, Fryer, Drinks, Pizza). KDS & POS read these dynamically.</p>
+        <a class="btn" href="stations-admin.html">Open Stations Admin</a>
+      </div>
     </div>
   </div>
 
   <footer>
     <span class="pill">Firebase: <b>churchfestivalpos</b></span>
-    <span class="muted">Tip: If an iPad looks stale, pull down to refresh.</span>
+    <span class="muted">Tip: If an iPad looks stale, pull down to refresh (or add <code>?nocache=...</code> to the URL).</span>
   </footer>
 </div>
 
@@ -113,9 +132,8 @@ const auth = firebase.auth();
 
 // Firestore quick check
 db.collection("menu").limit(1).get()
-  .then(()=> document.getElementById("conn").textContent="Firestore OK")
-  .then(()=> document.getElementById("conn").className="ok")
-  .catch(()=> document.getElementById("conn").className="danger");
+  .then(()=> { const el=document.getElementById("conn"); el.textContent="Firestore OK"; el.className="ok"; })
+  .catch(()=> { const el=document.getElementById("conn"); el.textContent="Firestore Error"; el.className="danger"; });
 
 // Auth quick check
 auth.onAuthStateChanged(u=>{
