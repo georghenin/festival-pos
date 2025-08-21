@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Stations Admin</title>
+<style>
+  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--accent:#5b9bff;--card:#0f141e;--border:#1b2230;--ok:#2fd28f}
+  html,body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0}
+  .wrap{max-width:720px;margin:0 auto;padding:16px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  input{font:inherit;background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:10px;padding:10px 12px;flex:1}
+  .btn{border:none;border-radius:10px;padding:10px 12px;background:var(--accent);color:#fff;cursor:pointer}
+  .btn.gray{background:#1e2432}
+  .pill{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:6px 10px;color:#aab3c0}
+  .small{color:var(--muted);font-size:12px}
+  ul{list-style:none;padding:0;margin:8px 0}
+  li{display:flex;gap:8px;align-items:center;margin:8px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="row" style="justify-content:space-between">
+    <h2>Stations Admin</h2>
+    <span id="me" class="pill">Not signed in</span>
+  </div>
+
+  <div class="card" id="auth">
+    <div class="row">
+      <input id="email" type="email" placeholder="Admin email">
+      <input id="pass" type="password" placeholder="Password">
+      <button id="login" class="btn">Sign in</button>
+      <button id="logout" class="btn gray">Sign out</button>
+    </div>
+    <div id="msg" class="small"></div>
+  </div>
+
+  <div class="card" id="app" style="display:none">
+    <div class="row">
+      <input id="newStation" placeholder="Add new station (e.g., Grill)">
+      <button id="add" class="btn">Add</button>
+    </div>
+    <ul id="list"></ul>
+    <div class="row">
+      <button id="save" class="btn">Save Stations</button>
+      <span class="small" id="status"></span>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
+  authDomain: "churchfestivalpos.firebaseapp.com",
+  projectId: "churchfestivalpos"
+});
+const db=firebase.firestore(), auth=firebase.auth();
+
+const $=s=>document.querySelector(s);
+const me=$('#me'), authBox=$('#auth'), app=$('#app'), msg=$('#msg');
+const email=$('#email'), pass=$('#pass'), login=$('#login'), logout=$('#logout');
+const listEl=$('#list'), newStation=$('#newStation'), add=$('#add'), save=$('#save'), statusEl=$('#status');
+
+const ADMINS = new Set(["smsmofri@gmail.com","george.henin98@gmail.com"]);
+
+let stations=["Grill","Fryer","Drinks","Pizza"];
+
+auth.onAuthStateChanged(u=>{
+  const ok = !!(u && ADMINS.has((u.email||"").toLowerCase()));
+  me.textContent = u ? u.email : 'Not signed in';
+  authBox.style.display='block';
+  app.style.display = ok? 'block':'none';
+  if(!ok && u) msg.textContent='Signed in but not an admin.';
+  if(ok) load();
+});
+
+login.onclick=async()=>{
+  msg.textContent='Signing in...';
+  try{ await auth.signInWithEmailAndPassword(email.value.trim(), pass.value); msg.textContent='Signed in.'; }
+  catch(e){ msg.textContent=e.message; }
+};
+logout.onclick=()=> auth.signOut();
+
+function render(){
+  listEl.innerHTML = stations.map((s,i)=>`
+    <li>
+      <input value="${s}" data-i="${i}">
+      <button class="btn gray" data-del="${i}">Delete</button>
+    </li>
+  `).join('');
+  listEl.querySelectorAll('input').forEach(inp=>{
+    inp.oninput = ()=> stations[+inp.dataset.i] = inp.value;
+  });
+  listEl.querySelectorAll('[data-del]').forEach(b=>{
+    b.onclick = ()=>{ stations.splice(+b.dataset.del,1); render(); };
+  });
+}
+
+add.onclick=()=>{ const v=newStation.value.trim(); if(!v) return; stations.push(v); newStation.value=''; render(); };
+
+async function load(){
+  const d=await db.collection('settings').doc('config').get();
+  const conf=d.data();
+  stations = (conf && Array.isArray(conf.stations) && conf.stations.length) ? conf.stations.slice() : stations;
+  render();
+}
+save.onclick=async()=>{
+  statusEl.textContent='Saving...';
+  try{
+    await db.collection('settings').doc('config').set({stations}, {merge:true});
+    // Refresh local cache that KDS may have saved:
+    localStorage.setItem('kdsStations', JSON.stringify([])); // clear any stale selection
+    statusEl.textContent='Saved.';
+  }catch(e){ statusEl.textContent=e.message; }
+};
+</script>
+</body>
+</html>
