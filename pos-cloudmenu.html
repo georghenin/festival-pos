@@ -1,199 +1,430 @@
 <!DOCTYPE html>
 <html lang="en"><head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Festival POS (Cloud Menu)</title>
-
-  <style>
-    :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--accent:#5b9bff;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b;--card:#0f141e;--border:#1b2230}
-    *{box-sizing:border-box}
-    html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-    .container{max-width:1100px;margin:0 auto;padding:16px}
-    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-    .space{height:12px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
-    .btn{border:none;border-radius:12px;padding:12px 14px;color:#fff;background:var(--accent);font:inherit;cursor:pointer}
-    .btn.ok{background:var(--ok)} .btn.warn{background:var(--warn)} .btn.danger{background:var(--danger)} .btn.gray{background:#1e2432;color:#e5e8ee}
-    input,select{font:inherit;background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:12px;padding:12px 14px}
-    .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#0f1420;color:#95a0ad;font-size:12px}
-    .grid{display:grid;gap:12px}
-    .title{margin:0;font-size:20px}
-    .small{font-size:12px;color:#95a0ad}
-    .hidden{display:none!important}
-    table{width:100%;border-collapse:collapse}
-    td,th{border-bottom:1px solid var(--border);padding:8px;text-align:left}
-  </style>
-
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Festival POS</title>
 <style>
-  .layout{display:grid;grid-template-columns:2fr 1.2fr;gap:12px}
-  @media (max-width:900px){.layout{grid-template-columns:1fr}}
-  .catbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-  .catbtn{padding:10px 12px;border-radius:999px;border:1px solid var(--border);background:#121826;color:#eaf0f6;cursor:pointer}
-  .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
-  .item{background:#121826;border:1px solid var(--border);border-radius:14px;padding:10px;cursor:pointer}
-  .item h4{margin:0 0 6px 0;font-size:14px}
-  .right .line{display:flex;justify-content:space-between;gap:8px;align-items:center;border-bottom:1px solid var(--border);padding:8px 0}
-  .qtybtn{padding:6px 10px;border-radius:10px;background:#1e2432;color:#fff;border:1px solid var(--border)}
-  .totals{display:flex;justify-content:space-between;margin-top:8px;font-weight:700;font-size:18px}
+  :root{
+    --bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--card:#0f141e;--border:#1b2230;
+    --accent:#5b9bff;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  .wrap{max-width:1200px;margin:0 auto;padding:14px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .left-right{display:grid;grid-template-columns:1fr 380px;gap:12px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px}
+  input,select,button{font:inherit}
+  input,select{background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  button{border:none;border-radius:10px;padding:10px 12px;cursor:pointer}
+  .btn{background:var(--accent);color:#fff}
+  .btn.ok{background:var(--ok);color:#0b0e14}
+  .btn.warn{background:var(--warn);color:#0b0e14}
+  .btn.gray{background:#1e2432;color:#e5e8ee}
+  .btn.danger{background:var(--danger);color:#0b0e14}
+  .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;color:#aab3c0}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+  .tab{border:1px solid var(--border);border-radius:999px;padding:6px 10px;background:#0f1420;color:#e5e8ee;cursor:pointer}
+  .tab.active{outline:2px solid var(--ok)}
+  .menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+  .item{background:#121826;border:1px solid var(--border);border-radius:14px;padding:8px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start}
+  .item img{width:100%;height:100px;object-fit:cover;border-radius:10px;margin-bottom:6px;background:#0b101a;border:1px solid var(--border)}
+  .item .nm{font-weight:600}
+  .item .pr{color:#cfe3ff;font-size:13px}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid var(--border);padding:8px;text-align:left;vertical-align:top}
+  .right .card{position:sticky;top:10px}
+  .total{display:flex;justify-content:space-between;font-weight:700;margin-top:8px}
+  .qbtn{padding:4px 8px;border-radius:8px;background:#1d2331;color:#dfe6f5}
+  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:50}
+  .modal{background:#0f141e;border:1px solid var(--border);border-radius:14px;padding:14px;max-width:520px;width:92%}
+  .opt{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed #1b2230}
+  .muted{color:var(--muted);font-size:13px}
 </style>
 </head>
 <body>
-<div class="container">
+<div class="wrap">
+  <!-- Top bar -->
   <div class="row" style="justify-content:space-between">
-    <h2 class="title">Festival POS</h2>
     <div class="row">
-      <button id="seed" class="btn gray hidden">Seed defaults</button>
-      <span class="pill" id="cashier">Not signed in</span>
-      <button class="btn gray" id="signout" style="display:none">Sign out</button>
+      <span style="font-size:20px;font-weight:700">Festival POS</span>
+      <span id="stationsBadge" class="pill">Stations: loading…</span>
+    </div>
+    <div class="row">
+      <input id="customer" placeholder="Customer name" style="min-width:200px">
+      <span id="me" class="pill">Signed out</span>
+      <button id="loginBtn" class="btn">Sign in</button>
+      <button id="logoutBtn" class="btn gray" style="display:none">Sign out</button>
     </div>
   </div>
 
-  <div id="auth" class="card">
-    <div class="row">
-      <input id="email" type="email" placeholder="Cashier email" style="flex:1;min-width:220px">
-      <input id="pass" type="password" placeholder="Password" style="flex:1;min-width:160px">
-      <button id="login" class="btn">Sign in</button>
-      <button id="create" class="btn gray">Create user</button>
-    </div>
-    <div id="msg" class="small" style="margin-top:8px"></div>
-  </div>
-
-  <div id="app" class="hidden">
-    <div class="card">
-      <div class="row">
-        <input id="cust" placeholder="Customer name (required)" style="flex:2;border:2px solid #2b7cff">
-        <select id="station">
-          <option value="">Auto route by item</option>
-          <option>Grill</option><option>Fryer</option><option>Drinks</option><option>Pizza</option>
-        </select>
+  <div class="left-right" style="margin-top:10px">
+    <!-- MENU SIDE -->
+    <div>
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <div class="tabs" id="stationTabs"><button class="tab active" data-st="__ALL__">All</button></div>
+          <input id="search" placeholder="Search items…" style="min-width:220px">
+        </div>
+        <div id="menu" class="menu-grid"></div>
+        <div id="menuEmpty" class="muted" style="display:none;margin-top:8px">No items.</div>
       </div>
-      <div class="small" id="nameWarn" style="color:#ffb3b3;margin-top:6px;display:none">Name is required</div>
     </div>
 
-    <div class="layout">
-      <div class="left card">
-        <div class="catbar" id="catbar"></div>
-        <div class="items" id="items"></div>
-      </div>
-      <div class="right card">
-        <div id="cart"></div>
-        <div class="totals">
-          <span>Total</span><span id="total">$0.00</span>
+    <!-- CART SIDE -->
+    <div class="right">
+      <div class="card">
+        <h3 style="margin:0 0 8px 0">Order</h3>
+        <table id="cartTable">
+          <thead><tr><th>Item</th><th>Qty</th><th>Each</th><th>Line</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="total"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
+        <div class="row" style="justify-content:space-between;margin-top:10px">
+          <button id="clearCart" class="btn gray">Clear</button>
+          <button id="submitOrder" class="btn ok">Submit Order</button>
         </div>
-        <div class="space"></div>
-        <div class="row">
-          <button id="clear" class="btn gray">Clear</button>
-          <button id="submit" class="btn ok" style="flex:1">Submit Order</button>
-        </div>
-        <div class="small" id="status" style="margin-top:8px"></div>
+        <div id="msg" class="muted" style="margin-top:8px"></div>
       </div>
     </div>
   </div>
 </div>
 
+<!-- Modifier Modal -->
+<div id="modMask" class="modal-mask" style="display:none">
+  <div class="modal">
+    <h3 id="modTitle" style="margin:0 0 6px 0">Customize</h3>
+    <div id="modBody"></div>
+    <div class="row" style="justify-content:flex-end;margin-top:10px">
+      <button id="modCancel" class="btn gray">Cancel</button>
+      <button id="modAdd" class="btn ok">Add to Order</button>
+    </div>
+  </div>
+</div>
 
-  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
-
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 <script>
-
-const FIREBASE_CONFIG = {
+// ---------- Firebase init ----------
+firebase.initializeApp({
   apiKey: "AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
   authDomain: "churchfestivalpos.firebaseapp.com",
   projectId: "churchfestivalpos",
   storageBucket: "churchfestivalpos.firebasestorage.app",
   messagingSenderId: "447909610900",
   appId: "1:447909610900:web:a54a828bacfa02e7883b81"
-};
+});
+const db=firebase.firestore(), auth=firebase.auth();
 
+// ---------- Admins (not required to place orders, but for future) ----------
+const ADMINS = new Set(["smsmofri@gmail.com","george.henin98@gmail.com"].map(x=>x.toLowerCase()));
 
-const DEFAULT_MENU = [
-  {cat:"Grill", name:"Gyro", price:12, station:"Grill", active:true, sort:10},
-  {cat:"Grill", name:"Chicken Souvlaki", price:12, station:"Grill", active:true, sort:20},
-  {cat:"Fryer", name:"Fries", price:5, station:"Fryer", active:true, sort:10},
-  {cat:"Fryer", name:"Falafel (4)", price:6, station:"Fryer", active:true, sort:20},
-  {cat:"Drinks", name:"Water", price:2, station:"Drinks", active:true, sort:10},
-  {cat:"Drinks", name:"Lemonade", price:4, station:"Drinks", active:true, sort:20},
-  {cat:"Pizza", name:"Slice Cheese", price:4, station:"Pizza", active:true, sort:10},
-  {cat:"Pizza", name:"Slice Pepperoni", price:5, station:"Pizza", active:true, sort:20}
-];
-
+// ---------- DOM ----------
 const $=s=>document.querySelector(s);
-const appBox = $('#app'), authBox = $('#auth'), cashierEl=$('#cashier'), signout=$('#signout');
-const email=$('#email'), pass=$('#pass'), login=$('#login'), create=$('#create'), msg=$('#msg');
-const catbar=$('#catbar'), itemsEl=$('#items'), cartEl=$('#cart'), totalEl=$('#total');
-const clearBtn=$('#clear'), submitBtn=$('#submit'), statusEl=$('#status'), stationSel=$('#station'), custInp=$('#cust'), nameWarn=$('#nameWarn');
-const seedBtn=$('#seed');
+const stationTabs=$('#stationTabs'), menu=$('#menu'), menuEmpty=$('#menuEmpty');
+const customer=$('#customer'), search=$('#search');
+const cartTBody=document.querySelector('#cartTable tbody');
+const subtotalEl=$('#subtotal'), msg=$('#msg');
+const me=$('#me'), loginBtn=$('#loginBtn'), logoutBtn=$('#logoutBtn');
+const stationsBadge=$('#stationsBadge');
 
-firebase.initializeApp(FIREBASE_CONFIG);
-const db=firebase.firestore(); const auth=firebase.auth();
+const modMask=$('#modMask'), modTitle=$('#modTitle'), modBody=$('#modBody'), modCancel=$('#modCancel'), modAdd=$('#modAdd');
 
-let MENU=[]; let CART=[]; let CATS=[]; let activeCat='All';
+// ---------- State ----------
+let STATIONS_ALL=['Grill','Fryer','Drinks','Pizza']; // fallback
+let FILTER_STATION='__ALL__';
+let MENU=[];      // {id, name, price, station, active, img?, modGroupIds?}
+let MOD_GROUPS=new Map(); // id -> {name, selectType, maxPicks, options:[{name, price}]}
+let CART=[];      // lines: {menuId, name, station, qty, basePrice, mods:[{groupName, options:[{name, price}]}], eachPrice, lineTotal}
 
-function money(n){return '$'+(n||0).toFixed(2);}
-function setUI(user){ const on=!!user; authBox.classList.toggle('hidden', on); appBox.classList.toggle('hidden', !on); cashierEl.textContent = on? user.email : 'Not signed in'; signout.style.display = on?'inline-flex':'none'; }
-auth.onAuthStateChanged(u=> setUI(u));
-login.onclick = async()=>{ msg.textContent='Signing in...'; try{await auth.signInWithEmailAndPassword(email.value.trim(), pass.value); msg.textContent='Signed in.';}catch(e){msg.textContent=e.message;} };
-create.onclick = async()=>{ msg.textContent='Creating user...'; try{await auth.createUserWithEmailAndPassword(email.value.trim(), pass.value); msg.textContent='User created.';}catch(e){msg.textContent=e.message;} };
-signout.onclick = ()=> auth.signOut();
+// ---------- Auth UI ----------
+auth.onAuthStateChanged(u=>{
+  if(u){ me.textContent=u.email; loginBtn.style.display='none'; logoutBtn.style.display='inline-block'; }
+  else { me.textContent='Signed out'; loginBtn.style.display='inline-block'; logoutBtn.style.display='none'; }
+});
+loginBtn.onclick=async()=>{
+  const email=prompt("Email:"); if(!email) return;
+  const pass=prompt("Password:"); if(pass===null) return;
+  try{ await auth.signInWithEmailAndPassword(email.trim(), pass); }catch(e){ alert(e.message); }
+};
+logoutBtn.onclick=()=> auth.signOut();
 
-function loadMenuRealtime(){ db.collection('menu').orderBy('cat').orderBy('sort').onSnapshot(snap=>{ MENU=[]; snap.forEach(d=> MENU.push({id:d.id, ...d.data()})); const active = MENU.filter(m=> m.active!==false); seedBtn.classList.toggle('hidden', active.length!==0); rebuild(active); }); }
-function rebuild(active){ CATS=['All', ...Array.from(new Set(active.map(i=>i.cat)))]; if(!CATS.includes(activeCat)) activeCat='All'; renderCats(); renderItems(active);}
-function renderCats(){ catbar.innerHTML = CATS.map(c=>`<button class="catbtn" data-cat="${c}">${c}</button>`).join(''); catbar.querySelectorAll('button').forEach(b=> b.onclick = ()=>{ activeCat=b.dataset.cat; renderItems(MENU.filter(m=>m.active!==false)); }); }
-function renderItems(list){ const show = list.filter(i=> activeCat==='All' || i.cat===activeCat); itemsEl.innerHTML = show.map(i=>`<div class="item" data-id="${i.id}">
-    <h4>${i.name}</h4><div class="small">${i.cat} • $${(+i.price).toFixed(2)} • ${i.station}</div>
-  </div>`).join('');
-  itemsEl.querySelectorAll('.item').forEach(el=> el.onclick=()=> addById(el.getAttribute('data-id')) );
-}
-function addById(id){ const it = MENU.find(x=>x.id===id); if(!it) return; const ex = CART.find(x=>x.id===id); if(ex) ex.qty++; else CART.push({id:it.id, name:it.name, price:+it.price, qty:1, station:it.station}); renderCart(); }
-function renderCart(){ cartEl.innerHTML = CART.map((l,i)=>`<div class="line">
-    <div><b>${l.name}</b><div class="small">${l.station}</div></div>
-    <div class="row">
-      <button class="qtybtn" data-i="${i}" data-a="-">−</button>
-      <div>${l.qty}</div>
-      <button class="qtybtn" data-i="${i}" data-a="+">+</button>
-      <div style="width:70px;text-align:right">${money(l.qty*l.price)}</div>
-      <button class="qtybtn" data-i="${i}" data-a="x">x</button>
-    </div>
-  </div>`).join('');
-  const tot = CART.reduce((s,l)=> s + l.qty*l.price, 0);
-  totalEl.textContent = money(tot);
-  cartEl.querySelectorAll('.qtybtn').forEach(b=> b.onclick=()=> qtyAction(+b.dataset.i, b.dataset.a) );
-}
-function qtyAction(i,a){ const l = CART[i]; if(!l) return; if(a==='+') l.qty++; if(a==='-') l.qty = Math.max(1, l.qty-1); if(a==='x') CART.splice(i,1); renderCart(); }
-
-async function nextOrderNumber(){ const ref = db.collection('meta').doc('counters'); const res = await db.runTransaction(async t=>{ const snap = await t.get(ref); let n = (snap.exists && snap.data().orderSeq) ? snap.data().orderSeq : 100; n++; t.set(ref, {orderSeq:n}, {merge:true}); return n; }); return res; }
-
-clearBtn.onclick = ()=>{ CART=[]; renderCart(); };
-
-submitBtn.onclick = async()=>{
-  nameWarn.style.display = custInp.value.trim()? 'none':'block';
-  if(!custInp.value.trim()){ custInp.focus(); return; }
-  if(CART.length===0) { statusEl.textContent='Add items first.'; return; }
-  submitBtn.disabled = true; statusEl.textContent='Submitting...';
+// ---------- Load stations (dynamic) ----------
+async function loadStations(){
   try{
-    const number = await nextOrderNumber();
-    const now = Date.now();
-    const items = CART.map(l=>({name:l.name, qty:l.qty, price:l.price, station:l.station}));
-    const preferred = stationSel.value || null;
-    await db.collection('orders').add({
-      number, items, status:'new', createdAt:now, updatedAt:now,
-      customer:custInp.value.trim(), preferredStation:preferred,
-      cashier: (auth.currentUser?.email)||null, total: CART.reduce((s,l)=>s+l.qty*l.price,0)
+    const snap=await db.collection('settings').doc('config').get();
+    const conf=snap.data();
+    if(conf && Array.isArray(conf.stations) && conf.stations.length) STATIONS_ALL=conf.stations;
+  }catch(e){}
+  // Build tabs
+  stationTabs.innerHTML = `<button class="tab active" data-st="__ALL__">All</button>` +
+    STATIONS_ALL.map(s=>`<button class="tab" data-st="${s}">${s}</button>`).join('');
+  stationTabs.querySelectorAll('.tab').forEach(btn=>{
+    btn.onclick=()=>{
+      stationTabs.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      FILTER_STATION = btn.dataset.st;
+      renderMenu();
+    };
+  });
+  stationsBadge.textContent = 'Stations: ' + STATIONS_ALL.join(', ');
+}
+
+// ---------- Load menu & mod groups ----------
+function loadMenu(){
+  db.collection('menu').orderBy('name').onSnapshot(snap=>{
+    MENU=[]; snap.forEach(d=>{ const m={id:d.id, ...d.data()}; if(m.active!==false) MENU.push(m); });
+    renderMenu();
+  });
+}
+function loadModGroups(){
+  db.collection('mod_groups').onSnapshot(snap=>{
+    MOD_GROUPS.clear();
+    snap.forEach(d=> MOD_GROUPS.set(d.id, { id:d.id, ...d.data() }) );
+  });
+}
+
+// ---------- Render menu ----------
+function renderMenu(){
+  const q=(search.value||'').toLowerCase().trim();
+  const items = MENU.filter(m=>{
+    const stationOk = (FILTER_STATION==='__ALL__') || (m.station===FILTER_STATION);
+    const textOk = !q || (`${m.name} ${m.station}`.toLowerCase().includes(q));
+    return stationOk && textOk;
+  });
+  menu.innerHTML = items.map(m=>{
+    const img = m.img ? `<img src="${m.img}" alt="">` : `<img src="" alt="" style="display:none">`;
+    return `<div class="item" data-id="${m.id}">
+      ${img}
+      <div class="nm">${m.name}</div>
+      <div class="pr">$${Number(m.price||0).toFixed(2)} <span class="muted">• ${m.station||''}</span></div>
+    </div>`;
+  }).join('');
+  menuEmpty.style.display = items.length? 'none':'block';
+  menu.querySelectorAll('.item').forEach(el=> el.onclick = ()=> onMenuClick(el.dataset.id));
+}
+search.oninput=renderMenu;
+
+// ---------- Add to cart flow (with modifiers) ----------
+function onMenuClick(menuId){
+  const m = MENU.find(x=>x.id===menuId);
+  if(!m) return;
+
+  const groupIds = Array.isArray(m.modGroupIds) ? m.modGroupIds.filter(Boolean) : [];
+  if(!groupIds.length){
+    // simple add (no modifiers)
+    addLine({menuId:m.id, name:m.name, station:m.station, basePrice:+m.price||0, mods:[]});
+    return;
+  }
+  // open modifier modal
+  openModifierModal(m, groupIds);
+}
+
+function openModifierModal(menuItem, groupIds){
+  modTitle.textContent = `Customize: ${menuItem.name}`;
+  modBody.innerHTML = '';
+  // Build group UI
+  const groups = groupIds.map(id=> MOD_GROUPS.get(id)).filter(Boolean);
+  if(!groups.length){
+    // if groups missing, just add base item
+    addLine({menuId:menuItem.id, name:menuItem.name, station:menuItem.station, basePrice:+menuItem.price||0, mods:[]});
+    return;
+  }
+
+  groups.forEach((g, idx)=>{
+    const gid = `g${idx}`;
+    const row = document.createElement('div');
+    row.innerHTML = `<div style="margin:6px 0 4px 0;font-weight:600">${g.name}</div>`;
+    const box = document.createElement('div');
+    (g.options||[]).forEach((opt, i)=>{
+      const optId = `${gid}_opt_${i}`;
+      if(g.selectType === 'single'){
+        const line = document.createElement('label');
+        line.className='opt';
+        line.innerHTML = `
+          <span><input type="radio" name="${gid}" value="${i}" id="${optId}"> ${opt.name}</span>
+          <span class="muted">${opt.price?`+$${Number(opt.price).toFixed(2)}`:''}</span>`;
+        box.appendChild(line);
+      }else{
+        const line = document.createElement('label');
+        line.className='opt';
+        line.innerHTML = `
+          <span><input type="checkbox" data-g="${gid}" value="${i}" id="${optId}"> ${opt.name}</span>
+          <span class="muted">${opt.price?`+$${Number(opt.price).toFixed(2)}`:''}</span>`;
+        box.appendChild(line);
+      }
     });
-    CART=[]; renderCart(); statusEl.textContent = 'Order #' + number + ' sent to kitchen.'; custInp.value='';
-  }catch(e){ statusEl.textContent = e.message; }
-  submitBtn.disabled = false;
+    if(g.selectType==='multi' && g.maxPicks){
+      const info=document.createElement('div');
+      info.className='muted';
+      info.style.marginTop='4px';
+      info.textContent = `Pick up to ${g.maxPicks}`;
+      box.appendChild(info);
+      // enforce max picks client-side
+      box.addEventListener('change', ()=>{
+        const checked = box.querySelectorAll('input[type=checkbox]:checked');
+        if(checked.length > (g.maxPicks||0)){
+          // uncheck the last one
+          checked[checked.length-1].checked=false;
+          alert(`You can pick up to ${g.maxPicks}`);
+        }
+      });
+    }
+    row.appendChild(box);
+    modBody.appendChild(row);
+  });
+
+  // Show modal
+  modMask.style.display='flex';
+
+  modCancel.onclick = ()=> { modMask.style.display='none'; };
+
+  // Confirm add
+  modAdd.onclick = ()=>{
+    // Build selection summary
+    const selection = [];
+    let addPrice = 0;
+
+    groups.forEach((g, idx)=>{
+      const gid = `g${idx}`;
+      const chosen = [];
+      if(g.selectType==='single'){
+        const picked = modBody.querySelector(`input[name="${gid}"]:checked`);
+        if(picked){
+          const opt = g.options[+picked.value];
+          chosen.push({ name: opt.name, price: +opt.price||0 });
+        }
+      }else{
+        const checks = [...modBody.querySelectorAll(`input[type=checkbox][data-g="${gid}"]:checked`)];
+        checks.forEach(c=>{
+          const opt = g.options[+c.value];
+          chosen.push({ name: opt.name, price: +opt.price||0 });
+        });
+      }
+      chosen.forEach(o=> addPrice += (o.price||0));
+      selection.push({ groupName: g.name, options: chosen });
+    });
+
+    addLine({
+      menuId: menuItem.id,
+      name: menuItem.name,
+      station: menuItem.station,
+      basePrice: +menuItem.price||0,
+      mods: selection
+    });
+    modMask.style.display='none';
+  };
+}
+
+function addLine({menuId, name, station, basePrice, mods}){
+  // compute each price = base + sum(mod prices)
+  const modSum = (mods||[]).flatMap(g=>g.options||[]).reduce((a,b)=> a + (+b.price||0), 0);
+  const each = (+basePrice||0) + modSum;
+
+  // If same item with identical mods exists, bump qty
+  const keyMods = JSON.stringify(mods||[]);
+  const existing = CART.find(l => l.menuId===menuId && JSON.stringify(l.mods||[])===keyMods);
+  if(existing){
+    existing.qty += 1;
+    existing.eachPrice = each;
+    existing.lineTotal = existing.qty * each;
+  }else{
+    CART.push({
+      menuId, name, station, qty:1, basePrice:+basePrice||0,
+      mods: mods||[], eachPrice: each, lineTotal: each
+    });
+  }
+  renderCart();
+}
+
+// ---------- Cart render / actions ----------
+function renderCart(){
+  cartTBody.innerHTML = CART.map((l, idx)=>{
+    const modsHtml = (l.mods&&l.mods.length)
+      ? `<div class="muted" style="font-size:12px;margin-top:2px">
+           ${l.mods.map(g=>`${g.groupName}: ${g.options.map(o=>o.name).join(', ')}`).join(' • ')}
+         </div>` : '';
+    return `<tr>
+      <td>
+        <div style="font-weight:600">${l.name}</div>
+        ${modsHtml}
+        <div class="muted" style="font-size:11px">${l.station||''}</div>
+      </td>
+      <td>
+        <button class="qbtn" data-dec="${idx}">−</button>
+        <span style="display:inline-block;width:26px;text-align:center">${l.qty}</span>
+        <button class="qbtn" data-inc="${idx}">+</button>
+      </td>
+      <td>$${l.eachPrice.toFixed(2)}</td>
+      <td>$${(l.eachPrice*l.qty).toFixed(2)}</td>
+      <td><button class="btn danger" data-del="${idx}">Remove</button></td>
+    </tr>`;
+  }).join('');
+  cartTBody.querySelectorAll('[data-inc]').forEach(b=> b.onclick=()=>{ CART[+b.dataset.inc].qty++; recalc(); });
+  cartTBody.querySelectorAll('[data-dec]').forEach(b=> b.onclick=()=>{ const i=+b.dataset.dec; CART[i].qty=Math.max(1,CART[i].qty-1); recalc(); });
+  cartTBody.querySelectorAll('[data-del]').forEach(b=> b.onclick=()=>{ CART.splice(+b.dataset.del,1); recalc(); });
+  recalc();
+}
+function recalc(){
+  CART.forEach(l=> l.lineTotal = l.qty * l.eachPrice);
+  const sub = CART.reduce((a,b)=> a + b.lineTotal, 0);
+  subtotalEl.textContent = `$${sub.toFixed(2)}`;
+}
+
+// ---------- Submit order ----------
+async function nextOrderNumber(){
+  const ref = db.collection('meta').doc('order_seq');
+  const num = await db.runTransaction(async tx=>{
+    const snap = await tx.get(ref);
+    let v = (snap.exists && typeof snap.data().value==='number') ? snap.data().value : 0;
+    v = v + 1;
+    tx.set(ref, {value:v}, {merge:true});
+    return v;
+  });
+  return num;
+}
+
+$('#clearCart').onclick=()=>{ CART=[]; renderCart(); };
+
+$('#submitOrder').onclick = async ()=>{
+  if(!CART.length){ alert('Cart is empty'); return; }
+  const cust = (customer.value||'').trim();
+  try{
+    msg.textContent='Submitting...';
+    const number = await nextOrderNumber();
+    const ts = Date.now();
+    const order = {
+      number,
+      status: 'new',               // KDS will work on these
+      createdAt: ts,
+      updatedAt: ts,
+      customer: cust || null,
+      total: CART.reduce((a,b)=> a + b.lineTotal, 0),
+      items: CART.map(l=>({
+        menuId: l.menuId,
+        name: l.name,
+        qty: l.qty,
+        price: l.eachPrice,     // unit price INCLUDING modifiers
+        station: l.station || null,
+        mods: (l.mods||[]).map(g=>({
+          groupName: g.groupName,
+          options: (g.options||[]).map(o=>({name:o.name, price:+o.price||0}))
+        }))
+      }))
+    };
+    await db.collection('orders').add(order);
+    CART=[]; renderCart(); customer.value=''; msg.textContent=`Order #${number} placed!`;
+    setTimeout(()=> msg.textContent='', 2000);
+  }catch(e){
+    msg.textContent = 'Error: ' + e.message;
+  }
 };
 
-seedBtn.onclick = async()=>{
-  if(!confirm('Seed default menu items into Firestore?')) return;
-  const batch = db.batch();
-  DEFAULT_MENU.forEach(m=>{ const ref = db.collection('menu').doc(); batch.set(ref, m); });
-  await batch.commit();
-  alert('Menu seeded.');
-};
-
-loadMenuRealtime();
+// ---------- Boot ----------
+loadStations();
+loadMenu();
+loadModGroups();
 </script>
 </body></html>
