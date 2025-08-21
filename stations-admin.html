@@ -63,8 +63,7 @@ const me=$('#me'), authBox=$('#auth'), app=$('#app'), msg=$('#msg');
 const email=$('#email'), pass=$('#pass'), login=$('#login'), logout=$('#logout');
 const listEl=$('#list'), newStation=$('#newStation'), add=$('#add'), save=$('#save'), statusEl=$('#status');
 
-const ADMINS = new Set(["smsmofri@gmail.com","george.henin98@gmail.com"]);
-
+const ADMINS = new Set(["smsmofri@gmail.com","george.henin98@gmail.com"].map(x=>x.toLowerCase()));
 let stations=["Grill","Fryer","Drinks","Pizza"];
 
 auth.onAuthStateChanged(u=>{
@@ -89,7 +88,7 @@ function render(){
       <input value="${s}" data-i="${i}">
       <button class="btn gray" data-del="${i}">Delete</button>
     </li>
-  `).join('');
+  `.trim()).join('');
   listEl.querySelectorAll('input').forEach(inp=>{
     inp.oninput = ()=> stations[+inp.dataset.i] = inp.value;
   });
@@ -98,7 +97,13 @@ function render(){
   });
 }
 
-add.onclick=()=>{ const v=newStation.value.trim(); if(!v) return; stations.push(v); newStation.value=''; render(); };
+add.onclick=()=>{
+  const v=newStation.value.trim();
+  if(!v) return;
+  stations.push(v);
+  newStation.value='';
+  render();
+};
 
 async function load(){
   const d=await db.collection('settings').doc('config').get();
@@ -106,12 +111,14 @@ async function load(){
   stations = (conf && Array.isArray(conf.stations) && conf.stations.length) ? conf.stations.slice() : stations;
   render();
 }
+
 save.onclick=async()=>{
   statusEl.textContent='Saving...';
   try{
-    await db.collection('settings').doc('config').set({stations}, {merge:true});
-    // Refresh local cache that KDS may have saved:
-    localStorage.setItem('kdsStations', JSON.stringify([])); // clear any stale selection
+    const cleaned = stations.map(s=>s.trim()).filter(Boolean);
+    await db.collection('settings').doc('config').set({stations: cleaned}, {merge:true});
+    // Clear any saved KDS station filters so new names show up cleanly next time:
+    localStorage.removeItem('kdsStations');
     statusEl.textContent='Saved.';
   }catch(e){ statusEl.textContent=e.message; }
 };
