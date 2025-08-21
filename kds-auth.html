@@ -1,327 +1,216 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>KDS (Auth + Stations + Sound + Completed & Picked Up)</title>
+<title>KDS (with Station Filters)</title>
 <style>
-  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--border:#1b2230;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b}
-  html,body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0}
-  .auth{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
-  input{font:inherit;background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
-  .top{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
-  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .pill{padding:6px 10px;border:1px solid var(--border);border-radius:999px;color:#aab3c0}
-  .tabs{display:flex;gap:8px;flex-wrap:wrap}
-  .tab{border:1px solid var(--border);border-radius:999px;padding:8px 14px;background:#0f1420;color:#e5e8ee;cursor:pointer}
-  .tab.active{outline:2px solid var(--ok)}
-  .btn{border:none;border-radius:10px;padding:8px 12px;cursor:pointer}
-  .btn.primary{background:var(--ok);color:#0b0e14}
-  .btn.secondary{background:#1e2432;color:#e5e8ee}
-  .btn.danger{background:var(--danger);color:#0b0e14}
-  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:16px;max-height:calc(100vh - 200px);overflow:auto}
-  .ticket{background:#121826;border:1px solid var(--border);border-radius:16px;padding:12px}
-  .small{font-size:12px;color:#aab3c0}
-  .num{font-weight:800}
-  .seg{display:flex;gap:6px;padding:6px;border:1px solid var(--border);border-radius:999px}
-  .seg button{background:#0f1420;color:#e5e8ee;border:1px solid var(--border);padding:6px 10px;border-radius:999px;cursor:pointer}
-  .seg button.active{outline:2px solid var(--ok)}
+  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--card:#0f141e;--border:#1b2230;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b;--accent:#5b9bff}
+  *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  .wrap{max-width:1200px;margin:0 auto;padding:14px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;color:#aab3c0;background:#0f1420}
+  .btn{border:none;border-radius:10px;padding:10px 12px;cursor:pointer;color:#fff;background:var(--accent)}
+  .btn.ok{background:var(--ok);color:#0b0e14}.btn.warn{background:var(--warn);color:#0b0e14}.btn.danger{background:var(--danger);color:#0b0e14}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{border:1px solid var(--border);background:#0f1420;color:#e5e8ee;border-radius:999px;padding:6px 10px;cursor:pointer}
+  .chip.active{outline:2px solid var(--ok)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+  .ticket{border:1px solid var(--border);background:#121826;border-radius:14px;padding:10px}
+  .hdr{display:flex;justify-content:space-between;gap:10px;align-items:center}
+  .customer{font-weight:800}
+  .items{margin-top:6px}
+  .line{border-top:1px dashed #293246;padding:6px 0}
+  .mods{color:#aeb7c6;font-size:12px;margin-top:2px}
+  .muted{color:var(--muted);font-size:12px}
+  .right{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+  .sep{height:1px;background:#1b2230;margin:8px 0}
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<!-- Sign-in -->
-<div class="auth" id="auth">
-  <input id="email" type="email" placeholder="KDS email (or staff/admin)">
-  <input id="pass" type="password" placeholder="Password">
-  <button id="login" class="btn primary">Sign in</button>
-  <span id="authMsg" class="small"></span>
-</div>
-
-<!-- Header -->
-<div class="top">
-  <div class="row">
-    <div class="tabs">
-      <button id="tabActive" class="tab active">Active</button>
-      <button id="tabCompleted" class="tab">Completed</button>
+  <!-- Top -->
+  <div class="row" style="justify-content:space-between">
+    <div class="row">
+      <strong style="font-size:20px">KDS</strong>
+      <span id="stationBadge" class="pill">Stations: loading…</span>
     </div>
-    <span class="pill" id="stationPill">All stations</span>
-    <span class="pill" id="count">0</span>
+    <div class="row">
+      <label class="pill"><input id="sound" type="checkbox" style="margin-right:6px"> Sound on new</label>
+      <label class="pill"><input id="showDone" type="checkbox" style="margin-right:6px"> Show completed</label>
+      <span id="me" class="pill">Not signed in</span>
+      <button id="login" class="btn">Sign in</button>
+      <button id="logout" class="btn" style="background:#1e2432">Sign out</button>
+    </div>
   </div>
-  <div class="row">
-    <label class="pill" style="cursor:pointer">
-      <input type="checkbox" id="soundToggle" style="margin-right:6px"> Sound
-    </label>
-    <button id="stationBtn" class="btn secondary">Stations…</button>
-    <span class="pill" id="me">Signed out</span>
+
+  <!-- Station filters -->
+  <div class="card" style="margin-top:10px">
+    <div class="row" style="justify-content:space-between">
+      <div class="chips" id="chips"></div>
+      <div class="row">
+        <button id="selectAll" class="btn gray" style="background:#1e2432">Select all</button>
+        <button id="savePref" class="btn ok">Save to this iPad</button>
+      </div>
+    </div>
+    <div class="muted" style="margin-top:6px">Only items from the selected stations will appear on this KDS. Preferences are saved on this device.</div>
   </div>
+
+  <!-- Tickets -->
+  <div class="grid" id="grid" style="margin-top:10px"></div>
+  <div id="empty" class="muted" style="margin-top:8px;display:none">No tickets.</div>
 </div>
 
-<!-- Completed filters -->
-<div id="completedControls" class="row" style="padding:8px 16px;display:none">
-  <div class="seg">
-    <button id="showReady" class="active">Ready</button>
-    <button id="showPicked">Picked Up</button>
-    <button id="showBoth">Both</button>
-  </div>
-</div>
+<audio id="ding"><source src="data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAA..." type="audio/mp3"></audio>
 
-<!-- Grid -->
-<div class="board" id="board"></div>
-
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 <script>
-// ---- Firebase (your project) ----
 firebase.initializeApp({
-  apiKey: "AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
-  authDomain: "churchfestivalpos.firebaseapp.com",
-  projectId: "churchfestivalpos",
-  storageBucket: "churchfestivalpos.firebasestorage.app",
-  messagingSenderId: "447909610900",
-  appId: "1:447909610900:web:a54a828bacfa02e7883b81"
+  apiKey:"AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
+  authDomain:"churchfestivalpos.firebaseapp.com",
+  projectId:"churchfestivalpos"
 });
 const db=firebase.firestore(), auth=firebase.auth();
 
-// ---- UI refs ----
-const board=document.getElementById('board');
-const count=document.getElementById('count');
-const me=document.getElementById('me');
-const authBox=document.getElementById('auth');
-const email=document.getElementById('email');
-const pass=document.getElementById('pass');
-const login=document.getElementById('login');
-const authMsg=document.getElementById('authMsg');
-const stationPill=document.getElementById('stationPill');
-const stationBtn=document.getElementById('stationBtn');
-const soundToggle=document.getElementById('soundToggle');
-const tabActive=document.getElementById('tabActive');
-const tabCompleted=document.getElementById('tabCompleted');
-const completedControls=document.getElementById('completedControls');
-const btnReady=document.getElementById('showReady');
-const btnPicked=document.getElementById('showPicked');
-const btnBoth=document.getElementById('showBoth');
+const $=s=>document.querySelector(s);
+const me=$('#me'), login=$('#login'), logout=$('#logout');
+const chips=$('#chips'), stationBadge=$('#stationBadge');
+const showDone=$('#showDone'), sound=$('#sound'), ding=$('#ding');
+const grid=$('#grid'), empty=$('#empty'), selectAll=$('#selectAll'), savePref=$('#savePref');
 
-// ---- Stations config (from Firestore settings) ----
-let STATIONS_ALL=['Grill','Fryer','Drinks','Pizza'];
-db.collection('settings').doc('config').get().then(d=>{
-  const conf=d.data(); if(conf && Array.isArray(conf.stations) && conf.stations.length){ STATIONS_ALL=conf.stations; initStationUI(); }
-});
+let STATIONS=['Grill','Fryer','Drinks','Pizza'];
+let selected=new Set(JSON.parse(localStorage.getItem('kdsStations')||'[]'));
+let lastSeen=0; // for sound
 
-// ---- Stations (URL + localStorage) ----
-const qs=new URLSearchParams(location.search);
-const urlStations=(qs.get('station')||'').trim();
-let ALLOW = new Set();
-
-function initStationUI(){
-  updateStationPill();
-}
-if(urlStations){
-  urlStations.split(',').map(s=>s.trim()).filter(Boolean).forEach(s=> ALLOW.add(s));
-}else{
-  try{
-    const saved=JSON.parse(localStorage.getItem('kdsStations')||'[]');
-    if(Array.isArray(saved)) saved.forEach(s=> ALLOW.add(s));
-  }catch(e){}
-}
-function updateStationPill(){
-  stationPill.textContent = ALLOW.size ? ('Stations: '+[...ALLOW].join(', ')) : 'All stations';
-}
-updateStationPill();
-
-function openStations(){
-  const box=document.createElement('div');
-  const html=STATIONS_ALL.map(s=>`
-    <label style="display:block;margin:6px 0"><input type="checkbox" value="${s}" ${ALLOW.has(s)?'checked':''}> ${s}</label>
-  `).join('');
-  box.innerHTML=`
-  <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:50">
-    <div style="background:#0f141e;border:1px solid #1b2230;border-radius:12px;padding:14px;min-width:280px">
-      <h3 style="margin:0 0 8px 0">Show stations</h3>
-      ${html}
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
-        <button id="stCancel" class="btn secondary">Cancel</button>
-        <button id="stSave" class="btn primary">Save</button>
-      </div>
-    </div>
-  </div>`;
-  document.body.appendChild(box);
-  box.querySelector('#stCancel').onclick=()=>box.remove();
-  box.querySelector('#stSave').onclick=()=>{
-    const sel=[...box.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
-    ALLOW=new Set(sel);
-    localStorage.setItem('kdsStations', JSON.stringify(sel));
-    updateStationPill();
-    box.remove();
-  };
-}
-stationBtn.onclick=openStations;
-
-function stationMatch(item){
-  if(!ALLOW.size) return true;
-  return ALLOW.has(item.station||'');
-}
-function fmtAgo(ts){ if(!ts) return '—'; const m=Math.floor((Date.now()-ts)/60000); return m<1?'now':m+'m'; }
-
-// ---- Sound on NEW Active tickets ----
-let SOUND_ON=false; soundToggle.onchange=()=>{ SOUND_ON=soundToggle.checked; if(SOUND_ON) ding(true); };
-function ding(test=false){
-  if(!SOUND_ON && !test) return;
-  try{
-    const ctx=new (window.AudioContext||window.webkitAudioContext)();
-    const o=ctx.createOscillator(), g=ctx.createGain();
-    o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(ctx.destination);
-    g.gain.value=0.0001; g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime+0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.35);
-    o.start(); o.stop(ctx.currentTime+0.4);
-  }catch(e){}
-}
-
-// ---- Auth ----
 auth.onAuthStateChanged(u=>{
-  if(u){ me.textContent = u.email; authBox.style.display='none'; }
-  else { me.textContent = 'Signed out'; authBox.style.display='flex'; }
+  me.textContent = u? u.email : 'Not signed in';
 });
-login.onclick = async ()=>{
-  authMsg.textContent='Signing in...';
-  try{ await auth.signInWithEmailAndPassword(email.value.trim(), pass.value); authMsg.textContent='Signed in'; }
-  catch(e){ authMsg.textContent=e.message; }
+login.onclick=async()=>{
+  const email=prompt('Email:'); if(!email) return;
+  const pass=prompt('Password:'); if(pass===null) return;
+  try{await auth.signInWithEmailAndPassword(email.trim(), pass);}catch(e){alert(e.message);}
 };
+logout.onclick=()=> auth.signOut();
 
-// ---- Tabs / subscriptions ----
-let mode='active'; // 'active' | 'completed'
-let unsub=null;
-
-tabActive.onclick = ()=>{ mode='active'; tabActive.classList.add('active'); tabCompleted.classList.remove('active'); completedControls.style.display='none'; subscribe(); };
-tabCompleted.onclick = ()=>{ mode='completed'; tabCompleted.classList.add('active'); tabActive.classList.remove('active'); completedControls.style.display='flex'; subscribe(); };
-
-// Completed filters
-let completedFilter='ready'; // 'ready' | 'picked' | 'both'
-btnReady.onclick = ()=>{ completedFilter='ready'; setSeg(); subscribe(); };
-btnPicked.onclick = ()=>{ completedFilter='picked'; setSeg(); subscribe(); };
-btnBoth.onclick = ()=>{ completedFilter='both'; setSeg(); subscribe(); };
-function setSeg(){
-  btnReady.classList.toggle('active', completedFilter==='ready');
-  btnPicked.classList.toggle('active', completedFilter==='picked');
-  btnBoth.classList.toggle('active', completedFilter==='both');
+// dynamic stations
+async function loadStations(){
+  try{
+    const snap=await db.collection('settings').doc('config').get();
+    const conf=snap.data();
+    if(conf && Array.isArray(conf.stations) && conf.stations.length) STATIONS=conf.stations;
+  }catch(e){}
+  renderChips();
+  stationBadge.textContent='Stations: '+STATIONS.join(', ');
 }
+function renderChips(){
+  if(!selected.size){ STATIONS.forEach(s=>selected.add(s)); }
+  chips.innerHTML = STATIONS.map(s=>`<span class="chip ${selected.has(s)?'active':''}" data-st="${s}">${s}</span>`).join('');
+  chips.querySelectorAll('.chip').forEach(c=>{
+    c.onclick=()=>{ const s=c.dataset.st; if(selected.has(s)) selected.delete(s); else selected.add(s); renderChips(); renderTickets(lastSnapshot); };
+  });
+}
+selectAll.onclick=()=>{ selected=new Set(STATIONS); renderChips(); renderTickets(lastSnapshot); };
+savePref.onclick=()=>{ localStorage.setItem('kdsStations', JSON.stringify([...selected])); alert('Saved on this iPad.'); };
 
-let lastSeenCreatedAt=0, firstLoadActive=true;
+let lastSnapshot=null;
+db.collection('orders').orderBy('createdAt','desc').limit(100).onSnapshot(snap=>{
+  lastSnapshot=snap;
+  renderTickets(snap,true);
+});
+function itemMatchesStations(item){ return !item.station || selected.has(item.station); }
+function orderHasSelectedStations(order){
+  return (order.items||[]).some(it => itemMatchesStations(it));
+}
+function renderTickets(snap,maybePlay){
+  const showCompleted = !!showDone.checked;
+  const docs=[];
+  snap.forEach(d=>{
+    const o=d.data(); o.id=d.id;
+    if(!showCompleted && o.status==='picked'){ return; } // hide finished
+    if(!orderHasSelectedStations(o)) return;
+    docs.push(o);
+  });
 
-function subscribe(){
-  if(unsub) unsub();
-
-  if(mode==='active'){
-    unsub = db.collection('orders')
-      .orderBy('createdAt','asc')
-      .limit(200)
-      .onSnapshot(snap=>{
-        const list=[];
-        let newest=lastSeenCreatedAt;
-        snap.forEach(d=>{
-          const o={id:d.id, ...d.data()};
-          if((o.status==='new' || o.status==='in_progress') && (o.items||[]).length){
-            const its=(o.items||[]).filter(i=>stationMatch(i));
-            if(its.length) list.push({...o, items:its});
-          }
-          if(o.createdAt) newest=Math.max(newest, o.createdAt);
-        });
-        renderActive(list);
-        const hasNew = !firstLoadActive && newest>lastSeenCreatedAt;
-        lastSeenCreatedAt=newest; firstLoadActive=false;
-        if(hasNew) ding();
-      }, showErr);
-  } else {
-    // Pull both timestamps streams independently; filter client-side to avoid composite index
-    unsub = db.collection('orders')
-      .orderBy('updatedAt','desc')
-      .limit(300)
-      .onSnapshot(snap=>{
-        const hist=[];
-        snap.forEach(d=>{
-          const o={id:d.id, ...d.data()};
-          const isReady = (o.status==='ready' && o.readyAt);
-          const isPicked = (o.status==='picked_up' && o.pickedUpAt);
-          if(
-            (completedFilter==='ready'  && isReady) ||
-            (completedFilter==='picked' && isPicked) ||
-            (completedFilter==='both'   && (isReady || isPicked))
-          ){
-            const its=(o.items||[]).filter(i=>stationMatch(i));
-            if(its.length) hist.push({...o, items:its});
-          }
-        });
-        // sort newest first by whichever timestamp exists
-        hist.sort((a,b)=> (b.pickedUpAt||b.readyAt||0) - (a.pickedUpAt||a.readyAt||0));
-        renderCompleted(hist);
-      }, showErr);
+  // sound on new
+  if(maybePlay && sound.checked && docs.length){
+    const newest = docs[0]?.createdAt||0;
+    if(newest>lastSeen){ lastSeen=newest; try{ding.currentTime=0;ding.play();}catch(ex){} }
   }
-}
 
-function showErr(err){
-  board.innerHTML = `<div class="small">Error: ${err.message}</div>`;
-}
+  grid.innerHTML = docs.map(o => ticketHTML(o)).join('');
+  empty.style.display = docs.length? 'none':'block';
 
-// ---- Renderers ----
-function renderActive(tickets){
-  board.innerHTML = tickets.map(t=>`
-    <div class="ticket">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><span class="num">#${t.number}</span> <span class="small">• ${fmtAgo(t.createdAt)}</span></div>
-        <button class="btn primary" data-ready="${t.id}">Ready</button>
-      </div>
-      ${t.customer?`<div style="margin-top:6px"><b>👤 ${t.customer}</b></div>`:''}
-      <ul style="margin:8px 0 0 16px">
-        ${t.items.map(i=>`<li>×${i.qty} — ${i.name}${i.station?` <span class="small">(${i.station})</span>`:''}</li>`).join('')}
-      </ul>
-    </div>
-  `).join('');
-  count.textContent = tickets.length;
-  board.querySelectorAll('button[data-ready]').forEach(b=>{
-    b.onclick = async ()=>{
-      try{
-        await db.collection('orders').doc(b.dataset.ready)
-          .update({status:'ready', readyAt:Date.now(), updatedAt:Date.now()});
-      }catch(e){ alert('Update failed: '+e.message); }
-    };
+  // bind actions
+  grid.querySelectorAll('[data-act]').forEach(b=>{
+    const [act,id]=[b.dataset.act,b.dataset.id];
+    b.onclick=()=> advanceOrder(id, act);
   });
 }
 
-function renderCompleted(hist){
-  board.innerHTML = hist.map(t=>{
-    const when = t.pickedUpAt || t.readyAt;
-    const label = t.status==='picked_up' ? 'Picked ' : 'Ready ';
-    const action = t.status==='picked_up'
-      ? `<button class="btn danger" data-reopen="${t.id}" title="Return to Ready">Return</button>`
-      : `<button class="btn secondary" data-reopen="${t.id}" title="Send back to kitchen">Reopen</button>`;
-    return `
-    <div class="ticket">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><span class="num">#${t.number}</span> <span class="small">• ${label}${fmtAgo(when)}</span></div>
-        ${action}
-      </div>
-      ${t.customer?`<div style="margin-top:6px"><b>👤 ${t.customer}</b></div>`:''}
-      <ul style="margin:8px 0 0 16px">
-        ${t.items.map(i=>`<li>×${i.qty} — ${i.name}${i.station?` <span class="small">(${i.station})</span>`:''}</li>`).join('')}
-      </ul>
-    </div>`;
+function modsHTML(mods){
+  if(!mods || !mods.length) return '';
+  const groups = mods.map(g=>{
+    const names=(g.options||[]).map(o=>o.name).join(', ');
+    return `<div>${g.groupName}: <span class="mods">${names||'-'}</span></div>`;
   }).join('');
-  count.textContent = hist.length;
-  board.querySelectorAll('button[data-reopen]').forEach(b=>{
-    b.onclick = async ()=>{
-      try{
-        const doc=await db.collection('orders').doc(b.dataset.reopen).get();
-        const wasPicked = doc.exists && doc.data().status==='picked_up';
-        await db.collection('orders').doc(b.dataset.reopen)
-          .update(wasPicked
-            ? {status:'ready', updatedAt:Date.now()}
-            : {status:'in_progress', updatedAt:Date.now()}
-          );
-      }catch(e){ alert('Reopen failed: '+e.message); }
-    };
-  });
+  return `<div class="mods" style="margin-top:2px">${groups}</div>`;
+}
+function ticketHTML(o){
+  const lines = (o.items||[])
+    .filter(itemMatchesStations)
+    .map(it=>`
+      <div class="line">
+        <div><strong>${it.qty||1}× ${it.name||''}</strong> <span class="muted">• ${it.station||''}</span></div>
+        ${modsHTML(it.mods)}
+      </div>
+    `).join('');
+
+  const controls = o.status==='new'
+    ? `<button class="btn warn" data-act="start" data-id="${o.id}">Start</button>`
+    : o.status==='in-progress'
+      ? `<button class="btn ok" data-act="ready" data-id="${o.id}">Ready</button>`
+      : `<button class="btn gray" style="background:#1e2432" disabled>Ready</button>`;
+
+  const right = o.status==='ready'
+    ? `<button class="btn gray" data-act="back" data-id="${o.id}" style="background:#1e2432">Undo Ready</button>`
+    : controls;
+
+  return `
+  <div class="ticket">
+    <div class="hdr">
+      <div>
+        <div class="customer">${o.customer||'No name'} <span class="muted">#${o.number||''}</span></div>
+        <div class="muted">${new Date(o.createdAt||Date.now()).toLocaleTimeString()}</div>
+      </div>
+      <div class="right">
+        ${right}
+      </div>
+    </div>
+    <div class="items">${lines||'<div class="muted">No items for selected stations.</div>'}</div>
+  </div>`;
 }
 
-// Start
-subscribe();
+async function advanceOrder(id, act){
+  const ref=db.collection('orders').doc(id);
+  try{
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(ref); if(!snap.exists) return;
+      const o=snap.data();
+      let status=o.status||'new';
+      if(act==='start') status='in-progress';
+      if(act==='ready') status='ready';
+      if(act==='back'){
+        status = (o.status==='ready') ? 'in-progress' : 'new';
+      }
+      tx.update(ref,{status, updatedAt: Date.now()});
+    });
+  }catch(e){ alert(e.message); }
+}
+
+// init
+loadStations();
 </script>
 </body></html>
