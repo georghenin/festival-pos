@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Festival POS (with Modifiers)</title>
+<title>Festival POS (with Modifiers + Station Filter + Images)</title>
 <style>
   :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--accent:#5b9bff;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b;--card:#0f141e;--border:#1b2230}
   *{box-sizing:border-box}
@@ -38,7 +38,7 @@
 <body>
 <div class="container">
   <div class="row" style="justify-content:space-between">
-    <h2 class="title">Festival POS (with Modifiers)</h2>
+    <h2 class="title">Festival POS</h2>
     <div class="row">
       <span class="pill" id="cashier">Not signed in</span>
       <button class="btn gray" id="signout" style="display:none">Sign out</button>
@@ -63,6 +63,14 @@
           <option value="">Auto route by item</option>
           <option>Grill</option><option>Fryer</option><option>Drinks</option><option>Pizza</option>
         </select>
+      </div>
+      <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+        <label class="pill">Filter station:
+          <select id="posStationFilter" style="margin-left:8px;background:transparent;border:none;color:#e5e8ee">
+            <option value="">All</option>
+            <option>Grill</option><option>Fryer</option><option>Drinks</option><option>Pizza</option>
+          </select>
+        </label>
       </div>
       <div class="small" id="nameWarn" style="color:#ffb3b3;margin-top:6px;display:none">Name is required</div>
     </div>
@@ -133,6 +141,7 @@ const appBox = $('#app'), authBox = $('#auth'), cashierEl=$('#cashier'), signout
 const email=$('#email'), pass=$('#pass'), login=$('#login'), create=$('#create'), msg=$('#msg');
 const catbar=$('#catbar'), itemsEl=$('#items'), cartEl=$('#cart'), totalEl=$('#total');
 const clearBtn=$('#clear'), submitBtn=$('#submit'), statusEl=$('#status'), stationSel=$('#station'), custInp=$('#cust'), nameWarn=$('#nameWarn');
+const posStationFilter = document.getElementById('posStationFilter');
 
 /* ---- Auth ---- */
 function setUI(user){const on=!!user; authBox.style.display = on?'none':'block'; appBox.style.display = on?'block':'none'; cashierEl.textContent = on? user.email : 'Not signed in'; signout.style.display = on?'inline-flex':'none';}
@@ -154,21 +163,28 @@ function loadMenuRealtime(){
     const active = MENU.filter(m=> m.active!==false);
     rebuild(active);
   });
-  // load all modifier groups once (or listen if you like)
   db.collection('modGroups').get().then(snap=>{
     MOD_GROUPS={}; snap.forEach(d=> MOD_GROUPS[d.id] = {id:d.id, ...d.data()});
   });
 }
-function rebuild(active){ CATS=['All', ...Array.from(new Set(active.map(i=>i.cat)))]; if(!CATS.includes(activeCat)) activeCat='All'; renderCats(); renderItems(active); }
-function renderCats(){ catbar.innerHTML = CATS.map(c=>`<button class="catbtn" data-cat="${c}">${c}</button>`).join(''); catbar.querySelectorAll('button').forEach(b=> b.onclick = ()=>{ activeCat=b.dataset.cat; renderItems(MENU.filter(m=>m.active!==false)); }); }
+function rebuild(active){ CATS=['All', ...Array.from(new Set(active.map(i=>i.cat).filter(Boolean)))]; if(!CATS.includes(activeCat)) activeCat='All'; renderCats(); renderItems(active); }
+function renderCats(){ 
+  // If you don't use categories, hide the bar by commenting next line
+  catbar.innerHTML = CATS.map(c=>`<button class="catbtn" data-cat="${c}">${c}</button>`).join('');
+  catbar.querySelectorAll('button').forEach(b=> b.onclick = ()=>{ activeCat=b.dataset.cat; renderItems(MENU.filter(m=>m.active!==false)); });
+}
 function renderItems(list){
-  const show = list.filter(i=> activeCat==='All' || i.cat===activeCat);
+  // Station filter first
+  const byStation = list.filter(i => !posStationFilter.value || (i.station||'')===posStationFilter.value);
+  const show = byStation.filter(i => activeCat==='All' || i.cat===activeCat);
   itemsEl.innerHTML = show.map(i=>`<div class="item" data-id="${i.id}">
+    ${i.img ? `<img loading="lazy" src="${i.img}" alt="" style="width:100%;height:90px;object-fit:cover;border-radius:10px;margin-bottom:6px">` : ``}
     <h4>${i.name}</h4>
-    <div class="small">${i.cat} • ${money(+i.price||0)}${i.modGroupId?' • has options':''}</div>
+    <div class="small">${i.station||''} • ${money(+i.price||0)}${i.modGroupId?' • has options':''}</div>
   </div>`).join('');
   itemsEl.querySelectorAll('.item').forEach(el=> el.onclick=()=> addClicked(el.getAttribute('data-id')) );
 }
+posStationFilter.onchange = ()=> renderItems(MENU.filter(m=>m.active!==false));
 
 /* ---- Cart ---- */
 let CART=[];
@@ -193,7 +209,7 @@ function renderCart(){
 }
 function qtyAction(i,a){ const l = CART[i]; if(!l) return; if(a==='+') l.qty++; if(a==='-') l.qty = Math.max(1, l.qty-1); if(a==='x') CART.splice(i,1); renderCart(); }
 
-/* ---- Click add: either simple item or modifiers ---- */
+/* ---- Click add: simple item or modifiers ---- */
 function addClicked(id){
   const it = MENU.find(x=>x.id===id);
   if(!it) return;
@@ -211,7 +227,6 @@ let currentItem=null, currentGroup=null, picks=[];
 
 function openModModal(item, group){
   currentItem=item; currentGroup=group;
-  // initialize counts to 0
   picks = (group.options||[]).map((o,idx)=>({ idx, name:o.name, priceDelta:+(o.priceDelta||0), station:o.station||item.station||'', qty:0, min:+(o.min||0), max:+(o.max||99) }));
   modTitle.innerHTML = `<b>${item.name}</b> — <span class="small">${group.name||'Customize'}</span>`;
   if(group.mode==='fixed_total'){ modRule.textContent = `Pick exactly ${group.requiredTotal||0} in any combination.`; }
@@ -222,7 +237,6 @@ function openModModal(item, group){
   modWrap.style.display='flex';
 }
 function closeMod(){ modWrap.style.display='none'; currentItem=null; currentGroup=null; picks=[]; }
-
 function totalPicked(){ return picks.reduce((s,p)=> s+p.qty, 0); }
 function extraPrice(){ 
   if(currentGroup.priceMode==='sum_of_options'){
@@ -230,7 +244,6 @@ function extraPrice(){
     const delta = picks.reduce((s,p)=> s + (p.qty * p.priceDelta), 0);
     return { total: base + delta, delta: delta };
   }
-  // fixed item price (ignore deltas)
   return { total: +currentItem.price||0, delta: 0 };
 }
 function renderOptions(){
@@ -261,9 +274,7 @@ function renderOptions(){
 function changePick(i,a){
   const rules = currentGroup, p=picks[i]; if(!p) return;
   if(a==='+'){
-    // per-option max
     if(p.qty >= p.max) return;
-    // total max
     if(rules.mode==='fixed_total'){
       if(totalPicked() >= (rules.requiredTotal||0)) return;
     }else if(rules.maxTotal){
@@ -276,27 +287,22 @@ function changePick(i,a){
   renderOptions();
 }
 modClose.onclick = closeMod;
-
 modAdd.onclick = ()=>{
-  // validate
   const rules=currentGroup, tp=totalPicked();
   if(rules.mode==='fixed_total' && tp !== (rules.requiredTotal||0)){
     modWarn.textContent = `Please pick exactly ${rules.requiredTotal||0}.`;
     modWarn.style.display='block'; return;
   }
   if(rules.minTotal && tp < rules.minTotal){ modWarn.textContent = `Please pick at least ${rules.minTotal}.`; modWarn.style.display='block'; return; }
-
   const chosen = picks.filter(p=>p.qty>0);
   if(!chosen.length){ modWarn.textContent = 'Pick at least one option.'; modWarn.style.display='block'; return; }
-
   const xp = extraPrice();
-  // Build one cart line with components
   const line = {
     id: currentItem.id,
     name: currentItem.name,
     qty: 1,
-    price: xp.total,                 // fixed or sum
-    station: currentItem.station||'',// optional, not used when splitting by sub-items
+    price: xp.total,
+    station: currentItem.station||'',
     mods: chosen.map(c=> ({ name:c.name, qty:c.qty, station:c.station, priceDelta:c.priceDelta }))
   };
   addLine(line);
@@ -310,12 +316,10 @@ submitBtn.onclick = async()=>{
   nameWarn.style.display = custInp.value.trim()? 'none':'block';
   if(!custInp.value.trim()){ custInp.focus(); return; }
   if(CART.length===0) { statusEl.textContent='Add items first.'; return; }
-
   submitBtn.disabled = true; statusEl.textContent='Submitting...';
   try{
     const now = Date.now();
-    const number = provisionalNumber(); // instant, zero contention
-    // flatten items for kitchen routing: if a line has mods, expand to individual items by station
+    const number = provisionalNumber();
     const items = [];
     CART.forEach(l=>{
       if(l.mods && l.mods.length){
@@ -326,7 +330,6 @@ submitBtn.onclick = async()=>{
         items.push({ name: l.name, qty: l.qty, price: l.price, station: l.station||'' });
       }
     });
-
     await db.collection('orders').add({
       number,
       items,
@@ -336,13 +339,10 @@ submitBtn.onclick = async()=>{
       preferredStation: stationSel.value || null,
       cashier: (auth.currentUser?.email)||null,
       total: CART.reduce((s,l)=> s+l.qty*l.price, 0),
-      rawCart: CART  // stored for reference
+      rawCart: CART
     });
-    CART=[]; renderCart(); statusEl.textContent = 'Order sent to kitchen.';
-    custInp.value='';
-  }catch(e){
-    statusEl.textContent = e.message;
-  }
+    CART=[]; renderCart(); statusEl.textContent = 'Order sent to kitchen.'; custInp.value='';
+  }catch(e){ statusEl.textContent = e.message; }
   submitBtn.disabled = false;
 };
 
