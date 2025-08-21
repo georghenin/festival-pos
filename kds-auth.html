@@ -1,46 +1,58 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>KDS (Sign-In + Station Filters + Sound)</title>
+<title>KDS (Auth + Stations + Sound + Completed)</title>
 <style>
-  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--border:#1b2230;--ok:#2fd28f;--danger:#ff6b6b}
+  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--border:#1b2230;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b}
   html,body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0}
-  .top{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
-  .pill{padding:6px 10px;border:1px solid var(--border);border-radius:999px;color:#aab3c0}
-  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:16px;max-height:calc(100vh - 140px);overflow:auto}
-  .ticket{background:#121826;border:1px solid var(--border);border-radius:16px;padding:12px}
-  .small{font-size:12px;color:#aab3c0}
-  .btn{border:none;border-radius:10px;padding:8px 12px;background:#1e2432;color:#e5e8ee;cursor:pointer}
-  .btn.primary{background:var(--ok);color:#0b0e14}
-  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .auth{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
   input{font:inherit;background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  .top{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .pill{padding:6px 10px;border:1px solid var(--border);border-radius:999px;color:#aab3c0}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .tab{border:1px solid var(--border);border-radius:999px;padding:8px 14px;background:#0f1420;color:#e5e8ee;cursor:pointer}
+  .tab.active{outline:2px solid var(--ok)}
+  .btn{border:none;border-radius:10px;padding:8px 12px;cursor:pointer}
+  .btn.primary{background:var(--ok);color:#0b0e14}
+  .btn.secondary{background:#1e2432;color:#e5e8ee}
+  .btn.danger{background:var(--danger);color:#0b0e14}
+  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:16px;max-height:calc(100vh - 180px);overflow:auto}
+  .ticket{background:#121826;border:1px solid var(--border);border-radius:16px;padding:12px}
+  .small{font-size:12px;color:#aab3c0}
+  .num{font-weight:800}
 </style>
 </head>
 <body>
 
+<!-- Sign-in -->
 <div class="auth" id="auth">
-  <input id="email" type="email" placeholder="KDS email (or cashier/admin)" style="min-width:220px">
-  <input id="pass" type="password" placeholder="Password" style="min-width:160px">
+  <input id="email" type="email" placeholder="KDS email (or staff/admin)">
+  <input id="pass" type="password" placeholder="Password">
   <button id="login" class="btn primary">Sign in</button>
   <span id="authMsg" class="small"></span>
 </div>
 
+<!-- Header -->
 <div class="top">
   <div class="row">
-    <b>Kitchen Display</b>
+    <div class="tabs">
+      <button id="tabActive" class="tab active">Active</button>
+      <button id="tabCompleted" class="tab">Completed</button>
+    </div>
     <span class="pill" id="stationPill">All stations</span>
+    <span class="pill" id="count">0</span>
   </div>
   <div class="row">
-    <span class="pill" id="me">Signed out</span>
-    <span class="pill" id="count">0</span>
-    <button id="stationBtn" class="btn">Stations…</button>
     <label class="pill" style="cursor:pointer">
       <input type="checkbox" id="soundToggle" style="margin-right:6px"> Sound
     </label>
+    <button id="stationBtn" class="btn secondary">Stations…</button>
+    <span class="pill" id="me">Signed out</span>
   </div>
 </div>
 
+<!-- Grid -->
 <div class="board" id="board"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
@@ -70,71 +82,75 @@ const authMsg=document.getElementById('authMsg');
 const stationPill=document.getElementById('stationPill');
 const stationBtn=document.getElementById('stationBtn');
 const soundToggle=document.getElementById('soundToggle');
+const tabActive=document.getElementById('tabActive');
+const tabCompleted=document.getElementById('tabCompleted');
 
-const ALL_STATIONS = ['Grill','Fryer','Drinks','Pizza'];
-
-// ---- Stations selection (URL + localStorage) ----
+// ---- Stations (URL + localStorage) ----
+const STATIONS_ALL=['Grill','Fryer','Drinks','Pizza'];
 const qs=new URLSearchParams(location.search);
-const urlParam = (qs.get('station')||'').trim();
-let ALLOW = new Set(); // allowed stations; empty = show all
-try{
-  const saved = JSON.parse(localStorage.getItem('kdsStations')||'[]');
-  if(saved && saved.length) ALLOW = new Set(saved);
-  else if(urlParam){ ALLOW = new Set(urlParam.split(',').map(s=>s.trim()).filter(Boolean)); }
-}catch(e){}
-function refreshPill(){
-  stationPill.textContent = ALLOW.size ? ('Stations: ' + [...ALLOW].join(', ')) : 'All stations';
+const urlStations=(qs.get('station')||'').trim();
+let ALLOW = new Set();
+
+if(urlStations){
+  urlStations.split(',').map(s=>s.trim()).filter(Boolean).forEach(s=> ALLOW.add(s));
+}else{
+  try{
+    const saved=JSON.parse(localStorage.getItem('kdsStations')||'[]');
+    if(Array.isArray(saved)) saved.forEach(s=> ALLOW.add(s));
+  }catch(e){}
 }
-refreshPill();
+function updateStationPill(){
+  stationPill.textContent = ALLOW.size ? ('Stations: '+[...ALLOW].join(', ')) : 'All stations';
+}
+updateStationPill();
 
 function openStations(){
-  const box = document.createElement('div');
-  box.innerHTML = `
+  const box=document.createElement('div');
+  const html=STATIONS_ALL.map(s=>`
+    <label style="display:block;margin:6px 0"><input type="checkbox" value="${s}" ${ALLOW.has(s)?'checked':''}> ${s}</label>
+  `).join('');
+  box.innerHTML=`
   <div style="position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:50">
     <div style="background:#0f141e;border:1px solid #1b2230;border-radius:12px;padding:14px;min-width:280px">
       <h3 style="margin:0 0 8px 0">Show stations</h3>
-      ${ALL_STATIONS.map(s=>`
-        <label style="display:block;margin:6px 0">
-          <input type="checkbox" value="${s}" ${ALLOW.has(s)?'checked':''}> ${s}
-        </label>
-      `).join('')}
+      ${html}
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
-        <button id="stCancel" class="btn">Cancel</button>
+        <button id="stCancel" class="btn secondary">Cancel</button>
         <button id="stSave" class="btn primary">Save</button>
       </div>
     </div>
   </div>`;
   document.body.appendChild(box);
-  box.querySelector('#stCancel').onclick = ()=> box.remove();
-  box.querySelector('#stSave').onclick = ()=>{
-    const sel = [...box.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
-    ALLOW = new Set(sel);
+  box.querySelector('#stCancel').onclick=()=>box.remove();
+  box.querySelector('#stSave').onclick=()=>{
+    const sel=[...box.querySelectorAll('input[type=checkbox]:checked')].map(i=>i.value);
+    ALLOW=new Set(sel);
     localStorage.setItem('kdsStations', JSON.stringify(sel));
-    refreshPill();
+    updateStationPill();
     box.remove();
   };
 }
-stationBtn.addEventListener('click', openStations);
+stationBtn.onclick=openStations;
 
-// ---- Sound ----
-let SOUND_ON=false, lastSeenCreatedAt=0, firstSnap=true;
-soundToggle.onchange = ()=>{ SOUND_ON = soundToggle.checked; if(SOUND_ON) ding(true); };
+function stationMatch(item){
+  if(!ALLOW.size) return true;
+  return ALLOW.has(item.station||'');
+}
+function fmtAgo(ts){ if(!ts) return '—'; const m=Math.floor((Date.now()-ts)/60000); return m<1?'now':m+'m'; }
+
+// ---- Sound on NEW Active tickets ----
+let SOUND_ON=false; soundToggle.onchange=()=>{ SOUND_ON=soundToggle.checked; if(SOUND_ON) ding(true); };
 function ding(test=false){
   if(!SOUND_ON && !test) return;
   try{
     const ctx=new (window.AudioContext||window.webkitAudioContext)();
     const o=ctx.createOscillator(), g=ctx.createGain();
-    o.type='sine';o.frequency.value=880;o.connect(g);g.connect(ctx.destination);
+    o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(ctx.destination);
     g.gain.value=0.0001; g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime+0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.35);
     o.start(); o.stop(ctx.currentTime+0.4);
   }catch(e){}
 }
-function stationAllowed(s){
-  if(!ALLOW.size) return true;
-  return ALLOW.has(s||'');
-}
-function fmtAgo(ts){ if(!ts) return '—'; const m=Math.floor((Date.now()-ts)/60000); return m<1?'now':m+'m'; }
 
 // ---- Auth ----
 auth.onAuthStateChanged(u=>{
@@ -143,57 +159,118 @@ auth.onAuthStateChanged(u=>{
 });
 login.onclick = async ()=>{
   authMsg.textContent='Signing in...';
-  try{
-    await auth.signInWithEmailAndPassword(email.value.trim(), pass.value);
-    authMsg.textContent='Signed in';
-  }catch(e){ authMsg.textContent=e.message; }
+  try{ await auth.signInWithEmailAndPassword(email.value.trim(), pass.value); authMsg.textContent='Signed in'; }
+  catch(e){ authMsg.textContent=e.message; }
 };
 
-// ---- Data stream (single orderBy; filter client-side) ----
-let unsub = db.collection('orders').orderBy('createdAt','asc').limit(200).onSnapshot(snap=>{
-  const list=[];
-  let newest = lastSeenCreatedAt;
-  snap.forEach(d=>{
-    const o={id:d.id, ...d.data()};
-    if(o.status==='new' || o.status==='in_progress'){
-      const its = (o.items||[]).filter(i=> stationAllowed(i.station));
-      if(its.length>0) list.push({...o, items:its});
-    }
-    if(o.createdAt) newest = Math.max(newest, o.createdAt);
-  });
-  const hasNew = !firstSnap && newest>lastSeenCreatedAt;
-  lastSeenCreatedAt = newest;
-  firstSnap=false;
-  render(list);
-  if(hasNew) ding();
-}, err=>{
-  board.innerHTML = `<div class="small">Error: ${err.message}</div>`;
-});
+// ---- Tabs / subscriptions ----
+let mode='active'; // 'active' | 'completed'
+let unsub=null;
 
-function render(tickets){
+tabActive.onclick = ()=>{ mode='active'; tabActive.classList.add('active'); tabCompleted.classList.remove('active'); subscribe(); };
+tabCompleted.onclick = ()=>{ mode='completed'; tabCompleted.classList.add('active'); tabActive.classList.remove('active'); subscribe(); };
+
+let lastSeenCreatedAt=0, firstLoadActive=true;
+
+function subscribe(){
+  if(unsub) unsub();
+
+  if(mode==='active'){
+    // Show orders the kitchen is working on (new/in_progress)
+    unsub = db.collection('orders')
+      .orderBy('createdAt','asc')
+      .limit(200)
+      .onSnapshot(snap=>{
+        const list=[];
+        let newest=lastSeenCreatedAt;
+        snap.forEach(d=>{
+          const o={id:d.id, ...d.data()};
+          if((o.status==='new' || o.status==='in_progress') && (o.items||[]).length){
+            // filter by station(s)
+            const its=(o.items||[]).filter(i=>stationMatch(i));
+            if(its.length) list.push({...o, items:its});
+          }
+          if(o.createdAt) newest=Math.max(newest, o.createdAt);
+        });
+        renderActive(list);
+        const hasNew = !firstLoadActive && newest>lastSeenCreatedAt;
+        lastSeenCreatedAt=newest; firstLoadActive=false;
+        if(hasNew) ding();
+      }, err=> showErr(err));
+  } else {
+    // Completed = orders the kitchen marked Ready (recent history)
+    // We order by readyAt desc to avoid composite index needs; filter client-side.
+    unsub = db.collection('orders')
+      .orderBy('readyAt','desc')
+      .limit(200)
+      .onSnapshot(snap=>{
+        const hist=[];
+        snap.forEach(d=>{
+          const o={id:d.id, ...d.data()};
+          if(o.status==='ready' && o.readyAt){ // "previously completed" by kitchen
+            const its=(o.items||[]).filter(i=>stationMatch(i));
+            if(its.length) hist.push({...o, items:its});
+          }
+        });
+        renderCompleted(hist);
+      }, err=> showErr(err));
+  }
+}
+
+function showErr(err){
+  board.innerHTML = `<div class="small">Error: ${err.message}</div>`;
+}
+
+// ---- Renderers ----
+function renderActive(tickets){
   board.innerHTML = tickets.map(t=>`
     <div class="ticket">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><b>#${t.number}</b> <span class="small">• ${fmtAgo(t.createdAt)}</span></div>
-        <button class="btn primary" data-id="${t.id}">Ready</button>
+        <div><span class="num">#${t.number}</span> <span class="small">• ${fmtAgo(t.createdAt)}</span></div>
+        <button class="btn primary" data-ready="${t.id}">Ready</button>
       </div>
       ${t.customer?`<div style="margin-top:6px"><b>👤 ${t.customer}</b></div>`:''}
       <ul style="margin:8px 0 0 16px">
-        ${t.items.map(i=>`<li>×${i.qty} — ${i.name} ${i.station?`<span class="small" style="color:#9fb0c3">(${i.station})</span>`:''}</li>`).join('')}
+        ${t.items.map(i=>`<li>×${i.qty} — ${i.name}${i.station?` <span class="small">(${i.station})</span>`:''}</li>`).join('')}
       </ul>
     </div>
   `).join('');
   count.textContent = tickets.length;
-  board.querySelectorAll('button[data-id]').forEach(b=>{
+  board.querySelectorAll('button[data-ready]').forEach(b=>{
     b.onclick = async ()=>{
       try{
-        await db.collection('orders').doc(b.dataset.id)
+        await db.collection('orders').doc(b.dataset.ready)
           .update({status:'ready', readyAt:Date.now(), updatedAt:Date.now()});
-      }catch(e){
-        alert('Update failed: '+e.message);
-      }
+      }catch(e){ alert('Update failed: '+e.message); }
     };
   });
 }
+
+function renderCompleted(hist){
+  board.innerHTML = hist.map(t=>`
+    <div class="ticket">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><span class="num">#${t.number}</span> <span class="small">• Ready ${fmtAgo(t.readyAt)}</span></div>
+        <button class="btn secondary" data-reopen="${t.id}" title="Send back to kitchen">Reopen</button>
+      </div>
+      ${t.customer?`<div style="margin-top:6px"><b>👤 ${t.customer}</b></div>`:''}
+      <ul style="margin:8px 0 0 16px">
+        ${t.items.map(i=>`<li>×${i.qty} — ${i.name}${i.station?` <span class="small">(${i.station})</span>`:''}</li>`).join('')}
+      </ul>
+    </div>
+  `).join('');
+  count.textContent = hist.length;
+  board.querySelectorAll('button[data-reopen]').forEach(b=>{
+    b.onclick = async ()=>{
+      try{
+        await db.collection('orders').doc(b.dataset.reopen)
+          .update({status:'in_progress', updatedAt:Date.now()});
+      }catch(e){ alert('Reopen failed: '+e.message); }
+    };
+  });
+}
+
+// Start on Active
+subscribe();
 </script>
 </body></html>
