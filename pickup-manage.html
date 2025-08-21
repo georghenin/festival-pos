@@ -1,321 +1,220 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Pickup Manager (Ready, Picked, All History)</title>
+<title>Pickup Manager</title>
 <style>
-  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--border:#1b2230;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b}
-  html,body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;height:100%}
-  .wrap{height:100vh;display:flex;flex-direction:column}
-  .top{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-  .grid{flex:1;display:grid;gap:16px;padding:16px;overflow:auto}
-  .tile{background:#121826;border:1px solid var(--border);border-radius:18px;min-height:160px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:12px;display:flex;flex-direction:column}
-  .num{font-size:28px;font-weight:800;letter-spacing:1px;line-height:1;margin-bottom:4px}
-  .cust{font-size:16px;color:#e5e8ee;margin-bottom:8px}
-  .meta{font-size:11px;color:#95a0ad;margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:8px}
-  .btn{border:none;border-radius:10px;padding:8px 12px;font:inherit;cursor:pointer}
-  .btn.ok{background:var(--ok);color:#0b0e14}
-  .btn.warn{background:var(--warn);color:#0b0e14}
-  .btn.gray{background:#1e2432;color:#e5e8ee}
-  .btn.danger{background:var(--danger);color:#0b0e14}
-  .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;color:#95a0ad}
-  .tabs{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .tab{border:1px solid var(--border);border-radius:999px;padding:8px 14px;background:#0f1420;color:#e5e8ee;cursor:pointer}
-  .tab.active{outline:2px solid var(--ok)}
-  .auth{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
-  input{font:inherit;background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--card:#0f141e;--border:#1b2230;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b;--accent:#5b9bff}
+  *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  .wrap{max-width:1200px;margin:0 auto;padding:14px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;color:#aab3c0;background:#0f1420}
+  .btn{border:none;border-radius:10px;padding:10px 12px;cursor:pointer;color:#fff;background:var(--accent)}
+  .btn.ok{background:var(--ok);color:#0b0e14}.btn.gray{background:#1e2432}.btn.danger{background:var(--danger);color:#0b0e14}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{border:1px solid var(--border);background:#0f1420;color:#e5e8ee;border-radius:999px;padding:6px 10px;cursor:pointer}
+  .chip.active{outline:2px solid var(--ok)}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .ticket{border:1px solid var(--border);background:#121826;border-radius:14px;padding:10px;margin-bottom:10px}
+  .hdr{display:flex;justify-content:space-between;gap:10px;align-items:center}
+  .customer{font-weight:800}
+  .line{border-top:1px dashed #293246;padding:6px 0}
+  .mods{color:#aeb7c6;font-size:12px;margin-top:2px}
+  .muted{color:var(--muted);font-size:12px}
+  @media (max-width:900px){ .cols{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
-<!-- Sign-in -->
-<div class="auth" id="auth">
-  <input id="email" type="email" placeholder="Pickup staff email">
-  <input id="pass" type="password" placeholder="Password">
-  <button id="login" class="btn ok">Sign in</button>
-  <span id="authMsg" class="pill">Signed out</span>
-</div>
-
 <div class="wrap">
-  <div class="top">
-    <div class="tabs">
-      <button class="tab active" id="tabReady">Ready</button>
-      <button class="tab" id="tabPicked">Picked Up</button>
-      <button class="tab" id="tabAll">All History</button>
-    </div>
 
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <label class="pill" style="cursor:pointer">
-        <input type="checkbox" id="soundToggle" style="margin-right:6px"> Sound
-      </label>
-      <span id="count" class="pill">Ready: 0</span>
-      <button id="bulkComplete" class="btn warn">Complete All Shown</button>
-      <button id="bulkUndo" class="btn gray" style="display:none">Undo All Shown</button>
-      <label class="pill" style="display:flex;align-items:center;gap:6px">
-        Columns: <input id="colsInp" type="number" value="4" min="1" max="8" style="width:70px;background:transparent;color:#e5e8ee;border:none">
-      </label>
-      <button id="signOut" class="btn gray">Sign out</button>
+  <!-- Top -->
+  <div class="row" style="justify-content:space-between">
+    <div class="row">
+      <strong style="font-size:20px">Pickup Manager</strong>
+      <span id="stationBadge" class="pill">Stations: loading…</span>
+    </div>
+    <div class="row">
+      <label class="pill"><input id="sound" type="checkbox" style="margin-right:6px"> Sound on new ready</label>
+      <span id="me" class="pill">Not signed in</span>
+      <button id="login" class="btn">Sign in</button>
+      <button id="logout" class="btn gray">Sign out</button>
     </div>
   </div>
 
-  <div id="grid" class="grid"></div>
+  <!-- Station filters -->
+  <div class="card" style="margin-top:10px">
+    <div class="row" style="justify-content:space-between">
+      <div>
+        <div class="muted" style="margin-bottom:6px">Only show orders that contain items from these stations:</div>
+        <div class="chips" id="chips"></div>
+      </div>
+      <div class="row">
+        <button id="selectAll" class="btn gray">Select all</button>
+        <button id="savePref" class="btn ok">Save to this iPad</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lists -->
+  <div class="cols" style="margin-top:10px">
+    <div class="card">
+      <h3 style="margin:0 0 8px 0">Ready for Pickup</h3>
+      <div id="ready"></div>
+      <div id="emptyReady" class="muted" style="display:none">No ready orders.</div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <h3 style="margin:0">Picked Up (today)</h3>
+        <button id="showAll" class="btn gray">Show all history</button>
+      </div>
+      <div id="picked"></div>
+      <div id="emptyPicked" class="muted" style="display:none">No picked orders.</div>
+    </div>
+  </div>
 </div>
 
+<audio id="ding"><source src="data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAA..." type="audio/mp3"></audio>
+
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 <script>
-// --- Firebase (your project) ---
 firebase.initializeApp({
-  apiKey: "AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
-  authDomain: "churchfestivalpos.firebaseapp.com",
-  projectId: "churchfestivalpos",
-  storageBucket: "churchfestivalpos.firebasestorage.app",
-  messagingSenderId: "447909610900",
-  appId: "1:447909610900:web:a54a828bacfa02e7883b81"
+  apiKey:"AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
+  authDomain:"churchfestivalpos.firebaseapp.com",
+  projectId:"churchfestivalpos"
 });
 const db=firebase.firestore(), auth=firebase.auth();
 
-// --- UI refs ---
-const grid=document.getElementById('grid');
-const count=document.getElementById('count');
-const colsInp=document.getElementById('colsInp');
-const signOut=document.getElementById('signOut');
-const email=document.getElementById('email');
-const pass=document.getElementById('pass');
-const login=document.getElementById('login');
-const authMsg=document.getElementById('authMsg');
-const authBox=document.getElementById('auth');
-const tabReady=document.getElementById('tabReady');
-const tabPicked=document.getElementById('tabPicked');
-const tabAll=document.getElementById('tabAll');
-const bulkComplete=document.getElementById('bulkComplete');
-const bulkUndo=document.getElementById('bulkUndo');
-const soundToggle=document.getElementById('soundToggle');
+const $=s=>document.querySelector(s);
+const me=$('#me'), login=$('#login'), logout=$('#logout');
+const stationBadge=$('#stationBadge'), chips=$('#chips'), selectAll=$('#selectAll'), savePref=$('#savePref');
+const ready=$('#ready'), picked=$('#picked'), emptyReady=$('#emptyReady'), emptyPicked=$('#emptyPicked');
+const sound=$('#sound'), ding=$('#ding'), showAll=$('#showAll');
 
-// columns
-const qs=new URLSearchParams(location.search);
-const cols = Math.max(1, parseInt(qs.get('cols') || colsInp.value, 10));
-grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
-colsInp.value = cols;
-colsInp.onchange = ()=> grid.style.gridTemplateColumns = `repeat(${Math.max(1,parseInt(colsInp.value||'4',10))},1fr)`;
+let STATIONS=['Grill','Fryer','Drinks','Pizza'];
+let selected=new Set(JSON.parse(localStorage.getItem('pickupStations')||'[]'));
+let lastReadySeen=0;
+let showAllHistory=false;
 
-// Stations config (kept for future consistency)
-let STATIONS_ALL=['Grill','Fryer','Drinks','Pizza'];
-db.collection('settings').doc('config').get().then(d=>{
-  const conf=d.data(); if(conf && Array.isArray(conf.stations) && conf.stations.length){ STATIONS_ALL=conf.stations; }
-});
+auth.onAuthStateChanged(u=>{ me.textContent=u?u.email:'Not signed in'; });
+login.onclick=async()=>{ const email=prompt('Email:'); if(!email) return; const pass=prompt('Password:'); if(pass===null) return; try{await auth.signInWithEmailAndPassword(email.trim(),pass);}catch(e){alert(e.message);} };
+logout.onclick=()=>auth.signOut();
 
-// --- Auth ---
-auth.onAuthStateChanged(u=>{
-  if(u && u.email){ authMsg.textContent = u.email; authBox.style.display='none'; }
-  else { authMsg.textContent = 'Signed out'; authBox.style.display='flex'; }
-});
-login.onclick = async ()=>{
-  authMsg.textContent='Signing in...';
-  try{ await auth.signInWithEmailAndPassword(email.value.trim(), pass.value); authMsg.textContent='Signed in'; }
-  catch(e){ authMsg.textContent=e.message; }
-};
-signOut.onclick = ()=> auth.signOut();
-
-// --- Helpers ---
-function fmtAgo(ts){ if(!ts) return '—'; const m=Math.floor((Date.now()-ts)/60000); return m<1?'now':m+'m'; }
-
-// ---- Sound ----
-let SOUND_ON=false; soundToggle.onchange=()=>{ SOUND_ON=soundToggle.checked; if(SOUND_ON) ding(true); };
-function ding(test=false){
-  if(!SOUND_ON && !test) return;
+// stations
+async function loadStations(){
   try{
-    const ctx=new (window.AudioContext||window.webkitAudioContext)();
-    const o=ctx.createOscillator(), g=ctx.createGain();
-    o.type='sine'; o.frequency.value=880; o.connect(g); g.connect(ctx.destination);
-    g.gain.value=0.0001; g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime+0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+0.35);
-    o.start(); o.stop(ctx.currentTime+0.4);
+    const snap=await db.collection('settings').doc('config').get();
+    const conf=snap.data(); if(conf && Array.isArray(conf.stations)&&conf.stations.length) STATIONS=conf.stations;
   }catch(e){}
+  renderChips();
+  stationBadge.textContent='Stations: '+STATIONS.join(', ');
 }
+function renderChips(){
+  if(!selected.size){ STATIONS.forEach(s=>selected.add(s)); }
+  chips.innerHTML = STATIONS.map(s=>`<span class="chip ${selected.has(s)?'active':''}" data-st="${s}">${s}</span>`).join('');
+  chips.querySelectorAll('.chip').forEach(c=>{
+    c.onclick=()=>{ const s=c.dataset.st; if(selected.has(s)) selected.delete(s); else selected.add(s); renderChips(); renderLists(); };
+  });
+}
+selectAll.onclick=()=>{ selected=new Set(STATIONS); renderChips(); renderLists(); };
+savePref.onclick=()=>{ localStorage.setItem('pickupStations', JSON.stringify([...selected])); alert('Saved on this iPad.'); };
 
-// We avoid composite indexes by ordering on one key and filtering client-side.
-let mode='ready';  // 'ready' | 'picked' | 'all'
-let unsub=null;
-let currentIds=[];
-let latestReady=0, firstReady=true;
-
+// data
+let unsub=null, unsubPicked=null;
 function subscribe(){
-  if(unsub) unsub();
-
-  if(mode==='ready'){
-    unsub = db.collection('orders').orderBy('readyAt','desc').limit(200).onSnapshot(renderReady, onErr);
-  }else if(mode==='picked'){
-    unsub = db.collection('orders').orderBy('pickedUpAt','desc').limit(200).onSnapshot(renderPicked, onErr);
+  if(unsub) unsub(); if(unsubPicked) unsubPicked();
+  unsub = db.collection('orders').where('status','==','ready').orderBy('createdAt','desc').limit(200)
+    .onSnapshot(s=>{ readyDocs = s.docs.map(d=>({id:d.id,...d.data()})); renderLists(true); });
+  // today picked
+  const start=new Date(); start.setHours(0,0,0,0);
+  unsubPicked = db.collection('orders')
+    .where('status','==','picked')
+    .where('updatedAt','>=', start.getTime())
+    .orderBy('updatedAt','desc').limit(200)
+    .onSnapshot(s=>{ pickedDocs = s.docs.map(d=>({id:d.id,...d.data()})); renderLists(); });
+}
+showAll.onclick=async()=>{
+  showAllHistory = !showAllHistory;
+  showAll.textContent = showAllHistory? 'Show today only' : 'Show all history';
+  if(showAllHistory){
+    if(unsubPicked) unsubPicked();
+    unsubPicked = db.collection('orders').where('status','==','picked').orderBy('updatedAt','desc').limit(400)
+      .onSnapshot(s=>{ pickedDocs = s.docs.map(d=>({id:d.id,...d.data()})); renderLists(); });
   }else{
-    unsub = db.collection('orders').orderBy('updatedAt','desc').limit(300).onSnapshot(renderAll, onErr);
+    if(unsubPicked) unsubPicked();
+    const start=new Date(); start.setHours(0,0,0,0);
+    unsubPicked = db.collection('orders').where('status','==','picked').where('updatedAt','>=',start.getTime())
+      .orderBy('updatedAt','desc').limit(200)
+      .onSnapshot(s=>{ pickedDocs = s.docs.map(d=>({id:d.id,...d.data()})); renderLists(); });
   }
+};
+
+let readyDocs=[], pickedDocs=[];
+function itemMatchesStations(it){ return !it.station || selected.has(it.station); }
+function orderHasSelectedStations(o){ return (o.items||[]).some(itemMatchesStations); }
+
+function modsHTML(mods){
+  if(!mods || !mods.length) return '';
+  const groups = mods.map(g=>{
+    const names=(g.options||[]).map(o=>o.name).join(', ');
+    return `<div>${g.groupName}: <span class="mods">${names||'-'}</span></div>`;
+  }).join('');
+  return `<div class="mods" style="margin-top:2px">${groups}</div>`;
 }
-
-function onErr(err){
-  grid.innerHTML = `<div style="color:#95a0ad">Error: ${err.message}</div>`;
-}
-
-function renderReady(snap){
-  const arr=[];
-  let localNewest=latestReady;
-  snap.forEach(d=>{
-    const o={id:d.id, ...d.data()};
-    if(o.status==='ready'){ arr.push(o); if(o.readyAt) localNewest=Math.max(localNewest, o.readyAt); }
-  });
-  currentIds = arr.map(o=>o.id);
-
-  grid.innerHTML = arr.map(o=>tileHTML(o,'ready')).join('');
-  count.textContent = 'Ready: ' + arr.length;
-
-  bindTileButtons();
-
-  const hasNew = !firstReady && localNewest>latestReady;
-  latestReady=Math.max(latestReady, localNewest); firstReady=false;
-  if(hasNew) ding();
-
-  bulkComplete.style.display='inline-block';
-  bulkUndo.style.display='none';
-}
-
-function renderPicked(snap){
-  const arr=[];
-  snap.forEach(d=>{
-    const o={id:d.id, ...d.data()};
-    if(o.status==='picked_up') arr.push(o);
-  });
-  currentIds = arr.map(o=>o.id);
-  grid.innerHTML = arr.map(o=>tileHTML(o,'picked')).join('');
-  count.textContent = 'Picked Up: ' + arr.length;
-
-  bindTileButtons();
-
-  bulkComplete.style.display='none';
-  bulkUndo.style.display='inline-block';
-}
-
-function renderAll(snap){
-  const arr=[];
-  snap.forEach(d=>{
-    const o={id:d.id, ...d.data()};
-    if( (o.status==='ready' && o.readyAt) || (o.status==='picked_up' && o.pickedUpAt) ){
-      arr.push(o);
-    }
-  });
-  arr.sort((a,b)=> (b.pickedUpAt||b.readyAt||0) - (a.pickedUpAt||a.readyAt||0));
-  currentIds = arr.map(o=>o.id);
-  grid.innerHTML = arr.map(o=>tileHTML(o, o.status==='picked_up'?'picked':'ready')).join('');
-  count.textContent = 'History: ' + arr.length;
-
-  bindTileButtons();
-
-  bulkComplete.style.display='none';
-  bulkUndo.style.display='none';
-}
-
-function tileHTML(o, mode){
-  const when = mode==='picked' ? o.pickedUpAt : o.readyAt;
-  const tag = mode==='picked' ? 'Picked ' : 'Ready ';
-  const actions = mode==='picked'
-    ? `<button class="btn warn" data-undo="${o.id}" title="Return to Ready">Undo</button>
-       <button class="btn danger" data-delete="${o.id}" title="Delete permanently">Delete</button>`
-    : `<button class="btn ok" data-complete="${o.id}">Complete</button>
-       <button class="btn gray" data-revert="${o.id}" title="Send back to kitchen">Back</button>`;
+function orderHTML(o, mode){
+  const lines=(o.items||[]).filter(itemMatchesStations).map(it=>`
+    <div class="line">
+      <div><strong>${it.qty||1}× ${it.name||''}</strong> <span class="muted">• ${it.station||''}</span></div>
+      ${modsHTML(it.mods)}
+    </div>
+  `).join('');
+  const btn = mode==='ready'
+    ? `<button class="btn ok" data-act="picked" data-id="${o.id}">Mark Picked Up</button>`
+    : `<button class="btn gray" data-act="undo" data-id="${o.id}">Undo</button>`;
   return `
-    <div class="tile" data-id="${o.id}">
-      <div class="num">#${o.number}</div>
-      <div class="cust">${o.customer?o.customer:''}</div>
-      <ul style="margin:0 0 8px 18px">
-        ${(o.items||[]).map(i=>`<li>×${i.qty} — ${i.name}${i.station?` <span style='color:#95a0ad'>( ${i.station} )</span>`:''}</li>`).join('')}
-      </ul>
-      <div class="meta">
-        <span>${tag}${fmtAgo(when)}</span>
-        <span style="display:flex;gap:6px">${actions}</span>
+  <div class="ticket">
+    <div class="hdr">
+      <div>
+        <div class="customer">${o.customer||'No name'} <span class="muted">#${o.number||''}</span></div>
+        <div class="muted">${new Date((mode==='ready'?o.updatedAt:o.updatedAt)||Date.now()).toLocaleTimeString()}</div>
       </div>
-    </div>`;
+      <div>${btn}</div>
+    </div>
+    ${lines||'<div class="muted" style="margin-top:6px">No items for selected stations.</div>'}
+  </div>`;
 }
 
-function bindTileButtons(){
-  grid.querySelectorAll('[data-complete]').forEach(b=> b.onclick = ()=> completeOrder(b.dataset.complete));
-  grid.querySelectorAll('[data-revert]').forEach(b=> b.onclick = ()=> revertOrder(b.dataset.revert));
-  grid.querySelectorAll('[data-undo]').forEach(b=> b.onclick = ()=> undoPicked(b.dataset.undo));
-  grid.querySelectorAll('[data-delete]').forEach(b=> b.onclick = ()=> deleteOrder(b.dataset.delete));
+function renderLists(maybeSound){
+  const r=readyDocs.filter(orderHasSelectedStations);
+  const p=pickedDocs.filter(orderHasSelectedStations);
+
+  if(maybeSound && sound.checked && r.length){
+    const newest=r[0]?.updatedAt || 0;
+    if(newest>lastReadySeen){ lastReadySeen=newest; try{ding.currentTime=0;ding.play();}catch(ex){} }
+  }
+
+  ready.innerHTML = r.map(o=>orderHTML(o,'ready')).join('');
+  picked.innerHTML = p.map(o=>orderHTML(o,'picked')).join('');
+  emptyReady.style.display = r.length? 'none':'block';
+  emptyPicked.style.display = p.length? 'none':'block';
+
+  // bind
+  ready.querySelectorAll('[data-act="picked"]').forEach(b=>{
+    b.onclick=()=> setStatus(b.dataset.id,'picked');
+  });
+  picked.querySelectorAll('[data-act="undo"]').forEach(b=>{
+    b.onclick=()=> setStatus(b.dataset.id,'ready');
+  });
 }
 
-async function completeOrder(id){
-  if(!auth.currentUser){ alert('Sign in first.'); return; }
-  try{
-    await db.collection('orders').doc(id).update({
-      status:'picked_up',
-      pickedUpAt: Date.now(),
-      updatedAt: Date.now()
-    });
-  }catch(e){ alert('Complete failed: '+e.message); }
-}
-async function revertOrder(id){
-  if(!auth.currentUser){ alert('Sign in first.'); return; }
-  try{
-    await db.collection('orders').doc(id).update({
-      status:'in_progress',
-      updatedAt: Date.now()
-    });
-  }catch(e){ alert('Revert failed: '+e.message); }
-}
-async function undoPicked(id){
-  if(!auth.currentUser){ alert('Sign in first.'); return; }
-  try{
-    await db.collection('orders').doc(id).update({
-      status:'ready',
-      updatedAt: Date.now()
-    });
-  }catch(e){ alert('Undo failed: '+e.message); }
-}
-async function deleteOrder(id){
-  if(!auth.currentUser){ alert('Sign in first.'); return; }
-  if(!confirm('Delete this order permanently?')) return;
-  try{ await db.collection('orders').doc(id).delete(); }
-  catch(e){ alert('Delete failed: '+e.message); }
+async function setStatus(id, status){
+  try{ await db.collection('orders').doc(id).update({status, updatedAt: Date.now()}); }
+  catch(e){ alert(e.message); }
 }
 
-// Bulk actions
-bulkComplete.onclick = async ()=>{
-  if(!auth.currentUser){ alert('Sign in first.'); return; }
-  if(!currentIds.length){ alert('Nothing to complete.'); return; }
-  if(!confirm('Mark ALL shown Ready orders as completed?')) return;
-  try{
-    for(let i=0;i<currentIds.length;i+=400){
-      const chunk = currentIds.slice(i, i+400);
-      const batch = db.batch();
-      const ts = Date.now();
-      chunk.forEach(id=>{
-        batch.update(db.collection('orders').doc(id), { status:'picked_up', pickedUpAt: ts, updatedAt: ts });
-      });
-      await batch.commit();
-    }
-  }catch(e){ alert('Bulk complete failed: '+e.message); }
-};
-bulkUndo.onclick = async ()=>{
-  if(!auth.currentUser){ alert('Sign in first.'); return; }
-  if(!currentIds.length){ alert('Nothing to undo.'); return; }
-  if(!confirm('Return ALL shown Picked Up orders to Ready?')) return;
-  try{
-    for(let i=0;i<currentIds.length;i+=400){
-      const chunk = currentIds.slice(i, i+400);
-      const batch = db.batch();
-      const ts = Date.now();
-      chunk.forEach(id=>{
-        batch.update(db.collection('orders').doc(id), { status:'ready', updatedAt: ts });
-      });
-      await batch.commit();
-    }
-  }catch(e){ alert('Bulk undo failed: '+e.message); }
-};
-
-// Tabs
-tabReady.onclick = ()=>{ mode='ready'; tabReady.classList.add('active'); tabPicked.classList.remove('active'); tabAll.classList.remove('active'); subscribe(); };
-tabPicked.onclick = ()=>{ mode='picked'; tabPicked.classList.add('active'); tabReady.classList.remove('active'); tabAll.classList.remove('active'); subscribe(); };
-tabAll.onclick = ()=>{ mode='all'; tabAll.classList.add('active'); tabReady.classList.remove('active'); tabPicked.classList.remove('active'); subscribe(); };
-
-// start
-subscribe();
+// init
+loadStations(); subscribe();
 </script>
 </body></html>
