@@ -91,41 +91,59 @@ const stationBadge=$('#stationBadge'), chips=$('#chips'), selectAll=$('#selectAl
 const ready=$('#ready'), picked=$('#picked'), emptyReady=$('#emptyReady'), emptyPicked=$('#emptyPicked');
 const toggleHist=$('#toggleHist'), histBox=$('#hist'), showAll=$('#showAll');
 
-let STATIONS=['Grill','Fryer','Drinks','Pizza'];
+let STATIONS=[];                                // dynamic, from settings/config
 let selected=new Set(JSON.parse(localStorage.getItem('pickupStations')||'[]'));
 let showAllHistory=false;
 
+// ---- auth (view without sign-in; write requires sign-in)
 auth.onAuthStateChanged(u=>{ me.textContent=u?u.email:'Not signed in'; });
 login.onclick=async()=>{ const e=prompt('Email:'); if(!e) return; const p=prompt('Password:'); if(p===null) return; try{await auth.signInWithEmailAndPassword(e.trim(),p);}catch(err){alert(err.message);} };
 logout.onclick=()=>auth.signOut();
 
-async function loadStations(){
-  try{ const s=await db.collection('settings').doc('config').get();
-    const conf=s.data(); if(conf && Array.isArray(conf.stations)&&conf.stations.length) STATIONS=conf.stations;
-  }catch(e){}
-  renderChips(); stationBadge.textContent='Stations: '+STATIONS.join(', ');
+// ---- dynamic stations (live)
+let unsubSettings=null;
+function watchStations(){
+  if (unsubSettings) unsubSettings();
+  unsubSettings = db.collection('settings').doc('config')
+    .onSnapshot(s=>{
+      const conf=s.data()||{};
+      const arr = Array.isArray(conf.stations) ? conf.stations.filter(Boolean) : [];
+      // If settings are empty, keep current; else replace.
+      if (arr.length) STATIONS = arr.slice();
+      // If nothing yet, we’ll also auto-discover below from orders.
+      renderChips(); updateBadge();
+    }, err=>{ console.warn('settings/config error', err); updateBadge(); });
 }
+function updateBadge(){ stationBadge.textContent = 'Stations: ' + (STATIONS.length? STATIONS.join(', ') : '—'); }
 function renderChips(){
-  if(!selected.size){ STATIONS.forEach(s=>selected.add(s)); }
-  chips.innerHTML = STATIONS.map(s=>`<span class="chip ${selected.has(s)?'active':''}" data-st="${s}">${s}</span>`).join('');
+  // If no stations yet, delay until we have some (either from settings or discovery)
+  chips.innerHTML = (STATIONS.length
+    ? STATIONS.map(s=>`<span class="chip ${selected.has(s)?'active':''}" data-st="${s}">${s}</span>`).join('')
+    : `<span class="muted">No stations configured yet</span>`);
   chips.querySelectorAll('.chip').forEach(c=>{
     c.onclick=()=>{ const s=c.dataset.st; if(selected.has(s)) selected.delete(s); else selected.add(s); renderChips(); renderLists(); };
   });
+  // If nothing selected yet on this iPad, default to all known stations
+  if (!selected.size && STATIONS.length){ STATIONS.forEach(s=>selected.add(s)); }
 }
-selectAll.onclick=()=>{ selected=new Set(STATIONS); renderChips(); renderLists(); };
+selectAll.onclick=()=>{ STATIONS.forEach(s=>selected.add(s)); renderChips(); renderLists(); };
 savePref.onclick=()=>{ localStorage.setItem('pickupStations', JSON.stringify([...selected])); alert('Saved on this iPad.'); };
 
+// ---- orders (ready + picked_up)
 let unsubReady=null, unsubPicked=null;
 let readyDocs=[], pickedDocs=[];
 
-function subscribe(){
+function subscribeOrders(){
   if(unsubReady) unsubReady(); if(unsubPicked) unsubPicked();
 
-  // READY — order by createdAt so we see items even if updatedAt/readyAt are missing
+  // READY — order by createdAt so docs without readyAt still appear
   unsubReady = db.collection('orders')
-    .where('status','==','ready')
     .orderBy('createdAt','desc').limit(300)
-    .onSnapshot(s=>{ readyDocs=s.docs.map(d=>({id:d.id,...d.data()})); renderLists(); });
+    .onSnapshot(s=>{
+      readyDocs = s.docs.map(d=>({id:d.id, ...d.data()})).filter(o=>o.status==='ready');
+      autoDiscoverStations(readyDocs); // learn any new stations from data
+      renderLists();
+    });
 
   // PICKED HISTORY — uses your actual status "picked_up"
   const start=new Date(); start.setHours(0,0,0,0);
@@ -133,34 +151,37 @@ function subscribe(){
     .where('status','==','picked_up')
     .where('updatedAt','>=', start.getTime())
     .orderBy('updatedAt','desc').limit(200)
-    .onSnapshot(s=>{ pickedDocs=s.docs.map(d=>({id:d.id,...d.data()})); if(histBox.style.display!=='none') renderLists(); });
+    .onSnapshot(s=>{
+      pickedDocs = s.docs.map(d=>({id:d.id, ...d.data()}));
+      autoDiscoverStations(pickedDocs);
+      if(histBox.style.display!=='none') renderLists();
+    });
 }
 
-toggleHist.onclick=()=>{
-  const open = histBox.style.display!=='none';
-  histBox.style.display = open ? 'none' : 'block';
-  toggleHist.textContent = open ? 'Show history' : 'Hide history';
-  if(!open) renderLists();
-};
-
-showAll.onclick=()=>{
-  showAllHistory=!showAllHistory; showAll.textContent=showAllHistory?'Show today only':'Show all history';
-  if(unsubPicked) unsubPicked();
-  if(showAllHistory){
-    unsubPicked = db.collection('orders').where('status','==','picked_up')
-      .orderBy('updatedAt','desc').limit(400)
-      .onSnapshot(s=>{ pickedDocs=s.docs.map(d=>({id:d.id,...d.data()})); if(histBox.style.display!=='none') renderLists(); });
-  }else{
-    const start=new Date(); start.setHours(0,0,0,0);
-    unsubPicked = db.collection('orders').where('status','==','picked_up').where('updatedAt','>=',start.getTime())
-      .orderBy('updatedAt','desc').limit(200)
-      .onSnapshot(s=>{ pickedDocs=s.docs.map(d=>({id:d.id,...d.data()})); if(histBox.style.display!=='none') renderLists(); });
+// learn stations from orders if settings didn’t define them (or new ones appear)
+function autoDiscoverStations(arr){
+  const seen = new Set(STATIONS);
+  arr.forEach(o => (o.items||[]).forEach(it => { if (it.station) seen.add(it.station); }));
+  if (seen.size !== STATIONS.length){
+    STATIONS = [...seen];
+    // by default, include any new stations in this iPad’s selection
+    STATIONS.forEach(s => selected.add(s));
+    renderChips(); updateBadge();
   }
-};
+}
 
-function itemMatchesStations(it){ return !it.station || selected.has(it.station); }
+// filtering
+function itemMatchesStations(it){
+  // include if item has no station
+  if (!it.station) return true;
+  // include if station is unknown to chips (fail‑open)
+  if (!STATIONS.includes(it.station)) return true;
+  // otherwise check chip selection
+  return selected.has(it.station);
+}
 function orderHasSelectedStations(o){ return (o.items||[]).some(itemMatchesStations); }
 
+// render helpers
 function modsHTML(mods){
   if(!mods || !mods.length) return '';
   const names = mods.flatMap(g => (g.options||[]).map(o=>o.name)).filter(Boolean);
@@ -208,12 +229,23 @@ function renderLists(){
   });
 }
 
+// actions (requires sign‑in due to Firestore rules)
 async function setStatus(id, status){
   try{ await db.collection('orders').doc(id).update({status, updatedAt: Date.now()}); }
   catch(e){ alert(e.message); }
 }
 
+// history toggle
+toggleHist.onclick=()=>{
+  const open = histBox.style.display!=='none';
+  histBox.style.display = open ? 'none' : 'block';
+  toggleHist.textContent = open ? 'Show history' : 'Hide history';
+  if(!open) renderLists();
+};
+
 // init
-loadStations(); subscribe();
+watchStations();           // live stations from settings/config
+subscribeOrders();         // orders listeners
+renderChips(); updateBadge();
 </script>
 </body></html>
