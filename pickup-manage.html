@@ -32,9 +32,8 @@
       <span id="stationBadge" class="pill">Stations: loading…</span>
     </div>
     <div class="row">
-      <label class="pill"><input id="sound" type="checkbox" style="margin-right:6px"> Sound on new ready</label>
       <span id="me" class="pill">Not signed in</span>
-      <button id="login" class="btn">Sign in</button>
+      <button id="login" class="btn gray">Sign in</button>
       <button id="logout" class="btn gray">Sign out</button>
     </div>
   </div>
@@ -62,7 +61,7 @@
     <div id="ready"></div>
     <div id="emptyReady" class="muted" style="display:none">No ready orders.</div>
 
-    <!-- History (picked) -->
+    <!-- History (picked_up) -->
     <div id="hist" class="history">
       <div class="row" style="justify-content:space-between;margin-top:8px">
         <h3 style="margin:0">Picked Up (today)</h3>
@@ -74,8 +73,6 @@
   </div>
 
 </div>
-
-<audio id="ding"><source src="data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAA..." type="audio/mp3"></audio>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
@@ -92,11 +89,10 @@ const $=s=>document.querySelector(s);
 const me=$('#me'), login=$('#login'), logout=$('#logout');
 const stationBadge=$('#stationBadge'), chips=$('#chips'), selectAll=$('#selectAll'), savePref=$('#savePref');
 const ready=$('#ready'), picked=$('#picked'), emptyReady=$('#emptyReady'), emptyPicked=$('#emptyPicked');
-const sound=$('#sound'), ding=$('#ding'), toggleHist=$('#toggleHist'), histBox=$('#hist'), showAll=$('#showAll');
+const toggleHist=$('#toggleHist'), histBox=$('#hist'), showAll=$('#showAll');
 
 let STATIONS=['Grill','Fryer','Drinks','Pizza'];
 let selected=new Set(JSON.parse(localStorage.getItem('pickupStations')||'[]'));
-let lastReadySeen=0;
 let showAllHistory=false;
 
 auth.onAuthStateChanged(u=>{ me.textContent=u?u.email:'Not signed in'; });
@@ -104,9 +100,8 @@ login.onclick=async()=>{ const e=prompt('Email:'); if(!e) return; const p=prompt
 logout.onclick=()=>auth.signOut();
 
 async function loadStations(){
-  try{
-    const s=await db.collection('settings').doc('config').get();
-    const conf=s.data(); if(conf && Array.isArray(conf.stations) && conf.stations.length) STATIONS=conf.stations;
+  try{ const s=await db.collection('settings').doc('config').get();
+    const conf=s.data(); if(conf && Array.isArray(conf.stations)&&conf.stations.length) STATIONS=conf.stations;
   }catch(e){}
   renderChips(); stationBadge.textContent='Stations: '+STATIONS.join(', ');
 }
@@ -122,31 +117,42 @@ savePref.onclick=()=>{ localStorage.setItem('pickupStations', JSON.stringify([..
 
 let unsubReady=null, unsubPicked=null;
 let readyDocs=[], pickedDocs=[];
+
 function subscribe(){
   if(unsubReady) unsubReady(); if(unsubPicked) unsubPicked();
-  unsubReady = db.collection('orders').where('status','==','ready').orderBy('updatedAt','desc').limit(300)
-    .onSnapshot(s=>{ readyDocs=s.docs.map(d=>({id:d.id,...d.data()})); renderLists(true); });
+
+  // READY — order by createdAt so we see items even if updatedAt/readyAt are missing
+  unsubReady = db.collection('orders')
+    .where('status','==','ready')
+    .orderBy('createdAt','desc').limit(300)
+    .onSnapshot(s=>{ readyDocs=s.docs.map(d=>({id:d.id,...d.data()})); renderLists(); });
+
+  // PICKED HISTORY — uses your actual status "picked_up"
   const start=new Date(); start.setHours(0,0,0,0);
   unsubPicked = db.collection('orders')
-    .where('status','==','picked').where('updatedAt','>=',start.getTime())
+    .where('status','==','picked_up')
+    .where('updatedAt','>=', start.getTime())
     .orderBy('updatedAt','desc').limit(200)
     .onSnapshot(s=>{ pickedDocs=s.docs.map(d=>({id:d.id,...d.data()})); if(histBox.style.display!=='none') renderLists(); });
 }
+
 toggleHist.onclick=()=>{
   const open = histBox.style.display!=='none';
   histBox.style.display = open ? 'none' : 'block';
   toggleHist.textContent = open ? 'Show history' : 'Hide history';
   if(!open) renderLists();
 };
+
 showAll.onclick=()=>{
   showAllHistory=!showAllHistory; showAll.textContent=showAllHistory?'Show today only':'Show all history';
   if(unsubPicked) unsubPicked();
   if(showAllHistory){
-    unsubPicked = db.collection('orders').where('status','==','picked').orderBy('updatedAt','desc').limit(400)
+    unsubPicked = db.collection('orders').where('status','==','picked_up')
+      .orderBy('updatedAt','desc').limit(400)
       .onSnapshot(s=>{ pickedDocs=s.docs.map(d=>({id:d.id,...d.data()})); if(histBox.style.display!=='none') renderLists(); });
   }else{
     const start=new Date(); start.setHours(0,0,0,0);
-    unsubPicked = db.collection('orders').where('status','==','picked').where('updatedAt','>=',start.getTime())
+    unsubPicked = db.collection('orders').where('status','==','picked_up').where('updatedAt','>=',start.getTime())
       .orderBy('updatedAt','desc').limit(200)
       .onSnapshot(s=>{ pickedDocs=s.docs.map(d=>({id:d.id,...d.data()})); if(histBox.style.display!=='none') renderLists(); });
   }
@@ -184,15 +190,10 @@ function orderHTML(o, mode){
   </div>`;
 }
 
-function renderLists(maybeSound){
+function renderLists(){
   const r=readyDocs.filter(orderHasSelectedStations);
   ready.innerHTML = r.map(o=>orderHTML(o,'ready')).join('');
   emptyReady.style.display = r.length? 'none':'block';
-
-  if(maybeSound && sound.checked && r.length){
-    const newest=r[0]?.updatedAt || r[0]?.createdAt || 0;
-    if(newest>lastReadySeen){ lastReadySeen=newest; try{ding.currentTime=0;ding.play();}catch(ex){} }
-  }
 
   if(histBox.style.display!=='none'){
     const p=pickedDocs.filter(orderHasSelectedStations);
@@ -202,9 +203,8 @@ function renderLists(maybeSound){
       b.onclick=()=> setStatus(b.dataset.id,'ready');
     });
   }
-
   ready.querySelectorAll('[data-act="picked"]').forEach(b=>{
-    b.onclick=()=> setStatus(b.dataset.id,'picked');
+    b.onclick=()=> setStatus(b.dataset.id,'picked_up');
   });
 }
 
