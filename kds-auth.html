@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>KDS (with Station Filters)</title>
+<title>KDS</title>
 <style>
   :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--card:#0f141e;--border:#1b2230;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b;--accent:#5b9bff}
   *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
@@ -9,27 +9,25 @@
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;color:#aab3c0;background:#0f1420}
   .btn{border:none;border-radius:10px;padding:10px 12px;cursor:pointer;color:#fff;background:var(--accent)}
-  .btn.ok{background:var(--ok);color:#0b0e14}.btn.warn{background:var(--warn);color:#0b0e14}.btn.danger{background:var(--danger);color:#0b0e14}
+  .btn.ok{background:var(--ok);color:#0b0e14}.btn.gray{background:#1e2432}
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px}
   .chips{display:flex;gap:8px;flex-wrap:wrap}
   .chip{border:1px solid var(--border);background:#0f1420;color:#e5e8ee;border-radius:999px;padding:6px 10px;cursor:pointer}
   .chip.active{outline:2px solid var(--ok)}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
   .ticket{border:1px solid var(--border);background:#121826;border-radius:14px;padding:10px}
+  .ticket.muted{opacity:.5}
   .hdr{display:flex;justify-content:space-between;gap:10px;align-items:center}
   .customer{font-weight:800}
   .items{margin-top:6px}
   .line{border-top:1px dashed #293246;padding:6px 0}
   .mods{color:#aeb7c6;font-size:12px;margin-top:2px}
   .muted{color:var(--muted);font-size:12px}
-  .right{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
-  .sep{height:1px;background:#1b2230;margin:8px 0}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <!-- Top -->
   <div class="row" style="justify-content:space-between">
     <div class="row">
       <strong style="font-size:20px">KDS</strong>
@@ -40,30 +38,27 @@
       <label class="pill"><input id="showDone" type="checkbox" style="margin-right:6px"> Show completed</label>
       <span id="me" class="pill">Not signed in</span>
       <button id="login" class="btn">Sign in</button>
-      <button id="logout" class="btn" style="background:#1e2432">Sign out</button>
+      <button id="logout" class="btn gray">Sign out</button>
     </div>
   </div>
 
-  <!-- Station filters -->
   <div class="card" style="margin-top:10px">
     <div class="row" style="justify-content:space-between">
       <div class="chips" id="chips"></div>
       <div class="row">
-        <button id="selectAll" class="btn gray" style="background:#1e2432">Select all</button>
+        <button id="selectAll" class="btn gray">Select all</button>
         <button id="savePref" class="btn ok">Save to this iPad</button>
       </div>
     </div>
     <div class="muted" style="margin-top:6px">Only items from the selected stations will appear on this KDS. Preferences are saved on this device.</div>
   </div>
 
-  <!-- Tickets -->
   <div class="grid" id="grid" style="margin-top:10px"></div>
   <div id="empty" class="muted" style="margin-top:8px;display:none">No tickets.</div>
 </div>
 
 <audio id="ding"><source src="data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAA..." type="audio/mp3"></audio>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
@@ -83,27 +78,19 @@ const grid=$('#grid'), empty=$('#empty'), selectAll=$('#selectAll'), savePref=$(
 
 let STATIONS=['Grill','Fryer','Drinks','Pizza'];
 let selected=new Set(JSON.parse(localStorage.getItem('kdsStations')||'[]'));
-let lastSeen=0; // for sound
+let lastSeen=0;
+let lastSnapshot=null;
 
-auth.onAuthStateChanged(u=>{
-  me.textContent = u? u.email : 'Not signed in';
-});
-login.onclick=async()=>{
-  const email=prompt('Email:'); if(!email) return;
-  const pass=prompt('Password:'); if(pass===null) return;
-  try{await auth.signInWithEmailAndPassword(email.trim(), pass);}catch(e){alert(e.message);}
-};
-logout.onclick=()=> auth.signOut();
+auth.onAuthStateChanged(u=>{ me.textContent=u?u.email:'Not signed in'; });
+login.onclick=async()=>{ const e=prompt('Email:'); if(!e) return; const p=prompt('Password:'); if(p===null) return; try{await auth.signInWithEmailAndPassword(e.trim(),p);}catch(err){alert(err.message);} };
+logout.onclick=()=>auth.signOut();
 
-// dynamic stations
 async function loadStations(){
   try{
-    const snap=await db.collection('settings').doc('config').get();
-    const conf=snap.data();
-    if(conf && Array.isArray(conf.stations) && conf.stations.length) STATIONS=conf.stations;
+    const s=await db.collection('settings').doc('config').get();
+    const conf=s.data(); if(conf && Array.isArray(conf.stations) && conf.stations.length) STATIONS=conf.stations;
   }catch(e){}
-  renderChips();
-  stationBadge.textContent='Stations: '+STATIONS.join(', ');
+  renderChips(); stationBadge.textContent='Stations: '+STATIONS.join(', ');
 }
 function renderChips(){
   if(!selected.size){ STATIONS.forEach(s=>selected.add(s)); }
@@ -115,98 +102,77 @@ function renderChips(){
 selectAll.onclick=()=>{ selected=new Set(STATIONS); renderChips(); renderTickets(lastSnapshot); };
 savePref.onclick=()=>{ localStorage.setItem('kdsStations', JSON.stringify([...selected])); alert('Saved on this iPad.'); };
 
-let lastSnapshot=null;
-db.collection('orders').orderBy('createdAt','desc').limit(100).onSnapshot(snap=>{
-  lastSnapshot=snap;
-  renderTickets(snap,true);
+db.collection('orders').orderBy('createdAt','desc').limit(150).onSnapshot(snap=>{
+  lastSnapshot=snap; renderTickets(snap,true);
 });
+showDone.onchange=()=> renderTickets(lastSnapshot);
+
 function itemMatchesStations(item){ return !item.station || selected.has(item.station); }
-function orderHasSelectedStations(order){
-  return (order.items||[]).some(it => itemMatchesStations(it));
-}
-function renderTickets(snap,maybePlay){
-  const showCompleted = !!showDone.checked;
-  const docs=[];
-  snap.forEach(d=>{
-    const o=d.data(); o.id=d.id;
-    if(!showCompleted && o.status==='picked'){ return; } // hide finished
-    if(!orderHasSelectedStations(o)) return;
-    docs.push(o);
-  });
-
-  // sound on new
-  if(maybePlay && sound.checked && docs.length){
-    const newest = docs[0]?.createdAt||0;
-    if(newest>lastSeen){ lastSeen=newest; try{ding.currentTime=0;ding.play();}catch(ex){} }
-  }
-
-  grid.innerHTML = docs.map(o => ticketHTML(o)).join('');
-  empty.style.display = docs.length? 'none':'block';
-
-  // bind actions
-  grid.querySelectorAll('[data-act]').forEach(b=>{
-    const [act,id]=[b.dataset.act,b.dataset.id];
-    b.onclick=()=> advanceOrder(id, act);
-  });
-}
+function orderHasSelectedStations(order){ return (order.items||[]).some(itemMatchesStations); }
 
 function modsHTML(mods){
+  // Show only option names (no group label)
   if(!mods || !mods.length) return '';
-  const groups = mods.map(g=>{
-    const names=(g.options||[]).map(o=>o.name).join(', ');
-    return `<div>${g.groupName}: <span class="mods">${names||'-'}</span></div>`;
-  }).join('');
-  return `<div class="mods" style="margin-top:2px">${groups}</div>`;
+  const names = mods.flatMap(g => (g.options||[]).map(o=>o.name)).filter(Boolean);
+  if(!names.length) return '';
+  return `<div class="mods">${names.join(', ')}</div>`;
 }
-function ticketHTML(o){
-  const lines = (o.items||[])
-    .filter(itemMatchesStations)
-    .map(it=>`
-      <div class="line">
-        <div><strong>${it.qty||1}× ${it.name||''}</strong> <span class="muted">• ${it.station||''}</span></div>
-        ${modsHTML(it.mods)}
-      </div>
-    `).join('');
 
-  const controls = o.status==='new'
-    ? `<button class="btn warn" data-act="start" data-id="${o.id}">Start</button>`
-    : o.status==='in-progress'
-      ? `<button class="btn ok" data-act="ready" data-id="${o.id}">Ready</button>`
-      : `<button class="btn gray" style="background:#1e2432" disabled>Ready</button>`;
+function ticketHTML(o, readOnly){
+  const lines=(o.items||[]).filter(itemMatchesStations).map(it=>`
+    <div class="line">
+      <div><strong>${it.qty||1}× ${it.name||''}</strong> <span class="muted">• ${it.station||''}</span></div>
+      ${modsHTML(it.mods)}
+    </div>
+  `).join('');
 
-  const right = o.status==='ready'
-    ? `<button class="btn gray" data-act="back" data-id="${o.id}" style="background:#1e2432">Undo Ready</button>`
-    : controls;
+  const controls = readOnly
+    ? `<button class="btn gray" disabled>Completed</button>`
+    : `<button class="btn ok" data-ready="${o.id}">Ready</button>`;
 
   return `
-  <div class="ticket">
+  <div class="ticket ${readOnly?'muted':''}">
     <div class="hdr">
       <div>
         <div class="customer">${o.customer||'No name'} <span class="muted">#${o.number||''}</span></div>
         <div class="muted">${new Date(o.createdAt||Date.now()).toLocaleTimeString()}</div>
       </div>
-      <div class="right">
-        ${right}
-      </div>
+      <div>${controls}</div>
     </div>
     <div class="items">${lines||'<div class="muted">No items for selected stations.</div>'}</div>
   </div>`;
 }
 
-async function advanceOrder(id, act){
-  const ref=db.collection('orders').doc(id);
+function renderTickets(snap, maybePlay){
+  if(!snap){ grid.innerHTML=''; empty.style.display='block'; return; }
+  const includeCompleted = !!showDone.checked;
+
+  const docs=[];
+  snap.forEach(d=>{
+    const o={id:d.id, ...d.data()};
+    const isCompleted = (o.status==='ready'||o.status==='picked');
+    if(!includeCompleted && isCompleted) return;      // hide completed unless toggled
+    if(!orderHasSelectedStations(o)) return;
+    docs.push(o);
+  });
+
+  if(maybePlay && sound.checked && docs.length){
+    const newest = docs[0]?.createdAt||0;
+    if(newest>lastSeen){ lastSeen=newest; try{ding.currentTime=0;ding.play();}catch(ex){} }
+  }
+
+  grid.innerHTML = docs.map(o => ticketHTML(o, /*readOnly*/ (o.status!=='new' && o.status!=='in-progress'))).join('');
+  empty.style.display = docs.length? 'none':'block';
+
+  grid.querySelectorAll('[data-ready]').forEach(b=>{
+    b.onclick=()=> setReady(b.dataset.ready);
+  });
+}
+
+async function setReady(id){
   try{
-    await db.runTransaction(async tx=>{
-      const snap=await tx.get(ref); if(!snap.exists) return;
-      const o=snap.data();
-      let status=o.status||'new';
-      if(act==='start') status='in-progress';
-      if(act==='ready') status='ready';
-      if(act==='back'){
-        status = (o.status==='ready') ? 'in-progress' : 'new';
-      }
-      tx.update(ref,{status, updatedAt: Date.now()});
-    });
+    await db.collection('orders').doc(id).update({status:'ready', updatedAt: Date.now()});
+    // UI will auto-update via onSnapshot; ticket will drop unless "Show completed" is on
   }catch(e){ alert(e.message); }
 }
 
