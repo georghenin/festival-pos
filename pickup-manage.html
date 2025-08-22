@@ -3,31 +3,29 @@
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Pickup Manager</title>
 <style>
-  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--card:#0f141e;--border:#1b2230;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b;--accent:#5b9bff}
+  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--card:#0f141e;--border:#1b2230;--ok:#2fd28f;--accent:#5b9bff}
   *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
   .wrap{max-width:1200px;margin:0 auto;padding:14px}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;color:#aab3c0;background:#0f1420}
   .btn{border:none;border-radius:10px;padding:10px 12px;cursor:pointer;color:#fff;background:var(--accent)}
-  .btn.ok{background:var(--ok);color:#0b0e14}.btn.gray{background:#1e2432}.btn.danger{background:var(--danger);color:#0b0e14}
+  .btn.ok{background:var(--ok);color:#0b0e14}.btn.gray{background:#1e2432}
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px}
   .chips{display:flex;gap:8px;flex-wrap:wrap}
   .chip{border:1px solid var(--border);background:#0f1420;color:#e5e8ee;border-radius:999px;padding:6px 10px;cursor:pointer}
   .chip.active{outline:2px solid var(--ok)}
-  .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .ticket{border:1px solid var(--border);background:#121826;border-radius:14px;padding:10px;margin-bottom:10px}
   .hdr{display:flex;justify-content:space-between;gap:10px;align-items:center}
   .customer{font-weight:800}
   .line{border-top:1px dashed #293246;padding:6px 0}
   .mods{color:#aeb7c6;font-size:12px;margin-top:2px}
   .muted{color:var(--muted);font-size:12px}
-  @media (max-width:900px){ .cols{grid-template-columns:1fr} }
+  .history{margin-top:10px;display:none}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <!-- Top -->
   <div class="row" style="justify-content:space-between">
     <div class="row">
       <strong style="font-size:20px">Pickup Manager</strong>
@@ -55,15 +53,18 @@
     </div>
   </div>
 
-  <!-- Lists -->
-  <div class="cols" style="margin-top:10px">
-    <div class="card">
-      <h3 style="margin:0 0 8px 0">Ready for Pickup</h3>
-      <div id="ready"></div>
-      <div id="emptyReady" class="muted" style="display:none">No ready orders.</div>
+  <!-- Ready list -->
+  <div class="card" style="margin-top:10px">
+    <div class="row" style="justify-content:space-between">
+      <h3 style="margin:0">Ready for Pickup</h3>
+      <button id="toggleHist" class="btn gray">Show history</button>
     </div>
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
+    <div id="ready"></div>
+    <div id="emptyReady" class="muted" style="display:none">No ready orders.</div>
+
+    <!-- History (picked) -->
+    <div id="hist" class="history">
+      <div class="row" style="justify-content:space-between;margin-top:8px">
         <h3 style="margin:0">Picked Up (today)</h3>
         <button id="showAll" class="btn gray">Show all history</button>
       </div>
@@ -71,11 +72,11 @@
       <div id="emptyPicked" class="muted" style="display:none">No picked orders.</div>
     </div>
   </div>
+
 </div>
 
 <audio id="ding"><source src="data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAA..." type="audio/mp3"></audio>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
@@ -91,7 +92,7 @@ const $=s=>document.querySelector(s);
 const me=$('#me'), login=$('#login'), logout=$('#logout');
 const stationBadge=$('#stationBadge'), chips=$('#chips'), selectAll=$('#selectAll'), savePref=$('#savePref');
 const ready=$('#ready'), picked=$('#picked'), emptyReady=$('#emptyReady'), emptyPicked=$('#emptyPicked');
-const sound=$('#sound'), ding=$('#ding'), showAll=$('#showAll');
+const sound=$('#sound'), ding=$('#ding'), toggleHist=$('#toggleHist'), histBox=$('#hist'), showAll=$('#showAll');
 
 let STATIONS=['Grill','Fryer','Drinks','Pizza'];
 let selected=new Set(JSON.parse(localStorage.getItem('pickupStations')||'[]'));
@@ -99,17 +100,15 @@ let lastReadySeen=0;
 let showAllHistory=false;
 
 auth.onAuthStateChanged(u=>{ me.textContent=u?u.email:'Not signed in'; });
-login.onclick=async()=>{ const email=prompt('Email:'); if(!email) return; const pass=prompt('Password:'); if(pass===null) return; try{await auth.signInWithEmailAndPassword(email.trim(),pass);}catch(e){alert(e.message);} };
+login.onclick=async()=>{ const e=prompt('Email:'); if(!e) return; const p=prompt('Password:'); if(p===null) return; try{await auth.signInWithEmailAndPassword(e.trim(),p);}catch(err){alert(err.message);} };
 logout.onclick=()=>auth.signOut();
 
-// stations
 async function loadStations(){
   try{
-    const snap=await db.collection('settings').doc('config').get();
-    const conf=snap.data(); if(conf && Array.isArray(conf.stations)&&conf.stations.length) STATIONS=conf.stations;
+    const s=await db.collection('settings').doc('config').get();
+    const conf=s.data(); if(conf && Array.isArray(conf.stations) && conf.stations.length) STATIONS=conf.stations;
   }catch(e){}
-  renderChips();
-  stationBadge.textContent='Stations: '+STATIONS.join(', ');
+  renderChips(); stationBadge.textContent='Stations: '+STATIONS.join(', ');
 }
 function renderChips(){
   if(!selected.size){ STATIONS.forEach(s=>selected.add(s)); }
@@ -121,47 +120,46 @@ function renderChips(){
 selectAll.onclick=()=>{ selected=new Set(STATIONS); renderChips(); renderLists(); };
 savePref.onclick=()=>{ localStorage.setItem('pickupStations', JSON.stringify([...selected])); alert('Saved on this iPad.'); };
 
-// data
-let unsub=null, unsubPicked=null;
+let unsubReady=null, unsubPicked=null;
+let readyDocs=[], pickedDocs=[];
 function subscribe(){
-  if(unsub) unsub(); if(unsubPicked) unsubPicked();
-  unsub = db.collection('orders').where('status','==','ready').orderBy('createdAt','desc').limit(200)
-    .onSnapshot(s=>{ readyDocs = s.docs.map(d=>({id:d.id,...d.data()})); renderLists(true); });
-  // today picked
+  if(unsubReady) unsubReady(); if(unsubPicked) unsubPicked();
+  unsubReady = db.collection('orders').where('status','==','ready').orderBy('updatedAt','desc').limit(300)
+    .onSnapshot(s=>{ readyDocs=s.docs.map(d=>({id:d.id,...d.data()})); renderLists(true); });
   const start=new Date(); start.setHours(0,0,0,0);
   unsubPicked = db.collection('orders')
-    .where('status','==','picked')
-    .where('updatedAt','>=', start.getTime())
+    .where('status','==','picked').where('updatedAt','>=',start.getTime())
     .orderBy('updatedAt','desc').limit(200)
-    .onSnapshot(s=>{ pickedDocs = s.docs.map(d=>({id:d.id,...d.data()})); renderLists(); });
+    .onSnapshot(s=>{ pickedDocs=s.docs.map(d=>({id:d.id,...d.data()})); if(histBox.style.display!=='none') renderLists(); });
 }
-showAll.onclick=async()=>{
-  showAllHistory = !showAllHistory;
-  showAll.textContent = showAllHistory? 'Show today only' : 'Show all history';
+toggleHist.onclick=()=>{
+  const open = histBox.style.display!=='none';
+  histBox.style.display = open ? 'none' : 'block';
+  toggleHist.textContent = open ? 'Show history' : 'Hide history';
+  if(!open) renderLists();
+};
+showAll.onclick=()=>{
+  showAllHistory=!showAllHistory; showAll.textContent=showAllHistory?'Show today only':'Show all history';
+  if(unsubPicked) unsubPicked();
   if(showAllHistory){
-    if(unsubPicked) unsubPicked();
     unsubPicked = db.collection('orders').where('status','==','picked').orderBy('updatedAt','desc').limit(400)
-      .onSnapshot(s=>{ pickedDocs = s.docs.map(d=>({id:d.id,...d.data()})); renderLists(); });
+      .onSnapshot(s=>{ pickedDocs=s.docs.map(d=>({id:d.id,...d.data()})); if(histBox.style.display!=='none') renderLists(); });
   }else{
-    if(unsubPicked) unsubPicked();
     const start=new Date(); start.setHours(0,0,0,0);
     unsubPicked = db.collection('orders').where('status','==','picked').where('updatedAt','>=',start.getTime())
       .orderBy('updatedAt','desc').limit(200)
-      .onSnapshot(s=>{ pickedDocs = s.docs.map(d=>({id:d.id,...d.data()})); renderLists(); });
+      .onSnapshot(s=>{ pickedDocs=s.docs.map(d=>({id:d.id,...d.data()})); if(histBox.style.display!=='none') renderLists(); });
   }
 };
 
-let readyDocs=[], pickedDocs=[];
 function itemMatchesStations(it){ return !it.station || selected.has(it.station); }
 function orderHasSelectedStations(o){ return (o.items||[]).some(itemMatchesStations); }
 
 function modsHTML(mods){
   if(!mods || !mods.length) return '';
-  const groups = mods.map(g=>{
-    const names=(g.options||[]).map(o=>o.name).join(', ');
-    return `<div>${g.groupName}: <span class="mods">${names||'-'}</span></div>`;
-  }).join('');
-  return `<div class="mods" style="margin-top:2px">${groups}</div>`;
+  const names = mods.flatMap(g => (g.options||[]).map(o=>o.name)).filter(Boolean);
+  if(!names.length) return '';
+  return `<div class="mods">${names.join(', ')}</div>`;
 }
 function orderHTML(o, mode){
   const lines=(o.items||[]).filter(itemMatchesStations).map(it=>`
@@ -178,7 +176,7 @@ function orderHTML(o, mode){
     <div class="hdr">
       <div>
         <div class="customer">${o.customer||'No name'} <span class="muted">#${o.number||''}</span></div>
-        <div class="muted">${new Date((mode==='ready'?o.updatedAt:o.updatedAt)||Date.now()).toLocaleTimeString()}</div>
+        <div class="muted">${new Date((o.updatedAt||o.createdAt)||Date.now()).toLocaleTimeString()}</div>
       </div>
       <div>${btn}</div>
     </div>
@@ -188,24 +186,25 @@ function orderHTML(o, mode){
 
 function renderLists(maybeSound){
   const r=readyDocs.filter(orderHasSelectedStations);
-  const p=pickedDocs.filter(orderHasSelectedStations);
+  ready.innerHTML = r.map(o=>orderHTML(o,'ready')).join('');
+  emptyReady.style.display = r.length? 'none':'block';
 
   if(maybeSound && sound.checked && r.length){
-    const newest=r[0]?.updatedAt || 0;
+    const newest=r[0]?.updatedAt || r[0]?.createdAt || 0;
     if(newest>lastReadySeen){ lastReadySeen=newest; try{ding.currentTime=0;ding.play();}catch(ex){} }
   }
 
-  ready.innerHTML = r.map(o=>orderHTML(o,'ready')).join('');
-  picked.innerHTML = p.map(o=>orderHTML(o,'picked')).join('');
-  emptyReady.style.display = r.length? 'none':'block';
-  emptyPicked.style.display = p.length? 'none':'block';
+  if(histBox.style.display!=='none'){
+    const p=pickedDocs.filter(orderHasSelectedStations);
+    picked.innerHTML = p.map(o=>orderHTML(o,'picked')).join('');
+    emptyPicked.style.display = p.length? 'none':'block';
+    picked.querySelectorAll('[data-act="undo"]').forEach(b=>{
+      b.onclick=()=> setStatus(b.dataset.id,'ready');
+    });
+  }
 
-  // bind
   ready.querySelectorAll('[data-act="picked"]').forEach(b=>{
     b.onclick=()=> setStatus(b.dataset.id,'picked');
-  });
-  picked.querySelectorAll('[data-act="undo"]').forEach(b=>{
-    b.onclick=()=> setStatus(b.dataset.id,'ready');
   });
 }
 
