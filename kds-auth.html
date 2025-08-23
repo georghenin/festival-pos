@@ -16,10 +16,8 @@
   .chip.active{outline:2px solid var(--ok)}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
   .ticket{border:1px solid var(--border);background:#121826;border-radius:14px;padding:10px}
-  .ticket.muted{opacity:.5}
   .hdr{display:flex;justify-content:space-between;gap:10px;align-items:center}
   .customer{font-weight:800}
-  .items{margin-top:6px}
   .line{border-top:1px dashed #293246;padding:6px 0}
   .mods{color:#aeb7c6;font-size:12px;margin-top:2px}
   .muted{color:var(--muted);font-size:12px}
@@ -34,7 +32,6 @@
       <span id="stationBadge" class="pill">Stations: loading…</span>
     </div>
     <div class="row">
-      <label class="pill"><input id="sound" type="checkbox" style="margin-right:6px"> Sound on new</label>
       <label class="pill"><input id="showDone" type="checkbox" style="margin-right:6px"> Show completed</label>
       <span id="me" class="pill">Not signed in</span>
       <button id="login" class="btn gray">Sign in</button>
@@ -50,7 +47,7 @@
         <button id="savePref" class="btn">Save to this iPad</button>
       </div>
     </div>
-    <div class="muted" style="margin-top:6px">Only items from the selected stations will appear on this KDS. Preferences are saved on this device.</div>
+    <div class="muted" style="margin-top:6px">Only items from the selected stations will appear here.</div>
   </div>
 
   <div class="grid" id="grid" style="margin-top:10px"></div>
@@ -102,8 +99,7 @@ db.collection('orders').orderBy('createdAt','desc').limit(150).onSnapshot(snap=>
 });
 showDone.onchange=()=> renderTickets(lastSnapshot);
 
-function itemMatchesStations(item){ return !item.station || selected.has(item.station); }
-function orderHasSelectedStations(order){ return (order.items||[]).some(itemMatchesStations); }
+const itemMatchesStations = (it)=> !it.station || selected.has(it.station);
 
 function modsHTML(mods){
   if(!mods || !mods.length) return '';
@@ -112,28 +108,28 @@ function modsHTML(mods){
   return `<div class="mods">${names.join(', ')}</div>`;
 }
 
-function ticketHTML(o, readOnly){
-  const lines=(o.items||[]).filter(itemMatchesStations).map(it=>`
+function ticketHTML(o){
+  // show only NOT-YET-READY items for the selected stations
+  const pending = (o.items||[]).filter(it => itemMatchesStations(it) && !it.ready);
+  if(!pending.length) return ''; // nothing left for this KDS to do
+
+  const lines=pending.map(it=>`
     <div class="line">
       <div><strong>${it.qty||1}× ${it.name||''}</strong> <span class="muted">• ${it.station||''}</span></div>
       ${modsHTML(it.mods)}
     </div>
   `).join('');
 
-  const controls = readOnly
-    ? `<button class="btn gray" disabled>Completed</button>`
-    : `<button class="btn" data-ready="${o.id}">Ready</button>`;
-
   return `
-  <div class="ticket ${readOnly?'muted':''}">
+  <div class="ticket">
     <div class="hdr">
       <div>
         <div class="customer">${o.customer||'No name'} <span class="muted">#${o.number||''}</span></div>
         <div class="muted">${new Date(o.createdAt||Date.now()).toLocaleTimeString()}</div>
       </div>
-      <div>${controls}</div>
+      <div><button class="btn" data-ready="${o.id}">Ready (this station's items)</button></div>
     </div>
-    <div class="items">${lines||'<div class="muted">No items for selected stations.</div>'}</div>
+    ${lines}
   </div>`;
 }
 
@@ -141,30 +137,51 @@ function renderTickets(snap){
   if(!snap){ grid.innerHTML=''; empty.style.display='block'; return; }
   const includeCompleted = !!showDone.checked;
 
-  const docs=[];
+  const html=[];
   snap.forEach(d=>{
     const o={id:d.id, ...d.data()};
-    const isCompleted = (o.status==='ready' || o.status==='picked_up');
-    if(!includeCompleted && isCompleted) return; // hide completed unless toggled
-    if(!orderHasSelectedStations(o)) return;
-    // Only show actionable (status not ready/picked_up) unless includeCompleted is on
-    if(!includeCompleted && o.status!=='new' && o.status!=='in-progress') return;
-    docs.push(o);
+    const allReady = (o.items||[]).length && (o.items||[]).every(it=>it.ready);
+    const isCompleted = allReady || o.status==='ready' || o.status==='picked_up';
+    if(!includeCompleted && isCompleted) return;
+
+    const th=ticketHTML(o);
+    if(th) html.push(th);
   });
 
-  grid.innerHTML = docs.map(o => ticketHTML(o, /*readOnly*/ (o.status!=='new' && o.status!=='in-progress'))).join('');
-  empty.style.display = docs.length? 'none':'block';
+  grid.innerHTML = html.join('');
+  empty.style.display = html.length? 'none':'block';
 
   grid.querySelectorAll('[data-ready]').forEach(b=>{
-    b.onclick=()=> setReady(b.dataset.ready);
+    b.onclick=()=> setReadyForThisStation(b.dataset.ready);
   });
 }
 
-async function setReady(id){
+// mark ONLY the visible station's items as ready
+async function setReadyForThisStation(orderId){
   const now=Date.now();
+  const ref=db.collection('orders').doc(orderId);
   try{
-    await db.collection('orders').doc(id).update({status:'ready', readyAt: now, updatedAt: now});
-    // Ticket drops from KDS immediately (unless "Show completed" is on)
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(ref); if(!snap.exists) return;
+      const o=snap.data(); const items=(o.items||[]).map(it=>{
+        if(itemMatchesStations(it) && !it.ready){
+          return {...it, ready:true, readyAt: now};
+        }
+        return it;
+      });
+      const allReady = items.length && items.every(i=>i.ready);
+      const updates = {
+        items,
+        updatedAt: now,
+      };
+      if(allReady){
+        updates.status = 'ready';
+        if(!o.readyAt) updates.readyAt = now;
+      }else{
+        updates.status = 'partial'; // optional state for visibility
+      }
+      tx.update(ref, updates);
+    });
   }catch(e){ alert(e.message); }
 }
 
