@@ -55,10 +55,8 @@
   <div id="empty" class="muted" style="margin-top:8px;display:none">No tickets.</div>
 </div>
 
-<!-- Loud chime (embedded; will arm on first tap) -->
-<audio id="ding" preload="auto">
-  <source src="data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAA//uQZAAAAAAAAAAAAAAAAAAAAA//uQZAAAAAAAAAAAAAAAAAAAAA" type="audio/mp3">
-</audio>
+<!-- Bell sound -->
+<audio id="ding" preload="auto"></audio>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
@@ -76,14 +74,28 @@ const me=$('#me'), login=$('#login'), logout=$('#logout');
 const chips=$('#chips'), stationBadge=$('#stationBadge');
 const showDone=$('#showDone'), grid=$('#grid'), empty=$('#empty'), selectAll=$('#selectAll'), savePref=$('#savePref');
 
-// sound
+// ====== SOUND (uses your WAV on GitHub Pages) ======
+const SOUND_URL = "https://georghenin.github.io/festival-pos/mixkit-bell-notification-933.wav"; // update if you place it elsewhere
 const dingEl = document.getElementById('ding');
+dingEl.src = SOUND_URL;
 const soundCb = document.getElementById('sound');
 let lastSoundTs = Number(localStorage.getItem('kdsLastSoundTs')||'0');
-function armAudioOnce(){ window.removeEventListener('click',armAudioOnce,true); try{dingEl.volume=1.0; dingEl.play().then(()=>dingEl.pause()).catch(()=>{});}catch(_){} }
-window.addEventListener('click',armAudioOnce,true);
-function playDing(){ if(!soundCb.checked) return; try{dingEl.currentTime=0; dingEl.volume=1.0; dingEl.play().catch(()=>{});}catch(_){} }
-function newestTsForKDS(orders){ let n=0; for(const o of orders){ const ts=Number(o.updatedAt||o.createdAt||0); if(ts>n) n=ts; } return n; }
+
+// iOS/Chrome: must unlock audio once with a user gesture
+function armAudioOnce(){
+  window.removeEventListener('click', armAudioOnce, true);
+  try { dingEl.volume = 1.0; dingEl.play().then(()=>dingEl.pause()).catch(()=>{}); } catch(_) {}
+}
+window.addEventListener('click', armAudioOnce, true);
+
+function playDing(){
+  if(!soundCb.checked) return;
+  try { dingEl.currentTime = 0; dingEl.volume = 1.0; dingEl.play().catch(()=>{}); } catch(_) {}
+}
+function newestTsForKDS(orders){
+  let n=0; for(const o of orders){ const ts=Number(o.updatedAt||o.createdAt||0); if(ts>n) n=ts; } return n;
+}
+// ===================================================
 
 let STATIONS=['Grill','Fryer','Drinks','Pizza'];
 let selected=new Set(JSON.parse(localStorage.getItem('kdsStations')||'[]'));
@@ -135,7 +147,6 @@ function renderTickets(snap){
     const isCompleted = allReady || o.status==='ready' || o.status==='picked_up';
     if(!includeCompleted && isCompleted) return;
 
-    // Pending items for this station set
     const pending=(o.items||[]).filter(it => itemMatchesStations(it) && !it.ready);
     if(!pending.length) return;
 
@@ -162,7 +173,7 @@ function renderTickets(snap){
   grid.innerHTML = html.join('');
   empty.style.display = html.length? 'none':'block';
 
-  // 🔔 play if a newer order is showing than last time
+  // 🔔 Sound if a newer order is present
   const newest = newestTsForKDS(shown);
   if(newest && newest > lastSoundTs){ playDing(); lastSoundTs=newest; localStorage.setItem('kdsLastSoundTs', String(lastSoundTs)); }
 
