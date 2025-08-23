@@ -32,6 +32,7 @@
       <span id="stationBadge" class="pill">Stations: loading…</span>
     </div>
     <div class="row">
+      <label class="pill"><input id="sound" type="checkbox" style="margin-right:6px"> Sound on new</label>
       <label class="pill"><input id="showDone" type="checkbox" style="margin-right:6px"> Show completed</label>
       <span id="me" class="pill">Not signed in</span>
       <button id="login" class="btn gray">Sign in</button>
@@ -54,6 +55,11 @@
   <div id="empty" class="muted" style="margin-top:8px;display:none">No tickets.</div>
 </div>
 
+<!-- Loud chime (embedded; will arm on first tap) -->
+<audio id="ding" preload="auto">
+  <source src="data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAA//uQZAAAAAAAAAAAAAAAAAAAAA//uQZAAAAAAAAAAAAAAAAAAAAA" type="audio/mp3">
+</audio>
+
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
@@ -69,6 +75,15 @@ const $=s=>document.querySelector(s);
 const me=$('#me'), login=$('#login'), logout=$('#logout');
 const chips=$('#chips'), stationBadge=$('#stationBadge');
 const showDone=$('#showDone'), grid=$('#grid'), empty=$('#empty'), selectAll=$('#selectAll'), savePref=$('#savePref');
+
+// sound
+const dingEl = document.getElementById('ding');
+const soundCb = document.getElementById('sound');
+let lastSoundTs = Number(localStorage.getItem('kdsLastSoundTs')||'0');
+function armAudioOnce(){ window.removeEventListener('click',armAudioOnce,true); try{dingEl.volume=1.0; dingEl.play().then(()=>dingEl.pause()).catch(()=>{});}catch(_){} }
+window.addEventListener('click',armAudioOnce,true);
+function playDing(){ if(!soundCb.checked) return; try{dingEl.currentTime=0; dingEl.volume=1.0; dingEl.play().catch(()=>{});}catch(_){} }
+function newestTsForKDS(orders){ let n=0; for(const o of orders){ const ts=Number(o.updatedAt||o.createdAt||0); if(ts>n) n=ts; } return n; }
 
 let STATIONS=['Grill','Fryer','Drinks','Pizza'];
 let selected=new Set(JSON.parse(localStorage.getItem('kdsStations')||'[]'));
@@ -108,34 +123,10 @@ function modsHTML(mods){
   return `<div class="mods">${names.join(', ')}</div>`;
 }
 
-function ticketHTML(o){
-  // show only NOT-YET-READY items for the selected stations
-  const pending = (o.items||[]).filter(it => itemMatchesStations(it) && !it.ready);
-  if(!pending.length) return ''; // nothing left for this KDS to do
-
-  const lines=pending.map(it=>`
-    <div class="line">
-      <div><strong>${it.qty||1}× ${it.name||''}</strong> <span class="muted">• ${it.station||''}</span></div>
-      ${modsHTML(it.mods)}
-    </div>
-  `).join('');
-
-  return `
-  <div class="ticket">
-    <div class="hdr">
-      <div>
-        <div class="customer">${o.customer||'No name'} <span class="muted">#${o.number||''}</span></div>
-        <div class="muted">${new Date(o.createdAt||Date.now()).toLocaleTimeString()}</div>
-      </div>
-      <div><button class="btn" data-ready="${o.id}">Ready (this station's items)</button></div>
-    </div>
-    ${lines}
-  </div>`;
-}
-
 function renderTickets(snap){
   if(!snap){ grid.innerHTML=''; empty.style.display='block'; return; }
   const includeCompleted = !!showDone.checked;
+  const shown=[]; // for sound
 
   const html=[];
   snap.forEach(d=>{
@@ -144,12 +135,36 @@ function renderTickets(snap){
     const isCompleted = allReady || o.status==='ready' || o.status==='picked_up';
     if(!includeCompleted && isCompleted) return;
 
-    const th=ticketHTML(o);
-    if(th) html.push(th);
+    // Pending items for this station set
+    const pending=(o.items||[]).filter(it => itemMatchesStations(it) && !it.ready);
+    if(!pending.length) return;
+
+    shown.push(o);
+    const lines=pending.map(it=>`
+      <div class="line">
+        <div><strong>${it.qty||1}× ${it.name||''}</strong> <span class="muted">• ${it.station||''}</span></div>
+        ${modsHTML(it.mods)}
+      </div>`).join('');
+
+    html.push(`
+      <div class="ticket">
+        <div class="hdr">
+          <div>
+            <div class="customer">${o.customer||'No name'} <span class="muted">#${o.number||''}</span></div>
+            <div class="muted">${new Date(o.createdAt||Date.now()).toLocaleTimeString()}</div>
+          </div>
+          <div><button class="btn" data-ready="${o.id}">Ready (this station's items)</button></div>
+        </div>
+        ${lines}
+      </div>`);
   });
 
   grid.innerHTML = html.join('');
   empty.style.display = html.length? 'none':'block';
+
+  // 🔔 play if a newer order is showing than last time
+  const newest = newestTsForKDS(shown);
+  if(newest && newest > lastSoundTs){ playDing(); lastSoundTs=newest; localStorage.setItem('kdsLastSoundTs', String(lastSoundTs)); }
 
   grid.querySelectorAll('[data-ready]').forEach(b=>{
     b.onclick=()=> setReadyForThisStation(b.dataset.ready);
@@ -170,15 +185,12 @@ async function setReadyForThisStation(orderId){
         return it;
       });
       const allReady = items.length && items.every(i=>i.ready);
-      const updates = {
-        items,
-        updatedAt: now,
-      };
+      const updates = { items, updatedAt: now };
       if(allReady){
         updates.status = 'ready';
         if(!o.readyAt) updates.readyAt = now;
       }else{
-        updates.status = 'partial'; // optional state for visibility
+        updates.status = 'partial';
       }
       tx.update(ref, updates);
     });
