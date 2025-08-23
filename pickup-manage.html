@@ -17,6 +17,7 @@
   .ticket{border:1px solid var(--border);background:#121826;border-radius:14px;padding:10px;margin-bottom:10px}
   .hdr{display:flex;justify-content:space-between;gap:10px;align-items:center}
   .customer{font-weight:800}
+  .colhdr{margin-top:8px;color:#aab3c6;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
   .line{border-top:1px dashed #293246;padding:6px 0}
   .mods{color:#aeb7c6;font-size:12px;margin-top:2px}
   .muted{color:var(--muted);font-size:12px}
@@ -91,65 +92,62 @@ const stationBadge=$('#stationBadge'), chips=$('#chips'), selectAll=$('#selectAl
 const ready=$('#ready'), picked=$('#picked'), emptyReady=$('#emptyReady'), emptyPicked=$('#emptyPicked');
 const toggleHist=$('#toggleHist'), histBox=$('#hist'), showAll=$('#showAll');
 
-let STATIONS=[];                                // dynamic, from settings/config
+let STATIONS=[];                                // dynamic
 let selected=new Set(JSON.parse(localStorage.getItem('pickupStations')||'[]'));
 let showAllHistory=false;
 
-// ---- auth (view without sign-in; write requires sign-in)
+// auth: view without sign-in; writes require sign-in
 auth.onAuthStateChanged(u=>{ me.textContent=u?u.email:'Not signed in'; });
 login.onclick=async()=>{ const e=prompt('Email:'); if(!e) return; const p=prompt('Password:'); if(p===null) return; try{await auth.signInWithEmailAndPassword(e.trim(),p);}catch(err){alert(err.message);} };
 logout.onclick=()=>auth.signOut();
 
-// ---- dynamic stations (live)
-let unsubSettings=null;
-function watchStations(){
-  if (unsubSettings) unsubSettings();
-  unsubSettings = db.collection('settings').doc('config')
-    .onSnapshot(s=>{
-      const conf=s.data()||{};
-      const arr = Array.isArray(conf.stations) ? conf.stations.filter(Boolean) : [];
-      // If settings are empty, keep current; else replace.
-      if (arr.length) STATIONS = arr.slice();
-      // If nothing yet, we’ll also auto-discover below from orders.
-      renderChips(); updateBadge();
-    }, err=>{ console.warn('settings/config error', err); updateBadge(); });
-}
-function updateBadge(){ stationBadge.textContent = 'Stations: ' + (STATIONS.length? STATIONS.join(', ') : '—'); }
+// stations live from settings/config
+db.collection('settings').doc('config').onSnapshot(s=>{
+  const conf=s.data()||{}; const arr=Array.isArray(conf.stations)?conf.stations.filter(Boolean):[];
+  if(arr.length) STATIONS=arr.slice();
+  renderChips(); stationBadge.textContent='Stations: '+(STATIONS.length?STATIONS.join(', '):'—');
+});
+
 function renderChips(){
-  // If no stations yet, delay until we have some (either from settings or discovery)
   chips.innerHTML = (STATIONS.length
     ? STATIONS.map(s=>`<span class="chip ${selected.has(s)?'active':''}" data-st="${s}">${s}</span>`).join('')
     : `<span class="muted">No stations configured yet</span>`);
   chips.querySelectorAll('.chip').forEach(c=>{
     c.onclick=()=>{ const s=c.dataset.st; if(selected.has(s)) selected.delete(s); else selected.add(s); renderChips(); renderLists(); };
   });
-  // If nothing selected yet on this iPad, default to all known stations
-  if (!selected.size && STATIONS.length){ STATIONS.forEach(s=>selected.add(s)); }
+  if(!selected.size && STATIONS.length){ STATIONS.forEach(s=>selected.add(s)); }
 }
 selectAll.onclick=()=>{ STATIONS.forEach(s=>selected.add(s)); renderChips(); renderLists(); };
 savePref.onclick=()=>{ localStorage.setItem('pickupStations', JSON.stringify([...selected])); alert('Saved on this iPad.'); };
 
-// ---- orders (ready + picked_up)
+// helpers
+const itemMatchesStations = (it)=>{
+  if(!it.station) return true;
+  if(!STATIONS.includes(it.station)) return true;
+  return selected.has(it.station);
+};
+const orderHasSelectedStations = (o)=> (o.items||[]).some(itemMatchesStations);
+function modsHTML(mods){ const names=(mods||[]).flatMap(g=>(g.options||[]).map(o=>o.name)).filter(Boolean); return names.length? `<div class="mods">${names.join(', ')}</div>`:''; }
+
+// data listeners
 let unsubReady=null, unsubPicked=null;
 let readyDocs=[], pickedDocs=[];
-
-function subscribeOrders(){
+function subscribe(){
   if(unsubReady) unsubReady(); if(unsubPicked) unsubPicked();
 
-  // READY — order by createdAt so docs without readyAt still appear
-  unsubReady = db.collection('orders')
-    .orderBy('createdAt','desc').limit(300)
+  // Show orders that have at least one ready item and are not picked up
+  unsubReady = db.collection('orders').orderBy('updatedAt','desc').limit(400)
     .onSnapshot(s=>{
-      readyDocs = s.docs.map(d=>({id:d.id, ...d.data()})).filter(o=>o.status==='ready');
-      autoDiscoverStations(readyDocs); // learn any new stations from data
+      readyDocs = s.docs.map(d=>({id:d.id, ...d.data()}))
+        .filter(o => (o.items||[]).some(it=>it.ready) && o.status!=='picked_up');
+      autoDiscoverStations(readyDocs);
       renderLists();
     });
 
-  // PICKED HISTORY — uses your actual status "picked_up"
+  // Picked history
   const start=new Date(); start.setHours(0,0,0,0);
   unsubPicked = db.collection('orders')
-    .where('status','==','picked_up')
-    .where('updatedAt','>=', start.getTime())
+    .where('status','==','picked_up').where('updatedAt','>=', start.getTime())
     .orderBy('updatedAt','desc').limit(200)
     .onSnapshot(s=>{
       pickedDocs = s.docs.map(d=>({id:d.id, ...d.data()}));
@@ -157,47 +155,30 @@ function subscribeOrders(){
       if(histBox.style.display!=='none') renderLists();
     });
 }
+subscribe();
 
-// learn stations from orders if settings didn’t define them (or new ones appear)
 function autoDiscoverStations(arr){
-  const seen = new Set(STATIONS);
-  arr.forEach(o => (o.items||[]).forEach(it => { if (it.station) seen.add(it.station); }));
-  if (seen.size !== STATIONS.length){
-    STATIONS = [...seen];
-    // by default, include any new stations in this iPad’s selection
-    STATIONS.forEach(s => selected.add(s));
-    renderChips(); updateBadge();
-  }
+  const seen=new Set(STATIONS);
+  arr.forEach(o => (o.items||[]).forEach(it=>{ if(it.station) seen.add(it.station); }));
+  if(seen.size!==STATIONS.length){ STATIONS=[...seen]; STATIONS.forEach(s=>selected.add(s)); renderChips(); stationBadge.textContent='Stations: '+STATIONS.join(', '); }
 }
 
-// filtering
-function itemMatchesStations(it){
-  // include if item has no station
-  if (!it.station) return true;
-  // include if station is unknown to chips (fail‑open)
-  if (!STATIONS.includes(it.station)) return true;
-  // otherwise check chip selection
-  return selected.has(it.station);
-}
-function orderHasSelectedStations(o){ return (o.items||[]).some(itemMatchesStations); }
+function orderHTML(o){
+  const rItems=(o.items||[]).filter(it=>it.ready && itemMatchesStations(it));
+  const pItems=(o.items||[]).filter(it=>!it.ready && itemMatchesStations(it));
 
-// render helpers
-function modsHTML(mods){
-  if(!mods || !mods.length) return '';
-  const names = mods.flatMap(g => (g.options||[]).map(o=>o.name)).filter(Boolean);
-  if(!names.length) return '';
-  return `<div class="mods">${names.join(', ')}</div>`;
-}
-function orderHTML(o, mode){
-  const lines=(o.items||[]).filter(itemMatchesStations).map(it=>`
-    <div class="line">
-      <div><strong>${it.qty||1}× ${it.name||''}</strong> <span class="muted">• ${it.station||''}</span></div>
-      ${modsHTML(it.mods)}
-    </div>
+  const rHTML = rItems.map(it=>`
+    <div class="line"><div><strong>${it.qty||1}× ${it.name}</strong> <span class="muted">• ${it.station||''}</span></div>${modsHTML(it.mods)}</div>
   `).join('');
-  const btn = mode==='ready'
+  const pHTML = pItems.map(it=>`
+    <div class="line"><div><strong>${it.qty||1}× ${it.name}</strong> <span class="muted">• ${it.station||''}</span></div>${modsHTML(it.mods)}</div>
+  `).join('');
+
+  const allReady = (o.items||[]).length && (o.items||[]).every(it=>it.ready);
+  const btn = allReady
     ? `<button class="btn ok" data-act="picked" data-id="${o.id}">Mark Picked Up</button>`
-    : `<button class="btn gray" data-act="undo" data-id="${o.id}">Undo</button>`;
+    : `<button class="btn gray" disabled title="Some items still preparing">Mark Picked Up</button>`;
+
   return `
   <div class="ticket">
     <div class="hdr">
@@ -207,29 +188,39 @@ function orderHTML(o, mode){
       </div>
       <div>${btn}</div>
     </div>
-    ${lines||'<div class="muted" style="margin-top:6px">No items for selected stations.</div>'}
+
+    ${rItems.length? `<div class="colhdr">Ready Items</div>${rHTML}` : ''}
+    ${pItems.length? `<div class="colhdr">Still Preparing</div>${pHTML}` : ''}
   </div>`;
 }
 
 function renderLists(){
   const r=readyDocs.filter(orderHasSelectedStations);
-  ready.innerHTML = r.map(o=>orderHTML(o,'ready')).join('');
+  ready.innerHTML = r.map(orderHTML).join('');
   emptyReady.style.display = r.length? 'none':'block';
 
   if(histBox.style.display!=='none'){
     const p=pickedDocs.filter(orderHasSelectedStations);
-    picked.innerHTML = p.map(o=>orderHTML(o,'picked')).join('');
+    picked.innerHTML = p.map(o=>`
+      <div class="ticket">
+        <div class="hdr">
+          <div>
+            <div class="customer">${o.customer||'No name'} <span class="muted">#${o.number||''}</span></div>
+            <div class="muted">${new Date((o.updatedAt||o.createdAt)||Date.now()).toLocaleTimeString()}</div>
+          </div>
+          <div><button class="btn gray" data-act="undo" data-id="${o.id}">Undo</button></div>
+        </div>
+        ${(o.items||[]).filter(itemMatchesStations).map(it=>`
+          <div class="line"><div><strong>${it.qty||1}× ${it.name}</strong> <span class="muted">• ${it.station||''}</span></div>${modsHTML(it.mods)}</div>
+        `).join('')}
+      </div>
+    `).join('');
     emptyPicked.style.display = p.length? 'none':'block';
-    picked.querySelectorAll('[data-act="undo"]').forEach(b=>{
-      b.onclick=()=> setStatus(b.dataset.id,'ready');
-    });
+    picked.querySelectorAll('[data-act="undo"]').forEach(b=> b.onclick=()=> setStatus(b.dataset.id,'ready')); // sends order back
   }
-  ready.querySelectorAll('[data-act="picked"]').forEach(b=>{
-    b.onclick=()=> setStatus(b.dataset.id,'picked_up');
-  });
+  ready.querySelectorAll('[data-act="picked"]').forEach(b=> b.onclick=()=> setStatus(b.dataset.id,'picked_up'));
 }
 
-// actions (requires sign‑in due to Firestore rules)
 async function setStatus(id, status){
   try{ await db.collection('orders').doc(id).update({status, updatedAt: Date.now()}); }
   catch(e){ alert(e.message); }
@@ -242,10 +233,5 @@ toggleHist.onclick=()=>{
   toggleHist.textContent = open ? 'Show history' : 'Hide history';
   if(!open) renderLists();
 };
-
-// init
-watchStations();           // live stations from settings/config
-subscribeOrders();         // orders listeners
-renderChips(); updateBadge();
 </script>
 </body></html>
