@@ -76,10 +76,8 @@
 
 </div>
 
-<!-- Loud chime -->
-<audio id="ding" preload="auto">
-  <source src="data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAA//uQZAAAAAAAAAAAAAAAAAAAAA//uQZAAAAAAAAAAAAAAAAAAAAA" type="audio/mp3">
-</audio>
+<!-- Bell sound -->
+<audio id="ding" preload="auto"></audio>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
@@ -98,8 +96,10 @@ const stationBadge=$('#stationBadge'), chips=$('#chips'), selectAll=$('#selectAl
 const ready=$('#ready'), picked=$('#picked'), emptyReady=$('#emptyReady'), emptyPicked=$('#emptyPicked');
 const toggleHist=$('#toggleHist'), histBox=$('#hist'), showAll=$('#showAll');
 
-// sound
-const dingEl=document.getElementById('ding'); const soundCb=document.getElementById('sound');
+// ====== SOUND (uses your WAV on GitHub Pages) ======
+const SOUND_URL = "https://georghenin.github.io/festival-pos/mixkit-bell-notification-933.wav"; // update if placed elsewhere
+const dingEl=document.getElementById('ding'); dingEl.src = SOUND_URL;
+const soundCb=document.getElementById('sound');
 let lastReadySoundTs = Number(localStorage.getItem('pickupLastSoundTs')||'0');
 function armAudioOnce(){ window.removeEventListener('click',armAudioOnce,true); try{dingEl.volume=1.0; dingEl.play().then(()=>dingEl.pause()).catch(()=>{});}catch(_){} }
 window.addEventListener('click',armAudioOnce,true);
@@ -117,6 +117,7 @@ function newestReadyTs(orders){
   }
   return max;
 }
+// ===================================================
 
 // auth: view without sign-in; writes require sign-in
 auth.onAuthStateChanged(u=>{ me.textContent=u?u.email:'Not signed in'; });
@@ -245,7 +246,7 @@ function renderLists(){
       </div>
     `).join('');
     emptyPicked.style.display = p.length? 'none':'block';
-    picked.querySelectorAll('[data-act="undo"]').forEach(b=> b.onclick=()=> setStatus(b.dataset.id,'ready')); // sends order back
+    picked.querySelectorAll('[data-act="undo"]').forEach(b=> b.onclick=()=> setStatus(b.dataset.id,'ready'));
   }
   ready.querySelectorAll('[data-act="picked"]').forEach(b=> b.onclick=()=> setStatus(b.dataset.id,'picked_up'));
 }
