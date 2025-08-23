@@ -20,7 +20,7 @@
   .colhdr{margin-top:8px;color:#aab3c6;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
   .line{border-top:1px dashed #293246;padding:6px 0}
   .mods{color:#aeb7c6;font-size:12px;margin-top:2px}
-  .muted{color:var(--muted);font-size:12px}
+  .muted{color:#95a0ad;font-size:12px}
   .history{margin-top:10px;display:none}
 </style>
 </head>
@@ -33,6 +33,7 @@
       <span id="stationBadge" class="pill">Stations: loading…</span>
     </div>
     <div class="row">
+      <label class="pill"><input id="sound" type="checkbox" style="margin-right:6px"> Sound on new ready</label>
       <span id="me" class="pill">Not signed in</span>
       <button id="login" class="btn gray">Sign in</button>
       <button id="logout" class="btn gray">Sign out</button>
@@ -75,6 +76,11 @@
 
 </div>
 
+<!-- Loud chime -->
+<audio id="ding" preload="auto">
+  <source src="data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAA//uQZAAAAAAAAAAAAAAAAAAAAA//uQZAAAAAAAAAAAAAAAAAAAAA" type="audio/mp3">
+</audio>
+
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
@@ -92,16 +98,36 @@ const stationBadge=$('#stationBadge'), chips=$('#chips'), selectAll=$('#selectAl
 const ready=$('#ready'), picked=$('#picked'), emptyReady=$('#emptyReady'), emptyPicked=$('#emptyPicked');
 const toggleHist=$('#toggleHist'), histBox=$('#hist'), showAll=$('#showAll');
 
-let STATIONS=[];                                // dynamic
-let selected=new Set(JSON.parse(localStorage.getItem('pickupStations')||'[]'));
-let showAllHistory=false;
+// sound
+const dingEl=document.getElementById('ding'); const soundCb=document.getElementById('sound');
+let lastReadySoundTs = Number(localStorage.getItem('pickupLastSoundTs')||'0');
+function armAudioOnce(){ window.removeEventListener('click',armAudioOnce,true); try{dingEl.volume=1.0; dingEl.play().then(()=>dingEl.pause()).catch(()=>{});}catch(_){} }
+window.addEventListener('click',armAudioOnce,true);
+function playDing(){ if(!soundCb.checked) return; try{dingEl.currentTime=0; dingEl.volume=1.0; dingEl.play().catch(()=>{});}catch(_){} }
+function newestReadyTs(orders){
+  let max=0;
+  for(const o of orders){
+    for(const it of (o.items||[])){
+      if(!itemMatchesStations(it)) continue;
+      if(it.ready){
+        const ts=Number(it.readyAt || o.updatedAt || o.createdAt || 0);
+        if(ts>max) max=ts;
+      }
+    }
+  }
+  return max;
+}
 
 // auth: view without sign-in; writes require sign-in
 auth.onAuthStateChanged(u=>{ me.textContent=u?u.email:'Not signed in'; });
-login.onclick=async()=>{ const e=prompt('Email:'); if(!e) return; const p=prompt('Password:'); if(p===null) return; try{await auth.signInWithEmailAndPassword(e.trim(),p);}catch(err){alert(err.message);} };
+login.onclick=async()=>{ const e=prompt('Email:'); if(!e) return; const p=prompt('Password'); if(p===null) return; try{await auth.signInWithEmailAndPassword(e.trim(),p);}catch(err){alert(err.message);} };
 logout.onclick=()=>auth.signOut();
 
-// stations live from settings/config
+// dynamic stations from settings/config
+let STATIONS=[];
+let selected=new Set(JSON.parse(localStorage.getItem('pickupStations')||'[]'));
+let showAllHistory=false;
+
 db.collection('settings').doc('config').onSnapshot(s=>{
   const conf=s.data()||{}; const arr=Array.isArray(conf.stations)?conf.stations.filter(Boolean):[];
   if(arr.length) STATIONS=arr.slice();
@@ -135,7 +161,7 @@ let readyDocs=[], pickedDocs=[];
 function subscribe(){
   if(unsubReady) unsubReady(); if(unsubPicked) unsubPicked();
 
-  // Show orders that have at least one ready item and are not picked up
+  // Orders with at least one ready item and not picked up
   unsubReady = db.collection('orders').orderBy('updatedAt','desc').limit(400)
     .onSnapshot(s=>{
       readyDocs = s.docs.map(d=>({id:d.id, ...d.data()}))
@@ -144,7 +170,6 @@ function subscribe(){
       renderLists();
     });
 
-  // Picked history
   const start=new Date(); start.setHours(0,0,0,0);
   unsubPicked = db.collection('orders')
     .where('status','==','picked_up').where('updatedAt','>=', start.getTime())
@@ -199,6 +224,10 @@ function renderLists(){
   ready.innerHTML = r.map(orderHTML).join('');
   emptyReady.style.display = r.length? 'none':'block';
 
+  // 🔔 sound: play when new ready items/orders appear
+  const newest = newestReadyTs(r);
+  if(newest && newest > lastReadySoundTs){ playDing(); lastReadySoundTs=newest; localStorage.setItem('pickupLastSoundTs', String(lastReadySoundTs)); }
+
   if(histBox.style.display!=='none'){
     const p=pickedDocs.filter(orderHasSelectedStations);
     picked.innerHTML = p.map(o=>`
@@ -226,7 +255,6 @@ async function setStatus(id, status){
   catch(e){ alert(e.message); }
 }
 
-// history toggle
 toggleHist.onclick=()=>{
   const open = histBox.style.display!=='none';
   histBox.style.display = open ? 'none' : 'block';
