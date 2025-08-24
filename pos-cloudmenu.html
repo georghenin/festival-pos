@@ -23,7 +23,8 @@
   .item{background:#121826;border:1px solid var(--border);border-radius:14px;padding:8px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start}
   .item img{width:100%;height:100px;object-fit:cover;border-radius:10px;margin-bottom:6px;background:#0b101a;border:1px solid var(--border)}
   .item .nm{font-weight:600}.item .pr{color:#cfe3ff;font-size:13px}
-  table{width:100%;border-collapse:collapse} th,td{border-bottom:1px solid var(--border);padding:8px;text-align:left;vertical-align:top}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid var(--border);padding:8px;text-align:left;vertical-align:top}
   .right .card{position:sticky;top:10px}
   .total{display:flex;justify-content:space-between;font-weight:700;margin-top:8px}
   .qbtn{padding:4px 8px;border-radius:8px;background:#1d2331;color:#dfe6f5}
@@ -81,13 +82,14 @@
         </div>
         <div class="row" style="margin-top:8px;gap:8px">
           <input id="printerIp" placeholder="Printer IP (e.g. 192.168.4.98)" style="min-width:220px">
-          <input id="printerDev" placeholder="Device ID (e.g. local_printer)" style="min-width:220px">
+          <input id="printerDev" placeholder="Device ID (e.g. printer)" style="min-width:220px">
           <button id="savePrinter" class="btn ok">Save</button>
           <button id="testPrint" class="btn gray">Test Print</button>
-          <button id="cutNow" class="btn gray" title="Force the cutter">Cut Now</button>
+          <button id="cutNow" class="btn gray">Cut Now</button>
         </div>
+        <div id="printLog" class="small" style="margin-top:6px;color:#9fb0c9"></div>
         <div class="small" style="margin-top:6px">
-          In Epson Web Config → <em>Configuration → ePOS‑Print</em>: Enable ePOS‑Print and set Device ID (often <code>local_printer</code>). Cutter must be enabled in the printer settings.
+          In Epson Web Config → <em>Configuration → ePOS‑Print</em>: Enable ePOS‑Print and set the Device ID (yours is <code>printer</code>). Make sure the cutter is enabled.
         </div>
       </div>
     </div>
@@ -151,41 +153,51 @@ const modMask=$('#modMask'), modTitle=$('#modTitle'), modBody=$('#modBody'), mod
 
 /* ===== Printer UI refs ===== */
 const printerIp=$('#printerIp'), printerDev=$('#printerDev'), savePrinter=$('#savePrinter'), testPrint=$('#testPrint'), autoPrint=$('#autoPrint'), cutNow=$('#cutNow');
+const printLog=$('#printLog');
 
 /* ===================== State ===================== */
 let STATIONS_ALL=['Grill','Fryer','Drinks','Pizza']; // fallback
 let FILTER_STATION='__ALL__';
 let MENU=[]; let MOD_GROUPS=new Map(); let CART=[];
 
+/* ===== Helpers ===== */
+function setPrintLog(txt){ if(printLog) printLog.textContent = txt||''; }
+function money(n){ return `$${(+n).toFixed(2)}`; }
+
 /* ===== Printer config (localStorage) ===== */
 function loadPrinterPrefs(){
   printerIp.value  = localStorage.getItem('printerIp')  || '';
-  printerDev.value = localStorage.getItem('printerDev') || 'local_printer';
+  printerDev.value = localStorage.getItem('printerDev') || 'printer'; // default to your actual Device ID
   autoPrint.checked = localStorage.getItem('printerAuto') === '1';
 }
 function savePrinterPrefs(){
   localStorage.setItem('printerIp', (printerIp.value||'').trim());
-  localStorage.setItem('printerDev',(printerDev.value||'local_printer').trim());
+  localStorage.setItem('printerDev',(printerDev.value||'printer').trim());
   localStorage.setItem('printerAuto', autoPrint.checked ? '1' : '0');
   alert('Printer settings saved to this device.');
 }
 savePrinter.onclick = savePrinterPrefs;
+
 testPrint.onclick = async()=>{
   savePrinterPrefs();
   const ip = (printerIp.value||'').trim();
-  const dev= (printerDev.value||'local_printer').trim();
+  const dev= (printerDev.value||'printer').trim();
   if(!ip){ alert('Set the printer IP first.'); return; }
-  await printRawXML([
-    {type:'text', text:'*** TEST PRINT ***', align:'center', bold:true},
-    {type:'text', text:new Date().toLocaleString(), align:'center'},
-  ], ip, dev, {doCut:true});
-  alert('Test print sent.');
+  setPrintLog('Sending TEST PRINT…');
+  try{
+    await printRaw(`*** TEST PRINT ***\n${new Date().toLocaleString()}\n`, ip, dev);
+    alert('Test print sent.');
+  }catch(e){ alert('Could not reach printer — see the log below.'); }
 };
+
 cutNow.onclick = async()=>{
   const ip = (printerIp.value||'').trim();
-  const dev= (printerDev.value||'local_printer').trim();
+  const dev= (printerDev.value||'printer').trim();
   if(!ip){ alert('Set the printer IP first.'); return; }
-  await printRawXML([], ip, dev, {feed:4, doCut:true});
+  setPrintLog('Sending CUT command…');
+  try{
+    await printRaw('', ip, dev); // sends feed + partial cut (see printRaw)
+  }catch(e){ alert('Cut failed — see the log below.'); }
 };
 
 /* ===================== Auth UI ===================== */
@@ -376,9 +388,9 @@ $('#submitOrder').onclick = async ()=>{
 };
 
 /* ===================== Epson ePOS‑Print ===================== */
-/** Build a nice 42‑column receipt */
+/** Pretty 42‑column receipt for 80mm */
 function fmtReceipt(order){
-  const width=42; // TM-m30II 80mm ~ 42 cols with Font A
+  const width=42;
   const line = '─'.repeat(width);
   const center = s => {
     s=String(s); const pad=Math.max(0, Math.floor((width - s.length)/2));
@@ -399,12 +411,8 @@ function fmtReceipt(order){
     const mods=(it.mods||[]).flatMap(g=>(g.options||[]).map(o=>o.name));
     if(mods.length){
       const m='('+mods.join(', ')+')';
-      // wrap mods
       let s=m;
-      while(s.length>width){
-        rows.push('  '+s.slice(0,width-2));
-        s=s.slice(width-2);
-      }
+      while(s.length>width){ rows.push('  '+s.slice(0,width-2)); s=s.slice(width-2); }
       rows.push('  '+s);
     }
   });
@@ -413,56 +421,45 @@ function fmtReceipt(order){
   rows.push(right('TOTAL', money(order.total)));
   rows.push('');
   rows.push(center('Thank you!'));
-  rows.push(''); // one extra blank
+  rows.push('');
   return rows.join('\n');
 }
 
-/**
- * Low-level XML print. Accepts simple chunks:
- *   {type:'text', text:'...', align:'left|center|right', bold:Boolean}
- * Options: {feed: number, doCut: boolean}
- */
-async function printRawXML(chunks, ip, devid, options={}){
+/** Send text to printer with FEED + PARTIAL CUT (works on TM‑m30II) */
+async function printRaw(text, ip, devid){
   const url=`http://${ip}/cgi-bin/epos/service.cgi?devid=${encodeURIComponent(devid)}&timeout=60000`;
-
   const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-  const parts=[];
-  parts.push(`<?xml version="1.0" encoding="utf-8"?>`);
-  parts.push(`<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">`);
+  const xml=`<?xml version="1.0" encoding="utf-8"?>
+<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
+  <text lang="en" smooth="true" font="font_a" width="1" height="1">${esc(text)}</text>
+  <feed line="5"/>
+  <cut type="partial"/>
+</epos-print>`;
 
-  (chunks||[]).forEach(c=>{
-    const align = c.align ? ` align="${c.align}"` : '';
-    const weight = c.bold ? ` weight="bold"` : '';
-    parts.push(`<text lang="en" smooth="true" font="font_a" width="1" height="1"${align}${weight}>${esc(c.text)}</text>`);
-  });
-
-  const feedLines = options.feed ?? 4;
-  if(feedLines>0) parts.push(`<feed line="${feedLines}"/>`);
-  if(options.doCut) parts.push(`<cut type="partial"/>`);
-
-  parts.push(`</epos-print>`);
-  const xml = parts.join('');
-
-  const res=await fetch(url,{method:"POST",headers:{"Content-Type":"text/xml"},body:xml});
-  const t=await res.text();
-  console.log('Printer response:', t);
-  return t;
+  setPrintLog('Sending job…');
+  try{
+    const res=await fetch(url,{method:"POST",headers:{"Content-Type":"text/xml"},body:xml});
+    const t=await res.text();
+    console.log('Printer response:', t);
+    setPrintLog('Printer response: '+t);
+    return t;
+  }catch(err){
+    console.error('Printer error', err);
+    setPrintLog('Printer error: '+ String(err));
+    throw err;
+  }
 }
 
 async function printReceipt(order){
   const ip=(localStorage.getItem('printerIp')||'').trim();
-  const dev=(localStorage.getItem('printerDev')||'local_printer').trim();
+  const dev=(localStorage.getItem('printerDev')||'printer').trim();
   if(!ip){ console.warn('No printer IP set; skipping print'); return; }
-
   const body = fmtReceipt(order);
   try{
-    await printRawXML([
-      {type:'text', text:body, align:'left', bold:false},
-    ], ip, dev, {feed:4, doCut:true});
+    await printRaw(body, ip, dev);
   }catch(err){
-    console.error('Print error', err);
-    alert('Could not print. Check printer IP/Device ID, that ePOS‑Print is enabled, and that mixed content is allowed for this page.');
+    alert('Could not print (see log under the buttons).');
   }
 }
 
