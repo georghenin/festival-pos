@@ -1,48 +1,75 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Epson ePOS‑Print Tester (correct XML)</title>
-  <style>
-    body{background:#0d0f13;color:#eaf0f6;font-family:system-ui;margin:0;padding:20px}
-    .row{display:flex;gap:8px;flex-wrap:wrap}
-    input,button{font:inherit;border-radius:8px;border:1px solid #1b2230;padding:10px 12px;background:#121826;color:#eaf0f6}
-    button{background:#5b9bff;color:#fff;border:none;cursor:pointer}
-    pre{white-space:pre-wrap;background:#0f141e;border:1px solid #1b2230;border-radius:12px;padding:12px;margin-top:12px}
-  </style>
-</head>
-<body>
-  <h2>Epson ePOS‑Print Tester</h2>
-  <div class="row">
-    <input id="ip" placeholder="Printer IP (e.g. 192.168.4.98)" style="min-width:260px">
-    <input id="devid" placeholder="Device ID (e.g. local_printer)" value="local_printer" style="min-width:220px">
-    <button id="send">Send Test</button>
-  </div>
-  <pre id="out">Waiting…</pre>
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Epson ePOS‑Print Tester (minimal)</title>
+<style>
+  body{font-family:system-ui,Arial;margin:20px;background:#0d0f13;color:#f5f7fa}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  input{padding:10px 12px;border-radius:8px;border:1px solid #1b2230;background:#121826;color:#eaf0f6}
+  button{padding:10px 14px;border:0;border-radius:10px;background:#5b9bff;color:#fff;cursor:pointer}
+  pre{background:#0f141e;border:1px solid #1b2230;border-radius:12px;padding:12px;white-space:pre-wrap}
+</style>
+
+<h2>Epson ePOS‑Print Tester (minimal)</h2>
+<div class="row">
+  <input id="ip" placeholder="Printer IP (e.g. 192.168.4.98)" style="min-width:260px">
+  <input id="devid" placeholder="Device ID (e.g. local_printer)" value="local_printer" style="min-width:220px">
+  <button id="go">Send Test</button>
+</div>
+<p style="opacity:.8">Make sure ePOS‑Print is Enabled on the printer page and Device ID matches.</p>
+
+<h3>Result</h3>
+<pre id="out">–</pre>
 
 <script>
-async function send(ip, devid, text){
-  const url = `http://${ip}/cgi-bin/epos/service.cgi?devid=${encodeURIComponent(devid)}&timeout=60000`;
-  const esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const xml = `<?xml version="1.0" encoding="utf-8"?>
-<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
-  <text lang="en" smooth="true" font="font_a" width="1" height="1">${esc}</text>
-  <cut type="feed"/>
-</epos-print>`;
-  const res = await fetch(url, { method:'POST', headers:{'Content-Type':'text/xml'}, body: xml });
-  return { status: res.status, text: await res.text() };
+const $ = s => document.querySelector(s);
+const out = $('#out');
+
+const MIN_XML =
+  `<?xml version="1.0" encoding="utf-8"?>`+
+  `<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">`+
+    `<text>HELLO</text>`+
+    `<feed>4</feed>`+
+    `<cut/>`+
+  `</epos-print>`;
+
+async function tryEndpoint(url, body){
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/xml; charset=utf-8' },
+    body
+  });
+  const txt = await res.text();
+  return {status: res.status, txt};
 }
 
-const ip=document.getElementById('ip'), devid=document.getElementById('devid'), out=document.getElementById('out');
-document.getElementById('send').onclick = async ()=>{
-  out.textContent = 'Sending… (make sure Chrome allows insecure content for this site)';
-  try{
-    const r = await send(ip.value.trim(), devid.value.trim() || 'local_printer', `*** TEST PRINT ***\n${new Date().toLocaleString()}\n`);
-    out.textContent = `HTTP ${r.status}\n\n${r.text}`;
-  }catch(e){
-    out.textContent = 'Fetch error: ' + e.message + '\n(Usually mixed-content blocking or wrong IP)';
+$('#go').onclick = async ()=>{
+  const ip = $('#ip').value.trim();
+  const devid = $('#devid').value.trim() || 'local_printer';
+  if(!ip){ out.textContent='Please enter the printer IP.'; return; }
+
+  out.textContent = 'Sending...';
+
+  const urls = [
+    `http://${ip}/cgi-bin/epos/service.cgi?devid=${encodeURIComponent(devid)}&timeout=60000`,
+    `http://${ip}/cgi-bin/epos/service.cgi?timeout=60000&devid=${encodeURIComponent(devid)}`, // param order swap
+    `http://${ip}/cgi-bin/epos/service.cgi` // no query (some firmwares accept devid in body)
+  ];
+
+  for (const u of urls){
+    try{
+      const r = await tryEndpoint(u, MIN_XML);
+      out.textContent = `URL: ${u}\nHTTP ${r.status}\n\n${r.txt}`;
+      // Stop on not-a-schema error or success
+      if (!/SchemaError/.test(r.txt)) return;
+    }catch(e){
+      out.textContent = `URL: ${u}\nError: ${e.message}`;
+    }
   }
+
+  out.textContent += `\n\nStill seeing SchemaError? Check:\n`+
+    `• Device ID EXACTLY matches (case-sensitive)\n`+
+    `• ePOS‑Print is Enabled\n`+
+    `• Printer not forcing HTTPS\n`+
+    `• Try reboot printer`;
 };
 </script>
-</body>
-</html>
