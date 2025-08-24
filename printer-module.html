@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Printer Module (Epson ePOS)</title>
+<style>
+  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--card:#0f141e;--border:#1b2230;--accent:#5b9bff;--ok:#2fd28f;--warn:#ffb020}
+  *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  .wrap{max-width:720px;margin:0 auto;padding:12px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  input{font:inherit;background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  button{border:none;border-radius:10px;padding:10px 12px;cursor:pointer;color:#fff;background:var(--accent)}
+  .btn.ok{background:var(--ok);color:#0b0e14}.btn.gray{background:#1e2432}.btn.warn{background:var(--warn);color:#0b0e14}
+  .muted{color:var(--muted);font-size:12px}
+  pre{white-space:pre-wrap;word-break:break-word;background:#0f141e;color:#eaf0f6;padding:10px;border-radius:10px;margin:8px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h3 style="margin:0 0 8px">Printer Module</h3>
+    <div class="row" style="margin-top:8px">
+      <input id="printerIp" placeholder="Printer IP (e.g. 192.168.1.50)" style="flex:1;min-width:220px">
+      <input id="printerDev" placeholder="Device ID (e.g. printer or local_printer)" style="flex:1;min-width:220px">
+      <button id="save" class="btn ok">Save</button>
+      <button id="test" class="btn gray">Test</button>
+      <button id="forceCut" class="btn warn" title="Feed + cut">Force Cut</button>
+    </div>
+    <div class="muted" style="margin-top:6px">
+      Make sure: Epson Web Config → <em>Configuration → ePOS‑Print</em> is Enabled and Device ID matches.
+    </div>
+    <pre id="log">Ready. This page can also be controlled by the POS via postMessage.</pre>
+  </div>
+</div>
+
+<script>
+/* ========= Settings ========= */
+const ipEl=document.getElementById('printerIp');
+const devEl=document.getElementById('printerDev');
+const logEl=document.getElementById('log');
+function loadPrefs(){
+  ipEl.value  = localStorage.getItem('printerIp')  || '';
+  devEl.value = localStorage.getItem('printerDev') || 'printer';
+}
+function savePrefs(){
+  localStorage.setItem('printerIp', (ipEl.value||'').trim());
+  localStorage.setItem('printerDev',(devEl.value||'printer').trim());
+  log('Saved.');
+}
+function log(s){ logEl.textContent = String(s); }
+
+/* ========= Core ePOS functions ========= */
+function xmlEscape(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function sendXml(xml, ip, devid){
+  const url = `http://${ip}/cgi-bin/epos/service.cgi?devid=${encodeURIComponent(devid)}&timeout=60000`;
+  const res = await fetch(url, { method:'POST', headers:{'Content-Type':'text/xml'}, body: xml });
+  const text = await res.text();
+  log('Printer response:\n' + text);
+  return text;
+}
+
+/* Safer default: feed a few lines, then partial cut (works well on TM‑m30II) */
+function wrapTextXml(bodyText){
+  const esc = xmlEscape(bodyText);
+  return `<?xml version="1.0" encoding="utf-8"?>
+<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
+  <text lang="en" smooth="true" font="font_a" width="1" height="1">${esc}</text>
+  <feed line="5"/>
+  <cut type="partial"/>
+</epos-print>`;
+}
+function cutOnlyXml(){
+  return `<?xml version="1.0" encoding="utf-8"?>
+<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
+  <feed line="5"/>
+  <cut type="partial"/>
+</epos-print>`;
+}
+
+async function printText(bodyText, ip, devid){
+  const xml = wrapTextXml(bodyText);
+  return await sendXml(xml, ip, devid);
+}
+async function forceCut(ip, devid){
+  const xml = cutOnlyXml();
+  return await sendXml(xml, ip, devid);
+}
+
+/* ========= Receipt builder (simple & clean) ========= */
+function money(n){ return '$' + (Number(n||0).toFixed(2)); }
+function buildReceiptText(order){
+  const lines=[];
+  const line = (s='')=>lines.push(s);
+
+  // Header
+  line('FESTIVAL POS');
+  line(`Order #${order.number}   ${new Date(order.createdAt||Date.now()).toLocaleTimeString()}`);
+  if(order.customer) line(`Customer: ${order.customer}`);
+  line('--------------------------------');
+
+  // Items
+  (order.items||[]).forEach(it=>{
+    line(`${it.qty||1}x ${it.name}  ${money((it.price||0)*(it.qty||1))}`);
+    const mods = (it.mods||[]).flatMap(g=>(g.options||[]).map(o=>o.name)).filter(Boolean);
+    if(mods.length) line('   - ' + mods.join(', '));
+    if(it.station) line(`   • ${it.station}`);
+  });
+
+  line('--------------------------------');
+  line(`TOTAL: ${money(order.total)}`);
+  line('');
+  line(new Date().toLocaleString());
+  line('\n'); // spacing before feed+cut in XML wrapper
+
+  return lines.join('\n');
+}
+
+/* ========= Public API (buttons) ========= */
+document.getElementById('save').onclick = savePrefs;
+document.getElementById('test').onclick = async ()=>{
+  savePrefs();
+  const ip=(ipEl.value||'').trim(), dev=(devEl.value||'printer').trim();
+  if(!ip){ log('Set IP first'); return; }
+  await printText('*** TEST PRINT ***\nHello from printer-module.html\n', ip, dev);
+};
+document.getElementById('forceCut').onclick = async ()=>{
+  savePrefs();
+  const ip=(ipEl.value||'').trim(), dev=(devEl.value||'printer').trim();
+  if(!ip){ log('Set IP first'); return; }
+  await forceCut(ip, dev);
+};
+
+/* ========= Message bridge (POS -> this page) =========
+   Expected messages:
+   {type:"test"}
+   {type:"cut"}
+   {type:"printReceipt", order:{...}}
+*/
+window.addEventListener('message', async (ev)=>{
+  try{
+    const data = ev.data || {};
+    const ip=(localStorage.getItem('printerIp')||'').trim();
+    const dev=(localStorage.getItem('printerDev')||'printer').trim();
+    if(!ip){ log('Printer IP not set in printer-module.html'); return; }
+
+    if(data.type==='test'){
+      await printText('*** TEST FROM POS ***\n', ip, dev);
+    }else if(data.type==='cut'){
+      await forceCut(ip, dev);
+    }else if(data.type==='printReceipt' && data.order){
+      const text = buildReceiptText(data.order);
+      await printText(text, ip, dev);
+    }
+  }catch(e){
+    log('Error: ' + (e && e.message ? e.message : String(e)));
+  }
+});
+
+loadPrefs();
+</script>
+</body>
+</html>
