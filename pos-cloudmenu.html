@@ -430,7 +430,7 @@ function buildReceiptText(order){
 }
 
 // Build Epson job (minimal <text> only)
-function _buildMinimalBody(text, {feedLines=6, cut="partial"} = {}){
+function _buildMinimalBody(text, {feedLines=6, cut=""} = {}){
   const parts = [];
   parts.push(`  <text>${_xmlEsc(text)}</text>`);
   if (feedLines && Number.isFinite(feedLines) && feedLines > 0) {
