@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Epson ePOS‑Print Tester (Feed Before Cut)</title>
+<title>Epson ePOS-Print Tester — Minimal (A6) Mode</title>
 <style>
   :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#9aa6b2;--card:#0f141e;--border:#1b2230;--accent:#5b9bff;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b}
   html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
@@ -11,209 +11,98 @@
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   input,textarea,select{font:inherit;background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
-  input[type=number]{width:90px}
   textarea{width:100%;min-height:160px}
   .btn{border:none;border-radius:10px;padding:10px 12px;background:var(--accent);color:#fff;cursor:pointer}
   .btn.ok{background:var(--ok);color:#0b0e14}
   .btn.gray{background:#1e2432}
-  .btn.warn{background:var(--warn);color:#0b0e14}
   .small{color:var(--muted);font-size:12px}
   .pill{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:6px 10px;color:#aab3c0;background:#0f1420}
   pre{white-space:pre-wrap;word-break:break-word;background:#0b101a;border:1px solid var(--border);border-radius:12px;padding:10px;color:#eaf0f6}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  @media (max-width:860px){ .grid2{grid-template-columns:1fr} }
-  label[title]{cursor:help}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h2 style="margin:0 0 6px 0">Epson ePOS‑Print Tester</h2>
-  <div class="small" style="margin-bottom:10px">
-    For TM‑m30II, keep <b>SOAP</b> ON and endpoint <code>/cgi-bin/epos/service.cgi</code>. If you got <code>SchemaError</code> earlier, this build feeds lines before cutting.
-  </div>
-
+  <h2>Epson ePOS-Print Tester — Minimal (A6) Mode</h2>
   <div class="card">
     <div class="row">
-      <input id="ip" placeholder="Printer IP (e.g. 192.168.4.98)" style="min-width:220px">
-      <input id="devid" placeholder="Device ID (e.g. printer)" style="min-width:220px">
+      <input id="ip" placeholder="Printer IP (e.g. 192.168.4.98)">
+      <input id="devid" placeholder="Device ID (e.g. printer)">
       <label>Endpoint:
         <select id="endpoint">
           <option value="service">/cgi-bin/epos/service.cgi</option>
           <option value="print">/cgi-bin/epos/print</option>
         </select>
       </label>
-      <label title="Wrap ePOS-Print in SOAP envelope (needed on many TM‑m30II firmwares)">
-        <input type="checkbox" id="soap" checked> SOAP
-      </label>
-      <label title="Adds initialize + lang/smooth/width/height on text">
-        <input type="checkbox" id="compat" checked> Compat text
-      </label>
-      <label title="Disable paper cut">
-        <input type="checkbox" id="nocut"> No cut
-      </label>
-      <label title="Blank lines before cutting">
-        Feed before cut: <input type="number" id="feedLines" min="0" max="10" value="4">
-      </label>
+      <label><input type="checkbox" id="soap" checked> SOAP</label>
       <button class="btn ok" id="save">Save</button>
       <button class="btn gray" id="openWeb">Open Web Config</button>
       <span id="status" class="pill">Not tested</span>
     </div>
   </div>
 
-  <div class="grid2" style="margin-top:12px">
-    <div class="card">
-      <h3 style="margin:0 0 8px 0">Quick Tests</h3>
-      <div class="row">
-        <button class="btn" id="testHello">Test: Hello</button>
-        <button class="btn" id="testCut">Test: Cut</button>
-        <button class="btn" id="testLong">Test: Long Text</button>
-      </div>
-      <div class="small" style="margin-top:8px">
-        Uses Epson ePOS‑Print XML over HTTP (SOAP optional).
-      </div>
-    </div>
-
-    <div class="card">
-      <h3 style="margin:0 0 8px 0">Custom Text</h3>
-      <div class="row">
-        <label>Font:
-          <select id="font">
-            <option value="font_a">Font A (standard)</option>
-            <option value="font_b">Font B (small)</option>
-          </select>
-        </label>
-        <label>Width × Height:
-          <select id="w"><option>1</option><option>2</option><option>3</option><option>4</option></select>
-          ×
-          <select id="h"><option>1</option><option>2</option><option>3</option><option>4</option></select>
-        </label>
-      </div>
-      <textarea id="body">*** TEST PRINT ***
-Hello from the ePOS‑Print tester!
-— Timestamp —</textarea>
-      <div class="row" style="margin-top:8px">
-        <button class="btn" id="printCustom">Print Custom Text</button>
-        <button class="btn warn" id="drawer">Open Cash Drawer (pin 2)</button>
-      </div>
+  <div class="card" style="margin-top:12px">
+    <h3>Quick Tests</h3>
+    <div class="row">
+      <button class="btn" id="testHello">Test: Hello</button>
+      <button class="btn" id="testLong">Test: Long Text</button>
     </div>
   </div>
 
   <div class="card" style="margin-top:12px">
-    <h3 style="margin:0 0 8px 0">Last Request & Response</h3>
-    <div class="small">Sent payload:</div>
+    <h3>Custom Text</h3>
+    <textarea id="body">*** TEST PRINT ***</textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="printCustom">Print Custom</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <h3>Last Request & Response</h3>
     <pre id="req">(none)</pre>
-    <div class="small">Response:</div>
     <pre id="resp">(none)</pre>
   </div>
 </div>
 
 <script>
 const $ = (s)=>document.querySelector(s);
-// Controls
-const ip=$('#ip'), devid=$('#devid'), endpoint=$('#endpoint'), soap=$('#soap'), compat=$('#compat'), nocut=$('#nocut'), feedLines=$('#feedLines');
+const ip=$('#ip'), devid=$('#devid'), endpoint=$('#endpoint'), soap=$('#soap');
 const save=$('#save'), status=$('#status'), openWeb=$('#openWeb');
-// IO panes
 const req=$('#req'), resp=$('#resp');
-// Text controls
-const body=$('#body'), font=$('#font'), w=$('#w'), h=$('#h');
-// Buttons
-const testHello=$('#testHello'), testCut=$('#testCut'), testLong=$('#testLong'), printCustom=$('#printCustom'), drawer=$('#drawer');
+const body=$('#body'), testHello=$('#testHello'), testLong=$('#testLong'), printCustom=$('#printCustom');
 
-// Load saved prefs
 (function(){
   ip.value = localStorage.getItem('epson_ip') || '';
   devid.value = localStorage.getItem('epson_devid') || 'printer';
-  endpoint.value = localStorage.getItem('epson_endpoint') || 'service';
-  soap.checked = (localStorage.getItem('epson_soap') ?? '1') !== '0';
-  compat.checked = (localStorage.getItem('epson_compat') ?? '1') !== '0';
-  nocut.checked = localStorage.getItem('epson_nocut') === '1';
-  feedLines.value = localStorage.getItem('epson_feedlines') || '4';
-  body.value = (localStorage.getItem('epson_body') || body.value);
-  font.value = localStorage.getItem('epson_font') || 'font_a';
-  w.value = localStorage.getItem('epson_w') || '1';
-  h.value = localStorage.getItem('epson_h') || '1';
 })();
+save.onclick = ()=>{ localStorage.setItem('epson_ip', ip.value.trim()); localStorage.setItem('epson_devid', devid.value.trim()); status.textContent = 'Saved'; };
 
-save.onclick = ()=>{
-  localStorage.setItem('epson_ip', ip.value.trim());
-  localStorage.setItem('epson_devid', devid.value.trim());
-  localStorage.setItem('epson_endpoint', endpoint.value);
-  localStorage.setItem('epson_soap', soap.checked ? '1':'0');
-  localStorage.setItem('epson_compat', compat.checked ? '1':'0');
-  localStorage.setItem('epson_nocut', nocut.checked ? '1':'0');
-  localStorage.setItem('epson_feedlines', String(feedLines.value||'4'));
-  localStorage.setItem('epson_body', body.value);
-  localStorage.setItem('epson_font', font.value);
-  localStorage.setItem('epson_w', w.value);
-  localStorage.setItem('epson_h', h.value);
-  status.textContent = 'Saved'; status.style.background='var(--ok)'; status.style.color='#0b0e14';
-};
-
-openWeb.onclick = ()=>{ const host=(ip.value||'').trim(); if(!host){alert('Enter the printer IP first.');return;} window.open('http://'+host+'/', '_blank'); };
+openWeb.onclick = ()=>{ const host=(ip.value||'').trim(); if(!host){alert('Enter IP first');return;} window.open('http://'+host+'/', '_blank'); };
 
 function escXml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function envelope(inner){
-  return `<?xml version="1.0" encoding="utf-8"?>\n` +
-         `<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">\n${inner}\n</epos-print>`;
-}
-function wrapIfSoap(xml){
-  if(!soap.checked) return xml;
-  return `<?xml version="1.0" encoding="utf-8"?>\n` +
-         `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">\n` +
-         `  <s:Body>${xml}</s:Body>\n</s:Envelope>`;
-}
-function urlFor(host, devid){
-  const path = endpoint.value === 'service' ? '/cgi-bin/epos/service.cgi' : '/cgi-bin/epos/print';
-  return `http://${host}${path}?devid=${encodeURIComponent(devid)}&timeout=60000`;
-}
-function buildTextBlock(text){
-  const f = (feedLines.value? Math.max(0, Math.min(10, parseInt(feedLines.value))) : 0);
-  const init = compat.checked ? `  <initialize/>\n` : ``;
-  const attrs = compat.checked
-    ? ` lang="en" smooth="true" font="${font.value}" width="${w.value}" height="${h.value}"`
-    : ` font="${font.value}"`;
-  const cutPart = nocut.checked ? `` : `  <cut type="feed"/>\n`;
-  return `${init}  <text${attrs}>${escXml(text)}</text>\n` +
-         (f>0 ? `  <feed line="${f}"/>\n` : ``) +
-         cutPart;
-}
+function envelope(inner){ return `<?xml version="1.0" encoding="utf-8"?>\n<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">\n${inner}\n</epos-print>`; }
+function wrapIfSoap(xml){ if(!soap.checked) return xml; return `<?xml version="1.0" encoding="utf-8"?>\n<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body>${xml}</s:Body></s:Envelope>`; }
+function urlFor(host, devid){ const path = endpoint.value==='service'?'/cgi-bin/epos/service.cgi':'/cgi-bin/epos/print'; return `http://${host}${path}?devid=${encodeURIComponent(devid)}&timeout=60000`; }
+
+function buildBody(text){ return `  <text>${escXml(text)}</text>\n`; }
 
 async function send(innerContent){
   const host=(ip.value||'').trim(), dev=(devid.value||'printer').trim();
-  if(!host){ alert('Set the printer IP first.'); return; }
+  if(!host){ alert('Set IP first.'); return; }
   const xml = envelope(innerContent);
   const payload = wrapIfSoap(xml);
   const url = urlFor(host, dev);
   req.textContent = payload;
-  status.textContent = 'Sending…'; status.style.background='var(--warn)'; status.style.color='#0b0e14';
+  status.textContent = 'Sending…'; status.style.background='var(--warn)'; 
   try{
     const r = await fetch(url,{method:'POST',headers:{'Content-Type':'text/xml; charset=utf-8'},body:payload});
     const t = await r.text();
-    resp.textContent = t;
-    status.textContent = 'Done'; status.style.background='var(--ok)'; status.style.color='#0b0e14';
-  }catch(e){
-    resp.textContent = 'Fetch error: ' + e.message;
-    status.textContent = 'Error'; status.style.background='var(--danger)'; status.style.color='#0b0e14';
-  }
+    resp.textContent = t; status.textContent = 'Done'; status.style.background='var(--ok)';
+  }catch(e){ resp.textContent='Error: '+e.message; status.textContent='Error'; status.style.background='var(--danger)'; }
 }
 
-// Quick tests
-testHello.onclick = ()=> send(buildTextBlock(`*** HELLO ***\n${new Date().toLocaleString()}`));
-testCut.onclick   = ()=> {
-  const f = (feedLines.value? Math.max(0, Math.min(10, parseInt(feedLines.value))) : 0);
-  const init = compat.checked ? `  <initialize/>\n` : ``;
-  const feed = f>0 ? `  <feed line="${f}"/>\n` : ``;
-  const cut  = nocut.checked ? `` : `  <cut type="feed"/>\n`;
-  send(init + feed + cut);
-};
-testLong.onclick  = ()=>{
-  const lines = Array.from({length:20},(_,i)=>'Line '+(i+1)).join('\n');
-  send(buildTextBlock(lines));
-};
-// Custom text
-printCustom.onclick = ()=> send(buildTextBlock( (body.value||'') + '\n' + new Date().toLocaleString() ));
-// Drawer
-drawer.onclick = ()=> send(`  <pulse drawer="2" time="100"/>\n  <feed line="1"/>\n`);
+testHello.onclick = ()=> send(buildBody(`HELLO\n${new Date().toLocaleString()}`));
+testLong.onclick  = ()=> send(buildBody(Array.from({length:20},(_,i)=>'Line '+(i+1)).join('\\n')));
+printCustom.onclick = ()=> send(buildBody(body.value));
 </script>
 </body>
 </html>
