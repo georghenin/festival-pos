@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Epson ePOS-Print Tester</title>
+<title>Epson ePOS‑Print Tester (Compat)</title>
 <style>
   :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#9aa6b2;--card:#0f141e;--border:#1b2230;--accent:#5b9bff;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b}
   html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
@@ -22,21 +22,32 @@
   pre{white-space:pre-wrap;word-break:break-word;background:#0b101a;border:1px solid var(--border);border-radius:12px;padding:10px;color:#eaf0f6}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   @media (max-width:820px){ .grid2{grid-template-columns:1fr} }
+  label[title]{cursor:help}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h2 style="margin:0 0 6px 0">Epson ePOS-Print Tester</h2>
+  <h2 style="margin:0 0 6px 0">Epson ePOS‑Print Tester</h2>
   <div class="small" style="margin-bottom:10px">
-    Use this page to test your Epson receipt printer independently of your POS.
-    In the printer’s Web Config, enable <b>ePOS-Print</b> and set a <b>Device ID</b> (default is <code>local_printer</code>).
-    In Chrome, you may need to allow mixed content (HTTP) for this page.
+    If you get <code>SchemaError</code>, switch the <b>Endpoint</b> to <code>/cgi-bin/epos/print</code> and keep “Compat text” on.
   </div>
 
   <div class="card">
     <div class="row">
-      <input id="ip" placeholder="Printer IP (e.g. 192.168.4.98)" style="min-width:220px">
-      <input id="devid" placeholder="Device ID (e.g. local_printer)" style="min-width:220px">
+      <input id="ip" placeholder="Printer IP (e.g. 192.168.4.98)" style="min-width:200px">
+      <input id="devid" placeholder="Device ID (e.g. printer)" style="min-width:200px">
+      <label>Endpoint:
+        <select id="endpoint">
+          <option value="print">/cgi-bin/epos/print</option>
+          <option value="service">/cgi-bin/epos/service.cgi</option>
+        </select>
+      </label>
+      <label title="Adds initialize + required text attributes for picky firmwares">
+        <input type="checkbox" id="compat" checked> Compat text
+      </label>
+      <label title="Disable paper cut if your model has no auto cutter">
+        <input type="checkbox" id="nocut"> No cut
+      </label>
       <button class="btn ok" id="save">Save</button>
       <button class="btn gray" id="openWeb">Open Web Config</button>
       <span id="status" class="pill">Not tested</span>
@@ -52,7 +63,7 @@
         <button class="btn" id="testLong">Test: Long Text</button>
       </div>
       <div class="small" style="margin-top:8px">
-        These send simple XML over HTTP to the printer using Epson’s ePOS-Print schema.
+        Use these to verify end‑to‑end printing.
       </div>
     </div>
 
@@ -66,12 +77,14 @@
           </select>
         </label>
         <label>Width × Height:
-          <select id="w"><option>1</option><option>2</option><option>3</option></select>
+          <select id="w"><option>1</option><option>2</option><option>3</option><option>4</option></select>
           ×
-          <select id="h"><option>1</option><option>2</option><option>3</option></select>
+          <select id="h"><option>1</option><option>2</option><option>3</option><option>4</option></select>
         </label>
       </div>
-      <textarea id="body">*** TEST PRINT ***\nHello from the ePOS-Print tester!\n— Timestamp —</textarea>
+      <textarea id="body">*** TEST PRINT ***
+Hello from the ePOS‑Print tester!
+— Timestamp —</textarea>
       <div class="row" style="margin-top:8px">
         <button class="btn" id="printCustom">Print Custom Text</button>
         <button class="btn warn" id="drawer">Open Cash Drawer (pin 2)</button>
@@ -90,15 +103,19 @@
 
 <script>
 const $ = (s)=>document.querySelector(s);
-const ip = $('#ip'), devid = $('#devid'), save = $('#save'), status = $('#status'), openWeb = $('#openWeb');
-const req = $('#req'), resp = $('#resp');
-const body = $('#body'), font = $('#font'), w = $('#w'), h = $('#h');
-const testHello = $('#testHello'), testCut = $('#testCut'), testLong = $('#testLong'), printCustom = $('#printCustom'), drawer = $('#drawer');
+const ip=$('#ip'), devid=$('#devid'), endpoint=$('#endpoint'), compat=$('#compat'), nocut=$('#nocut');
+const save=$('#save'), status=$('#status'), openWeb=$('#openWeb');
+const req=$('#req'), resp=$('#resp');
+const body=$('#body'), font=$('#font'), w=$('#w'), h=$('#h');
+const testHello=$('#testHello'), testCut=$('#testCut'), testLong=$('#testLong'), printCustom=$('#printCustom'), drawer=$('#drawer');
 
 // Load prefs
 (function(){
   ip.value = localStorage.getItem('epson_ip') || '';
-  devid.value = localStorage.getItem('epson_devid') || 'local_printer';
+  devid.value = localStorage.getItem('epson_devid') || 'printer';
+  endpoint.value = localStorage.getItem('epson_endpoint') || 'print';
+  compat.checked = (localStorage.getItem('epson_compat') ?? '1') !== '0';
+  nocut.checked = localStorage.getItem('epson_nocut') === '1';
   body.value = (localStorage.getItem('epson_body') || body.value);
   font.value = localStorage.getItem('epson_font') || 'font_a';
   w.value = localStorage.getItem('epson_w') || '1';
@@ -106,43 +123,66 @@ const testHello = $('#testHello'), testCut = $('#testCut'), testLong = $('#testL
 })();
 
 save.onclick = ()=>{
-  localStorage.setItem('epson_ip', (ip.value||'').trim());
-  localStorage.setItem('epson_devid', (devid.value||'local_printer').trim());
+  localStorage.setItem('epson_ip', ip.value.trim());
+  localStorage.setItem('epson_devid', devid.value.trim());
+  localStorage.setItem('epson_endpoint', endpoint.value);
+  localStorage.setItem('epson_compat', compat.checked ? '1':'0');
+  localStorage.setItem('epson_nocut', nocut.checked ? '1':'0');
   localStorage.setItem('epson_body', body.value);
   localStorage.setItem('epson_font', font.value);
   localStorage.setItem('epson_w', w.value);
   localStorage.setItem('epson_h', h.value);
-  status.textContent = 'Saved';
-  status.style.background = 'var(--ok)';
-  status.style.color = '#0b0e14';
+  status.textContent = 'Saved'; status.style.background='var(--ok)'; status.style.color='#0b0e14';
 };
-
-openWeb.onclick = ()=>{ const host=(ip.value||'').trim(); if(!host){alert('Enter printer IP first.');return;} window.open('http://'+host+'/', '_blank'); };
+openWeb.onclick = ()=>{ const host=(ip.value||'').trim(); if(!host){alert('Enter the printer IP first.');return;} window.open('http://'+host+'/', '_blank'); };
 
 function escXml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function buildEnvelope(inner){ return `<?xml version="1.0" encoding="utf-8"?>\n<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">\n${inner}\n</epos-print>`; }
+function env(inner){
+  return `<?xml version="1.0" encoding="utf-8"?>\n` +
+         `<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">\n${inner}\n</epos-print>`;
+}
+function makeText(t){
+  // “Compat” adds initialize + full attribute set
+  const attrs = compat.checked
+    ? ` lang="en" smooth="true" font="${font.value}" width="${w.value}" height="${h.value}"`
+    : ` font="${font.value}"`;
+  const init = compat.checked ? `  <initialize/>\n` : ``;
+  return `${init}  <text${attrs}>${escXml(t)}</text>\n  <feed line="2"/>\n` + (nocut.checked ? `` : `  <cut type="feed"/>\n`);
+}
+function urlFor(ip, devid){
+  const base = endpoint.value === 'print' ? '/cgi-bin/epos/print' : '/cgi-bin/epos/service.cgi';
+  return `http://${ip}${base}?devid=${encodeURIComponent(devid)}&timeout=60000`;
+}
 
-async function sendXml(inner){
-  const host=(ip.value||'').trim(); const dev=(devid.value||'local_printer').trim();
+async function send(inner){
+  const host=(ip.value||'').trim(), dev=(devid.value||'printer').trim();
   if(!host){ alert('Set the printer IP first.'); return; }
-  const url=`http://${host}/cgi-bin/epos/service.cgi?devid=${encodeURIComponent(dev)}&timeout=60000`;
-  const xml=buildEnvelope(inner);
-  req.textContent=xml; status.textContent='Sending...'; status.style.background='var(--warn)';
+  const xml = env(inner);
+  const url = urlFor(host, dev);
+  req.textContent = xml;
+  status.textContent = 'Sending…'; status.style.background='var(--warn)'; status.style.color='#0b0e14';
   try{
-    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/xml'},body:xml});
-    const t=await r.text(); resp.textContent=t; status.textContent='Done'; status.style.background='var(--ok)';
-  }catch(e){ resp.textContent='Fetch error: '+e.message; status.textContent='Error'; status.style.background='var(--danger)'; }
+    const r = await fetch(url,{method:'POST',headers:{'Content-Type':'text/xml'},body:xml});
+    const t = await r.text();
+    resp.textContent = t;
+    status.textContent = 'Done'; status.style.background='var(--ok)'; status.style.color='#0b0e14';
+  }catch(e){
+    resp.textContent = 'Fetch error: ' + e.message;
+    status.textContent = 'Error'; status.style.background='var(--danger)'; status.style.color='#0b0e14';
+  }
 }
 
 // Quick tests
-testHello.onclick=()=>{ const ts=new Date().toLocaleString(); const inner=`<text font="font_a">*** HELLO ***\\n${escXml(ts)}\\n</text><feed line="2"/><cut type="feed"/>`; sendXml(inner); };
-testCut.onclick=()=>{ sendXml(`<feed line="4"/><cut type="feed"/>`); };
-testLong.onclick=()=>{ const lines=Array.from({length:20},(_,i)=>'Line '+(i+1)).join('\\n'); sendXml(`<text font="font_a">${escXml(lines)}</text><feed line="2"/><cut type="feed"/>`); };
-
+testHello.onclick = ()=> send(makeText(`*** HELLO ***\n${new Date().toLocaleString()}`));
+testCut.onclick   = ()=> send( (compat.checked?`  <initialize/>\n`:'') + (nocut.checked?`  <feed line="4"/>\n`:`  <feed line="4"/>\n  <cut type="feed"/>\n`) );
+testLong.onclick  = ()=>{
+  const lines = Array.from({length:20},(_,i)=>'Line '+(i+1)).join('\\n');
+  send(makeText(lines));
+};
 // Custom text
-printCustom.onclick=()=>{ const msg=(body.value||'')+'\\n'+new Date().toLocaleString(); const inner=`<text font="${font.value}" width="${w.value}" height="${h.value}">${escXml(msg)}</text><feed line="2"/><cut type="feed"/>`; sendXml(inner); };
+printCustom.onclick = ()=> send(makeText( (body.value||'') + '\\n' + new Date().toLocaleString() ));
 // Drawer
-drawer.onclick=()=> sendXml(`<pulse drawer="2" time="100"/><feed line="1"/>`);
+drawer.onclick = ()=> send(`  <pulse drawer="2" time="100"/>\n  <feed line="1"/>\n`);
 </script>
 </body>
 </html>
