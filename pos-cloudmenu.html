@@ -35,10 +35,9 @@
   .hdr-title{font-size:22px;font-weight:800}
   .hdr-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
   .customer-wrap{margin-top:8px}
-  #customer,#phone{font-size:20px;padding:14px 16px;border-radius:12px}
-  #customer{width:64%} #phone{width:34%}
+  #customer{width:100%;font-size:20px;padding:14px 16px;border-radius:12px}
   .small{font-size:12px;color:#9fb0c9}
-  @media (max-width:900px){ .left-right{grid-template-columns:1fr} #customer,#phone{width:100%} }
+  @media (max-width:900px){ .left-right{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -47,7 +46,7 @@
   <!-- Header -->
   <div class="hdr">
     <div class="row">
-      <span class="hdr-title">Festival POS <span class="pill" style="margin-left:6px">vPRINT‑2 + SMS</span></span>
+      <span class="hdr-title">Festival POS <span class="pill" style="margin-left:6px">vPRINT‑3</span></span>
       <span id="stationsBadge" class="pill">Stations: loading…</span>
     </div>
     <div class="hdr-right">
@@ -57,10 +56,9 @@
     </div>
   </div>
 
-  <!-- Customer + Phone -->
-  <div class="customer-wrap" style="display:flex;gap:10px;flex-wrap:wrap">
+  <!-- Customer -->
+  <div class="customer-wrap">
     <input id="customer" placeholder="Customer name (required)">
-    <input id="phone" placeholder="Phone (SMS receipts/ready, e.g. 555‑123‑4567)">
   </div>
 
   <div class="left-right" style="margin-top:10px">
@@ -75,20 +73,21 @@
         <div id="menuEmpty" class="muted" style="display:none;margin-top:8px">No items.</div>
       </div>
 
-      <!-- Printer -->
+      <!-- Receipt Printer -->
       <div class="card" id="printerCard" style="margin-top:10px">
         <div class="row" style="justify-content:space-between;align-items:center">
           <strong>Receipt Printer</strong>
           <label class="row" style="gap:6px"><input type="checkbox" id="autoPrint"> Auto‑print on submit</label>
         </div>
-        <div class="row" style="margin-top:8px">
+        <div class="row" style="margin-top:8px;gap:8px">
           <input id="printerIp" placeholder="Printer IP (e.g. 192.168.4.98)" style="min-width:220px">
           <input id="printerDev" placeholder="Device ID (e.g. local_printer)" style="min-width:220px">
           <button id="savePrinter" class="btn ok">Save</button>
           <button id="testPrint" class="btn gray">Test Print</button>
+          <button id="cutNow" class="btn gray" title="Force the cutter">Cut Now</button>
         </div>
         <div class="small" style="margin-top:6px">
-          In Epson Web Config → <em>Configuration → ePOS‑Print</em>: Enable ePOS‑Print and set Device ID (default often <code>local_printer</code>).
+          In Epson Web Config → <em>Configuration → ePOS‑Print</em>: Enable ePOS‑Print and set Device ID (often <code>local_printer</code>). Cutter must be enabled in the printer settings.
         </div>
       </div>
     </div>
@@ -129,6 +128,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 <script>
+/* ===================== Firebase init ===================== */
 firebase.initializeApp({
   apiKey:"AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
   authDomain:"churchfestivalpos.firebaseapp.com",
@@ -139,25 +139,25 @@ firebase.initializeApp({
 });
 const db=firebase.firestore(), auth=firebase.auth();
 
-/* DOM refs */
+/* ===================== DOM refs ===================== */
 const $=s=>document.querySelector(s);
 const stationTabs=$('#stationTabs'), menu=$('#menu'), menuEmpty=$('#menuEmpty');
-const customer=$('#customer'), phoneEl=$('#phone'), search=$('#search');
+const customer=$('#customer'), search=$('#search');
 const cartTBody=document.querySelector('#cartTable tbody');
 const subtotalEl=$('#subtotal'), msg=$('#msg');
 const me=$('#me'), loginBtn=$('#loginBtn'), logoutBtn=$('#logoutBtn');
 const stationsBadge=$('#stationsBadge');
 const modMask=$('#modMask'), modTitle=$('#modTitle'), modBody=$('#modBody'), modCancel=$('#modCancel'), modAdd=$('#modAdd');
 
-/* Printer UI */
-const printerIp=$('#printerIp'), printerDev=$('#printerDev'), savePrinter=$('#savePrinter'), testPrint=$('#testPrint'), autoPrint=$('#autoPrint');
+/* ===== Printer UI refs ===== */
+const printerIp=$('#printerIp'), printerDev=$('#printerDev'), savePrinter=$('#savePrinter'), testPrint=$('#testPrint'), autoPrint=$('#autoPrint'), cutNow=$('#cutNow');
 
-/* State */
-let STATIONS_ALL=['Grill','Fryer','Drinks','Pizza'];
+/* ===================== State ===================== */
+let STATIONS_ALL=['Grill','Fryer','Drinks','Pizza']; // fallback
 let FILTER_STATION='__ALL__';
 let MENU=[]; let MOD_GROUPS=new Map(); let CART=[];
 
-/* Printer prefs */
+/* ===== Printer config (localStorage) ===== */
 function loadPrinterPrefs(){
   printerIp.value  = localStorage.getItem('printerIp')  || '';
   printerDev.value = localStorage.getItem('printerDev') || 'local_printer';
@@ -175,11 +175,20 @@ testPrint.onclick = async()=>{
   const ip = (printerIp.value||'').trim();
   const dev= (printerDev.value||'local_printer').trim();
   if(!ip){ alert('Set the printer IP first.'); return; }
-  await printRaw(`*** TEST PRINT ***\n${new Date().toLocaleString()}\n\n`, ip, dev);
+  await printRawXML([
+    {type:'text', text:'*** TEST PRINT ***', align:'center', bold:true},
+    {type:'text', text:new Date().toLocaleString(), align:'center'},
+  ], ip, dev, {doCut:true});
   alert('Test print sent.');
 };
+cutNow.onclick = async()=>{
+  const ip = (printerIp.value||'').trim();
+  const dev= (printerDev.value||'local_printer').trim();
+  if(!ip){ alert('Set the printer IP first.'); return; }
+  await printRawXML([], ip, dev, {feed:4, doCut:true});
+};
 
-/* Auth UI */
+/* ===================== Auth UI ===================== */
 auth.onAuthStateChanged(u=>{
   if(u){ me.textContent=u.email; loginBtn.style.display='none'; logoutBtn.style.display='inline-block'; }
   else { me.textContent='Signed out'; loginBtn.style.display='inline-block'; logoutBtn.style.display='none'; }
@@ -191,7 +200,7 @@ loginBtn.onclick=async()=>{
 };
 logoutBtn.onclick=()=> auth.signOut();
 
-/* Stations */
+/* ===================== Stations ===================== */
 async function loadStations(){
   try{
     const snap=await db.collection('settings').doc('config').get();
@@ -211,7 +220,7 @@ async function loadStations(){
   stationsBadge.textContent = 'Stations: ' + STATIONS_ALL.join(', ');
 }
 
-/* Data */
+/* ===================== Data loads ===================== */
 function loadMenu(){
   db.collection('menu').orderBy('name').onSnapshot(snap=>{
     MENU=[]; snap.forEach(d=>{ const m={id:d.id, ...d.data()}; if(m.active!==false) MENU.push(m); });
@@ -225,7 +234,7 @@ function loadModGroups(){
   });
 }
 
-/* Render menu */
+/* ===================== Render menu ===================== */
 function renderMenu(){
   const q=(search.value||'').toLowerCase().trim();
   const items = MENU.filter(m=>{
@@ -246,7 +255,7 @@ function renderMenu(){
 }
 search.oninput=renderMenu;
 
-/* Add to cart w/ modifiers */
+/* ===================== Add to cart (with modifiers) ===================== */
 function onMenuClick(menuId){
   const m = MENU.find(x=>x.id===menuId);
   if(!m) return;
@@ -323,7 +332,7 @@ function addLine({menuId,name,station,basePrice,mods}){
   renderCart();
 }
 
-/* Cart */
+/* ===================== Cart ===================== */
 function renderCart(){
   cartTBody.innerHTML = CART.map((l, idx)=>{
     const modsHtml = (l.mods&&l.mods.length)
@@ -341,92 +350,123 @@ function renderCart(){
 }
 function recalc(){ CART.forEach(l=> l.lineTotal=l.qty*l.eachPrice); const sub=CART.reduce((a,b)=>a+b.lineTotal,0); subtotalEl.textContent=`$${sub.toFixed(2)}`; }
 
-/* Order submit + SMS receipt */
+/* ===================== Order submit ===================== */
 async function nextOrderNumber(){
   const ref=db.collection('meta').doc('order_seq');
   const num=await db.runTransaction(async tx=>{ const snap=await tx.get(ref); let v=(snap.exists&&typeof snap.data().value==='number')?snap.data().value:0; v=v+1; tx.set(ref,{value:v},{merge:true}); return v; });
   return num;
 }
 $('#clearCart').onclick=()=>{ CART=[]; renderCart(); };
-
-const FN_BASE = ""; // leave empty to auto-use region URL; or hardcode your full function URL(s)
-
-async function callFn(path, body){
-  try{
-    // If you know the full URL after deploy, paste it here:
-    // const url = "https://us-central1-churchfestivalpos.cloudfunctions.net"+path;
-    const url = (FN_BASE || "https://us-central1-churchfestivalpos.cloudfunctions.net") + path;
-    const r = await fetch(url, { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) });
-    return await r.json();
-  }catch(e){ return {error: String(e)}; }
-}
-
 $('#submitOrder').onclick = async ()=>{
   if(!CART.length){ alert('Cart is empty'); return; }
   const cust=(customer.value||'').trim(); if(!cust){ alert('Please enter the customer name.'); customer.focus(); return; }
-  const phone=(phoneEl.value||'').trim();
-
   try{
     msg.textContent='Submitting...';
     const number=await nextOrderNumber(); const ts=Date.now();
     const order={ number, status:'new', createdAt:ts, updatedAt:ts, customer:cust,
-      phone: phone || null,
       total:CART.reduce((a,b)=>a+b.lineTotal,0),
       items:CART.map(l=>({ menuId:l.menuId, name:l.name, qty:l.qty, price:l.eachPrice, station:l.station||null,
         mods:(l.mods||[]).map(g=>({ groupName:g.groupName, options:(g.options||[]).map(o=>({name:o.name,price:+o.price||0})) }))
       }))
     };
     await db.collection('orders').add(order);
-
-    // Print (optional)
     if(autoPrint.checked){ await printReceipt(order); }
-
-    // SMS receipt (optional if phone present)
-    if(phone){
-      callFn("/sendReceiptSms", { to: phone, order }).then(r=>{
-        if(r?.error) console.warn("SMS error", r.error);
-      });
-    }
-
-    CART=[]; renderCart(); customer.value=''; phoneEl.value='';
-    msg.textContent=`Order #${number} placed!`; setTimeout(()=> msg.textContent='', 2000);
+    CART=[]; renderCart(); customer.value=''; msg.textContent=`Order #${number} placed!`; setTimeout(()=> msg.textContent='', 2000);
   }catch(e){ msg.textContent='Error: '+e.message; }
 };
 
-/* Epson ePOS‑Print */
-async function printRaw(text, ip, devid){
-  const url=`http://${ip}/cgi-bin/epos/service.cgi?devid=${encodeURIComponent(devid)}&timeout=60000`;
-  const escXml=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const xml=`<?xml version="1.0" encoding="utf-8"?>
-<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
-  <text lang="en" smooth="true" font="font_a" width="1" height="1">${escXml}</text>
-  <cut type="feed"/>
-</epos-print>`;
-  const res=await fetch(url,{method:"POST",headers:{"Content-Type":"text/xml"},body:xml});
-  const t=await res.text(); console.log('Printer response:', t); return t;
+/* ===================== Epson ePOS‑Print ===================== */
+/** Build a nice 42‑column receipt */
+function fmtReceipt(order){
+  const width=42; // TM-m30II 80mm ~ 42 cols with Font A
+  const line = '─'.repeat(width);
+  const center = s => {
+    s=String(s); const pad=Math.max(0, Math.floor((width - s.length)/2));
+    return ' '.repeat(pad)+s;
+  };
+  const money = n => '$'+(+n).toFixed(2);
+  const right = (l,r) => { l=String(l); r=String(r); const spaces=Math.max(1,width-l.length-r.length); return l+' '.repeat(spaces)+r; };
+
+  const rows=[];
+  rows.push(center('FESTIVAL POS'));
+  rows.push(center(`Order #${order.number}`));
+  rows.push(center(new Date().toLocaleString()));
+  rows.push(line);
+
+  order.items.forEach(it=>{
+    const amt = money(it.price*it.qty);
+    rows.push(right(`${it.qty}× ${it.name}`, amt));
+    const mods=(it.mods||[]).flatMap(g=>(g.options||[]).map(o=>o.name));
+    if(mods.length){
+      const m='('+mods.join(', ')+')';
+      // wrap mods
+      let s=m;
+      while(s.length>width){
+        rows.push('  '+s.slice(0,width-2));
+        s=s.slice(width-2);
+      }
+      rows.push('  '+s);
+    }
+  });
+
+  rows.push(line);
+  rows.push(right('TOTAL', money(order.total)));
+  rows.push('');
+  rows.push(center('Thank you!'));
+  rows.push(''); // one extra blank
+  return rows.join('\n');
 }
-function money(n){ return `$${(+n).toFixed(2)}`; }
+
+/**
+ * Low-level XML print. Accepts simple chunks:
+ *   {type:'text', text:'...', align:'left|center|right', bold:Boolean}
+ * Options: {feed: number, doCut: boolean}
+ */
+async function printRawXML(chunks, ip, devid, options={}){
+  const url=`http://${ip}/cgi-bin/epos/service.cgi?devid=${encodeURIComponent(devid)}&timeout=60000`;
+
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  const parts=[];
+  parts.push(`<?xml version="1.0" encoding="utf-8"?>`);
+  parts.push(`<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">`);
+
+  (chunks||[]).forEach(c=>{
+    const align = c.align ? ` align="${c.align}"` : '';
+    const weight = c.bold ? ` weight="bold"` : '';
+    parts.push(`<text lang="en" smooth="true" font="font_a" width="1" height="1"${align}${weight}>${esc(c.text)}</text>`);
+  });
+
+  const feedLines = options.feed ?? 4;
+  if(feedLines>0) parts.push(`<feed line="${feedLines}"/>`);
+  if(options.doCut) parts.push(`<cut type="partial"/>`);
+
+  parts.push(`</epos-print>`);
+  const xml = parts.join('');
+
+  const res=await fetch(url,{method:"POST",headers:{"Content-Type":"text/xml"},body:xml});
+  const t=await res.text();
+  console.log('Printer response:', t);
+  return t;
+}
+
 async function printReceipt(order){
   const ip=(localStorage.getItem('printerIp')||'').trim();
   const dev=(localStorage.getItem('printerDev')||'local_printer').trim();
   if(!ip){ console.warn('No printer IP set; skipping print'); return; }
-  let lines=[]; 
-  lines.push('FESTIVAL POS');
-  lines.push(`Order #${order.number}`);
-  lines.push(`Customer: ${order.customer}`);
-  lines.push('------------------------------');
-  order.items.forEach(it=>{
-    const mods=(it.mods||[]).flatMap(g=>(g.options||[]).map(o=>o.name)).join(', ');
-    lines.push(`${it.qty}x ${it.name}${mods?' ('+mods+')':''}  ${money(it.price*it.qty)}`);
-  });
-  lines.push('------------------------------');
-  lines.push(`TOTAL: ${money(order.total)}`);
-  lines.push(new Date().toLocaleString()); 
-  lines.push('\n\n');
-  try{ await printRaw(lines.join('\n'), ip, dev); }catch(err){ console.error('Print error', err); alert('Could not print.'); }
+
+  const body = fmtReceipt(order);
+  try{
+    await printRawXML([
+      {type:'text', text:body, align:'left', bold:false},
+    ], ip, dev, {feed:4, doCut:true});
+  }catch(err){
+    console.error('Print error', err);
+    alert('Could not print. Check printer IP/Device ID, that ePOS‑Print is enabled, and that mixed content is allowed for this page.');
+  }
 }
 
-/* Boot */
+/* ===================== Boot ===================== */
 loadPrinterPrefs();
 loadStations();
 loadMenu();
