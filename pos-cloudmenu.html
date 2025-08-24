@@ -4,10 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Festival POS</title>
 <style>
-  :root{
-    --bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--card:#0f141e;--border:#1b2230;
-    --accent:#5b9bff;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b
-  }
+  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--card:#0f141e;--border:#1b2230;--accent:#5b9bff;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b}
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
   .wrap{max-width:1200px;margin:0 auto;padding:14px}
@@ -17,11 +14,7 @@
   input,select,button{font:inherit}
   input,select{background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
   button{border:none;border-radius:10px;padding:10px 12px;cursor:pointer}
-  .btn{background:var(--accent);color:#fff}
-  .btn.ok{background:var(--ok);color:#0b0e14}
-  .btn.warn{background:var(--warn);color:#0b0e14}
-  .btn.gray{background:#1e2432;color:#e5e8ee}
-  .btn.danger{background:var(--danger);color:#0b0e14}
+  .btn{background:var(--accent);color:#fff}.btn.ok{background:var(--ok);color:#0b0e14}.btn.gray{background:#1e2432}.btn.danger{background:#ff6b6b;color:#0b0e14}
   .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;color:#aab3c0}
   .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
   .tab{border:1px solid var(--border);border-radius:999px;padding:6px 10px;background:#0f1420;color:#e5e8ee;cursor:pointer}
@@ -29,10 +22,8 @@
   .menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
   .item{background:#121826;border:1px solid var(--border);border-radius:14px;padding:8px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start}
   .item img{width:100%;height:100px;object-fit:cover;border-radius:10px;margin-bottom:6px;background:#0b101a;border:1px solid var(--border)}
-  .item .nm{font-weight:600}
-  .item .pr{color:#cfe3ff;font-size:13px}
-  table{width:100%;border-collapse:collapse}
-  th,td{border-bottom:1px solid var(--border);padding:8px;text-align:left;vertical-align:top}
+  .item .nm{font-weight:600}.item .pr{color:#cfe3ff;font-size:13px}
+  table{width:100%;border-collapse:collapse} th,td{border-bottom:1px solid var(--border);padding:8px;text-align:left;vertical-align:top}
   .right .card{position:sticky;top:10px}
   .total{display:flex;justify-content:space-between;font-weight:700;margin-top:8px}
   .qbtn{padding:4px 8px;border-radius:8px;background:#1d2331;color:#dfe6f5}
@@ -55,7 +46,7 @@
   <!-- Header -->
   <div class="hdr">
     <div class="row">
-      <span class="hdr-title">Festival POS</span>
+      <span class="hdr-title">Festival POS <span class="pill" style="margin-left:6px">vPRINT‑2</span></span>
       <span id="stationsBadge" class="pill">Stations: loading…</span>
     </div>
     <div class="hdr-right">
@@ -82,8 +73,8 @@
         <div id="menuEmpty" class="muted" style="display:none;margin-top:8px">No items.</div>
       </div>
 
-      <!-- Printer config -->
-      <div class="card" style="margin-top:10px">
+      <!-- ===== Receipt Printer card (you should SEE this) ===== -->
+      <div class="card" id="printerCard" style="margin-top:10px">
         <div class="row" style="justify-content:space-between;align-items:center">
           <strong>Receipt Printer</strong>
           <label class="row" style="gap:6px">
@@ -108,7 +99,8 @@
         <h3 style="margin:0 0 8px 0">Order</h3>
         <table id="cartTable">
           <thead><tr><th>Item</th><th>Qty</th><th>Each</th><th>Line</th><th></th></tr></thead>
-        <tbody></tbody></table>
+          <tbody></tbody>
+        </table>
         <div class="total"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
         <div class="row" style="justify-content:space-between;margin-top:10px">
           <button id="clearCart" class="btn gray">Clear</button>
@@ -139,12 +131,12 @@
 <script>
 /* ===================== Firebase init ===================== */
 firebase.initializeApp({
-  apiKey: "AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
-  authDomain: "churchfestivalpos.firebaseapp.com",
-  projectId: "churchfestivalpos",
-  storageBucket: "churchfestivalpos.firebasestorage.app",
-  messagingSenderId: "447909610900",
-  appId: "1:447909610900:web:a54a828bacfa02e7883b81"
+  apiKey:"AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
+  authDomain:"churchfestivalpos.firebaseapp.com",
+  projectId:"churchfestivalpos",
+  storageBucket:"churchfestivalpos.firebasestorage.app",
+  messagingSenderId:"447909610900",
+  appId:"1:447909610900:web:a54a828bacfa02e7883b81"
 });
 const db=firebase.firestore(), auth=firebase.auth();
 
@@ -156,19 +148,15 @@ const cartTBody=document.querySelector('#cartTable tbody');
 const subtotalEl=$('#subtotal'), msg=$('#msg');
 const me=$('#me'), loginBtn=$('#loginBtn'), logoutBtn=$('#logoutBtn');
 const stationsBadge=$('#stationsBadge');
-
 const modMask=$('#modMask'), modTitle=$('#modTitle'), modBody=$('#modBody'), modCancel=$('#modCancel'), modAdd=$('#modAdd');
 
 /* ===== Printer UI refs ===== */
 const printerIp=$('#printerIp'), printerDev=$('#printerDev'), savePrinter=$('#savePrinter'), testPrint=$('#testPrint'), autoPrint=$('#autoPrint');
 
 /* ===================== State ===================== */
-const ADMINS = new Set(["smsmofri@gmail.com","george.henin98@gmail.com"].map(x=>x.toLowerCase()));
 let STATIONS_ALL=['Grill','Fryer','Drinks','Pizza']; // fallback
 let FILTER_STATION='__ALL__';
-let MENU=[];                 // {id, name, price, station, active, img?, modGroupIds?}
-let MOD_GROUPS=new Map();    // id -> {name, selectType, maxPicks, options:[{name, price}]}
-let CART=[];                 // lines with mods & pricing
+let MENU=[]; let MOD_GROUPS=new Map(); let CART=[];
 
 /* ===== Printer config (localStorage) ===== */
 function loadPrinterPrefs(){
@@ -177,19 +165,19 @@ function loadPrinterPrefs(){
   autoPrint.checked = localStorage.getItem('printerAuto') === '1';
 }
 function savePrinterPrefs(){
-  localStorage.setItem('printerIp', printerIp.value.trim());
-  localStorage.setItem('printerDev', printerDev.value.trim() || 'local_printer');
+  localStorage.setItem('printerIp', (printerIp.value||'').trim());
+  localStorage.setItem('printerDev',(printerDev.value||'local_printer').trim());
   localStorage.setItem('printerAuto', autoPrint.checked ? '1' : '0');
   alert('Printer settings saved to this device.');
 }
 savePrinter.onclick = savePrinterPrefs;
 testPrint.onclick = async()=>{
   savePrinterPrefs();
-  const ip = printerIp.value.trim();
-  const dev= printerDev.value.trim() || 'local_printer';
+  const ip = (printerIp.value||'').trim();
+  const dev= (printerDev.value||'local_printer').trim();
   if(!ip){ alert('Set the printer IP first.'); return; }
   await printRaw(`*** TEST PRINT ***\n${new Date().toLocaleString()}\n\n`, ip, dev);
-  alert('Test print sent. If nothing prints, check ePOS‑Print is enabled, IP/Device matches, and mixed content is allowed.');
+  alert('Test print sent. If nothing prints, enable ePOS‑Print in the printer web page and allow mixed content.');
 };
 
 /* ===================== Auth UI ===================== */
@@ -263,7 +251,6 @@ search.oninput=renderMenu;
 function onMenuClick(menuId){
   const m = MENU.find(x=>x.id===menuId);
   if(!m) return;
-
   const groupIds = Array.isArray(m.modGroupIds) ? m.modGroupIds.filter(Boolean) : [];
   if(!groupIds.length){
     addLine({menuId:m.id, name:m.name, station:m.station, basePrice:+m.price||0, mods:[]});
@@ -271,7 +258,6 @@ function onMenuClick(menuId){
   }
   openModifierModal(m, groupIds);
 }
-
 function openModifierModal(menuItem, groupIds){
   modTitle.textContent = `Customize: ${menuItem.name}`;
   modBody.innerHTML = '';
@@ -280,101 +266,61 @@ function openModifierModal(menuItem, groupIds){
     addLine({menuId:menuItem.id, name:menuItem.name, station:menuItem.station, basePrice:+menuItem.price||0, mods:[]});
     return;
   }
-
   groups.forEach((g, idx)=>{
     const gid = `g${idx}`;
     const row = document.createElement('div');
     row.innerHTML = `<div style="margin:6px 0 4px 0;font-weight:600">${g.name}</div>`;
     const box = document.createElement('div');
     (g.options||[]).forEach((opt, i)=>{
-      const optId = `${gid}_opt_${i}`;
       if(g.selectType === 'single'){
-        const line = document.createElement('label');
-        line.className='opt';
-        line.innerHTML = `
-          <span><input type="radio" name="${gid}" value="${i}" id="${optId}"> ${opt.name}</span>
-          <span class="muted">${opt.price?`+$${Number(opt.price).toFixed(2)}`:''}</span>`;
+        const line = document.createElement('label'); line.className='opt';
+        line.innerHTML = `<span><input type="radio" name="${gid}" value="${i}"> ${opt.name}</span>
+                          <span class="muted">${opt.price?`+$${Number(opt.price).toFixed(2)}`:''}</span>`;
         box.appendChild(line);
       }else{
-        const line = document.createElement('label');
-        line.className='opt';
-        line.innerHTML = `
-          <span><input type="checkbox" data-g="${gid}" value="${i}" id="${optId}"> ${opt.name}</span>
-          <span class="muted">${opt.price?`+$${Number(opt.price).toFixed(2)}`:''}</span>`;
+        const line = document.createElement('label'); line.className='opt';
+        line.innerHTML = `<span><input type="checkbox" data-g="${gid}" value="${i}"> ${opt.name}</span>
+                          <span class="muted">${opt.price?`+$${Number(opt.price).toFixed(2)}`:''}</span>`;
         box.appendChild(line);
       }
     });
     if(g.selectType==='multi' && g.maxPicks){
-      const info=document.createElement('div');
-      info.className='muted';
-      info.style.marginTop='4px';
-      info.textContent = `Pick up to ${g.maxPicks}`;
-      box.appendChild(info);
+      const info=document.createElement('div'); info.className='muted'; info.style.marginTop='4px';
+      info.textContent = `Pick up to ${g.maxPicks}`; box.appendChild(info);
       box.addEventListener('change', ()=>{
         const checked = box.querySelectorAll('input[type=checkbox]:checked');
-        if(checked.length > (g.maxPicks||0)){
-          checked[checked.length-1].checked=false;
-          alert(`You can pick up to ${g.maxPicks}`);
-        }
+        if(checked.length > (g.maxPicks||0)){ checked[checked.length-1].checked=false; alert(`You can pick up to ${g.maxPicks}`); }
       });
     }
-    row.appendChild(box);
-    modBody.appendChild(row);
+    row.appendChild(box); modBody.appendChild(row);
   });
-
   modMask.style.display='flex';
   modCancel.onclick = ()=> { modMask.style.display='none'; };
-
   modAdd.onclick = ()=>{
-    const selection = [];
-    let addPrice = 0;
+    const selection = []; let addPrice = 0;
     groups.forEach((g, idx)=>{
-      const gid = `g${idx}`;
-      const chosen = [];
+      const gid=`g${idx}`; const chosen=[];
       if(g.selectType==='single'){
         const picked = modBody.querySelector(`input[name="${gid}"]:checked`);
-        if(picked){
-          const opt = g.options[+picked.value];
-          chosen.push({ name: opt.name, price: +opt.price||0 });
-        }
+        if(picked){ const opt=g.options[+picked.value]; chosen.push({name:opt.name,price:+opt.price||0}); }
       }else{
-        const checks = [...modBody.querySelectorAll(`input[type=checkbox][data-g="${gid}"]:checked`)];
-        checks.forEach(c=>{
-          const opt = g.options[+c.value];
-          chosen.push({ name: opt.name, price: +opt.price||0 });
-        });
+        [...modBody.querySelectorAll(`input[type=checkbox][data-g="${gid}"]:checked`)]
+          .forEach(c=>{ const opt=g.options[+c.value]; chosen.push({name:opt.name,price:+opt.price||0}); });
       }
       chosen.forEach(o=> addPrice += (o.price||0));
-      selection.push({ groupName: g.name, options: chosen });
+      selection.push({ groupName:g.name, options:chosen });
     });
-
-    addLine({
-      menuId: menuItem.id,
-      name: menuItem.name,
-      station: menuItem.station,
-      basePrice: +menuItem.price||0,
-      mods: selection
-    });
+    addLine({ menuId:menuItem.id, name:menuItem.name, station:menuItem.station, basePrice:+menuItem.price||0, mods:selection });
     modMask.style.display='none';
   };
 }
-
-function addLine({menuId, name, station, basePrice, mods}){
+function addLine({menuId,name,station,basePrice,mods}){
   const modSum = (mods||[]).flatMap(g=>g.options||[]).reduce((a,b)=> a + (+b.price||0), 0);
   const each = (+basePrice||0) + modSum;
-
   const keyMods = JSON.stringify(mods||[]);
   const existing = CART.find(l => l.menuId===menuId && JSON.stringify(l.mods||[])===keyMods);
-  if(existing){
-    existing.qty += 1;
-    existing.eachPrice = each;
-    existing.lineTotal = existing.qty * each;
-  }else{
-    CART.push({
-      menuId, name, station, qty:1, basePrice:+basePrice||0,
-      mods: mods||[], eachPrice: each, lineTotal: each
-    });
-  }
+  if(existing){ existing.qty += 1; existing.eachPrice=each; existing.lineTotal=existing.qty*each; }
+  else{ CART.push({menuId,name,station,qty:1,basePrice:+basePrice||0,mods:mods||[],eachPrice:each,lineTotal:each}); }
   renderCart();
 }
 
@@ -382,140 +328,67 @@ function addLine({menuId, name, station, basePrice, mods}){
 function renderCart(){
   cartTBody.innerHTML = CART.map((l, idx)=>{
     const modsHtml = (l.mods&&l.mods.length)
-      ? `<div class="muted" style="font-size:12px;margin-top:2px">
-           ${l.mods.map(g=>`${g.groupName}: ${g.options.map(o=>o.name).join(', ')}`).join(' • ')}
-         </div>` : '';
+      ? `<div class="muted" style="font-size:12px;margin-top:2px">${l.mods.map(g=>`${g.groupName}: ${g.options.map(o=>o.name).join(', ')}`).join(' • ')}</div>` : '';
     return `<tr>
-      <td>
-        <div style="font-weight:600">${l.name}</div>
-        ${modsHtml}
-        <div class="muted" style="font-size:11px">${l.station||''}</div>
-      </td>
-      <td>
-        <button class="qbtn" data-dec="${idx}">−</button>
-        <span style="display:inline-block;width:26px;text-align:center">${l.qty}</span>
-        <button class="qbtn" data-inc="${idx}">+</button>
-      </td>
-      <td>$${l.eachPrice.toFixed(2)}</td>
-      <td>$${(l.eachPrice*l.qty).toFixed(2)}</td>
-      <td><button class="btn danger" data-del="${idx}">Remove</button></td>
-    </tr>`;
+      <td><div style="font-weight:600">${l.name}</div>${modsHtml}<div class="muted" style="font-size:11px">${l.station||''}</div></td>
+      <td><button class="qbtn" data-dec="${idx}">−</button><span style="display:inline-block;width:26px;text-align:center">${l.qty}</span><button class="qbtn" data-inc="${idx}">+</button></td>
+      <td>$${l.eachPrice.toFixed(2)}</td><td>$${(l.eachPrice*l.qty).toFixed(2)}</td>
+      <td><button class="btn danger" data-del="${idx}">Remove</button></td></tr>`;
   }).join('');
   cartTBody.querySelectorAll('[data-inc]').forEach(b=> b.onclick=()=>{ CART[+b.dataset.inc].qty++; recalc(); });
   cartTBody.querySelectorAll('[data-dec]').forEach(b=> b.onclick=()=>{ const i=+b.dataset.dec; CART[i].qty=Math.max(1,CART[i].qty-1); recalc(); });
   cartTBody.querySelectorAll('[data-del]').forEach(b=> b.onclick=()=>{ CART.splice(+b.dataset.del,1); recalc(); });
   recalc();
 }
-function recalc(){
-  CART.forEach(l=> l.lineTotal = l.qty * l.eachPrice);
-  const sub = CART.reduce((a,b)=> a + b.lineTotal, 0);
-  subtotalEl.textContent = `$${sub.toFixed(2)}`;
-}
+function recalc(){ CART.forEach(l=> l.lineTotal=l.qty*l.eachPrice); const sub=CART.reduce((a,b)=>a+b.lineTotal,0); subtotalEl.textContent=`$${sub.toFixed(2)}`; }
 
 /* ===================== Order submit ===================== */
 async function nextOrderNumber(){
-  const ref = db.collection('meta').doc('order_seq');
-  const num = await db.runTransaction(async tx=>{
-    const snap = await tx.get(ref);
-    let v = (snap.exists && typeof snap.data().value==='number') ? snap.data().value : 0;
-    v = v + 1;
-    tx.set(ref, {value:v}, {merge:true});
-    return v;
-  });
+  const ref=db.collection('meta').doc('order_seq');
+  const num=await db.runTransaction(async tx=>{ const snap=await tx.get(ref); let v=(snap.exists&&typeof snap.data().value==='number')?snap.data().value:0; v=v+1; tx.set(ref,{value:v},{merge:true}); return v; });
   return num;
 }
-
 $('#clearCart').onclick=()=>{ CART=[]; renderCart(); };
-
 $('#submitOrder').onclick = async ()=>{
   if(!CART.length){ alert('Cart is empty'); return; }
-  const cust = (customer.value||'').trim();
-  if(!cust){
-    alert('Please enter the customer name.');
-    customer.focus();
-    return;
-  }
+  const cust=(customer.value||'').trim(); if(!cust){ alert('Please enter the customer name.'); customer.focus(); return; }
   try{
     msg.textContent='Submitting...';
-    const number = await nextOrderNumber();
-    const ts = Date.now();
-    const order = {
-      number,
-      status: 'new',
-      createdAt: ts,
-      updatedAt: ts,
-      customer: cust,
-      total: CART.reduce((a,b)=> a + b.lineTotal, 0),
-      items: CART.map(l=>({
-        menuId: l.menuId,
-        name: l.name,
-        qty: l.qty,
-        price: l.eachPrice,     // unit price INCLUDING modifiers
-        station: l.station || null,
-        mods: (l.mods||[]).map(g=>({
-          groupName: g.groupName,
-          options: (g.options||[]).map(o=>({name:o.name, price:+o.price||0}))
-        }))
+    const number=await nextOrderNumber(); const ts=Date.now();
+    const order={ number, status:'new', createdAt:ts, updatedAt:ts, customer:cust,
+      total:CART.reduce((a,b)=>a+b.lineTotal,0),
+      items:CART.map(l=>({ menuId:l.menuId, name:l.name, qty:l.qty, price:l.eachPrice, station:l.station||null,
+        mods:(l.mods||[]).map(g=>({ groupName:g.groupName, options:(g.options||[]).map(o=>({name:o.name,price:+o.price||0})) }))
       }))
     };
     await db.collection('orders').add(order);
-
-    // Print if enabled
-    if(autoPrint.checked){
-      await printReceipt(order);
-    }
-
-    CART=[]; renderCart(); customer.value=''; msg.textContent=`Order #${number} placed!`;
-    setTimeout(()=> msg.textContent='', 2000);
-  }catch(e){
-    msg.textContent = 'Error: ' + e.message;
-  }
+    if(autoPrint.checked){ await printReceipt(order); }
+    CART=[]; renderCart(); customer.value=''; msg.textContent=`Order #${number} placed!`; setTimeout(()=> msg.textContent='', 2000);
+  }catch(e){ msg.textContent='Error: '+e.message; }
 };
 
 /* ===================== Epson ePOS‑Print ===================== */
 async function printRaw(text, ip, devid){
-  const url = `http://${ip}/cgi-bin/epos/service.cgi?devid=${encodeURIComponent(devid)}&timeout=60000`;
-  const escXml = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const xml = `<?xml version="1.0" encoding="utf-8"?>
+  const url=`http://${ip}/cgi-bin/epos/service.cgi?devid=${encodeURIComponent(devid)}&timeout=60000`;
+  const escXml=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const xml=`<?xml version="1.0" encoding="utf-8"?>
 <epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
   <text lang="en" smooth="true" font="font_a" width="1" height="1">${escXml}</text>
   <cut type="feed"/>
 </epos-print>`;
-  const res = await fetch(url, { method:"POST", headers:{ "Content-Type":"text/xml" }, body: xml });
-  const t = await res.text();
-  console.log('Printer response:', t);
-  return t;
+  const res=await fetch(url,{method:"POST",headers:{"Content-Type":"text/xml"},body:xml});
+  const t=await res.text(); console.log('Printer response:', t); return t;
 }
-function fmtMoney(n){ return `$${(+n).toFixed(2)}`; }
-
+function money(n){ return `$${(+n).toFixed(2)}`; }
 async function printReceipt(order){
-  const ip  = (localStorage.getItem('printerIp')  || '').trim();
-  const dev = (localStorage.getItem('printerDev') || 'local_printer').trim();
+  const ip=(localStorage.getItem('printerIp')||'').trim();
+  const dev=(localStorage.getItem('printerDev')||'local_printer').trim();
   if(!ip){ console.warn('No printer IP set; skipping print'); return; }
-
-  let lines = [];
-  lines.push('FESTIVAL POS');
-  lines.push(`Order #${order.number}`);
-  lines.push(`Customer: ${order.customer}`);
+  let lines=[]; lines.push('FESTIVAL POS'); lines.push(`Order #${order.number}`); lines.push(`Customer: ${order.customer}`);
   lines.push('------------------------------');
-  order.items.forEach(it=>{
-    const name = `${it.qty}x ${it.name}`;
-    const mods = (it.mods||[]).flatMap(g => (g.options||[]).map(o=>o.name)).join(', ');
-    const line = `${name}${mods? ' ('+mods+')':''}  ${fmtMoney(it.price*it.qty)}`;
-    lines.push(line);
-  });
-  lines.push('------------------------------');
-  lines.push(`TOTAL: ${fmtMoney(order.total)}`);
-  lines.push('');
-  lines.push(new Date().toLocaleString());
-  lines.push('\n\n');
-
-  try{
-    await printRaw(lines.join('\n'), ip, dev);
-  }catch(err){
-    console.error('Print error', err);
-    alert('Could not print. Check printer IP/Device ID, ePOS-Print is enabled, and allow insecure content for this site.');
-  }
+  order.items.forEach(it=>{ const mods=(it.mods||[]).flatMap(g=>(g.options||[]).map(o=>o.name)).join(', '); lines.push(`${it.qty}x ${it.name}${mods?' ('+mods+')':''}  ${money(it.price*it.qty)}`); });
+  lines.push('------------------------------'); lines.push(`TOTAL: ${money(order.total)}`); lines.push(''); lines.push(new Date().toLocaleString()); lines.push('\n\n');
+  try{ await printRaw(lines.join('\n'), ip, dev); }catch(err){ console.error('Print error', err); alert('Could not print. Check printer IP/Device ID, ePOS‑Print is enabled, and allow insecure content for this site.'); }
 }
 
 /* ===================== Boot ===================== */
