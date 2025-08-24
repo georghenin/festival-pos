@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><title>ePOS Tester</title>
+<style>body{font:14px system-ui;background:#0d0f13;color:#eee;padding:16px}
+input,button{font:inherit;padding:8px;border-radius:8px;border:1px solid #333;background:#121826;color:#eee}
+#out{white-space:pre-wrap;border:1px solid #333;padding:10px;border-radius:8px;margin-top:10px;background:#0f141e}</style>
+<h2>Epson ePOS‑Print Tester</h2>
+<p>IP: <input id="ip" value="192.168.4.98" size="15">
+   Device ID: <input id="devid" value="local_printer" size="15">
+   <button id="go">Send Test</button></p>
+<div id="out">Waiting…</div>
+<script>
+document.querySelector('#go').onclick=async()=>{
+  const ip=document.querySelector('#ip').value.trim();
+  const devid=document.querySelector('#devid').value.trim()||'local_printer';
+  const url=`http://${ip}/cgi-bin/epos/service.cgi?devid=${encodeURIComponent(devid)}&timeout=10000`;
+  const xml=`<?xml version="1.0" encoding="utf-8"?>
+<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print"><text>*** TEST ***\n${new Date().toLocaleString()}</text><cut type="feed"/></epos-print>`;
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/xml'},body:xml});
+    const t=await r.text();
+    out.textContent=`HTTP ${r.status}\n\n${t}`;
+  }catch(e){ out.textContent='Error: '+e.message; }
+};
+</script>
