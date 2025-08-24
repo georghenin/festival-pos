@@ -73,7 +73,7 @@
         <div id="menuEmpty" class="muted" style="display:none;margin-top:8px">No items.</div>
       </div>
 
-      <!-- ===== Receipt Printer card (you should SEE this) ===== -->
+      <!-- ===== Receipt Printer card ===== -->
       <div class="card" id="printerCard" style="margin-top:10px">
         <div class="row" style="justify-content:space-between;align-items:center">
           <strong>Receipt Printer</strong>
@@ -88,7 +88,7 @@
           <button id="testPrint" class="btn gray">Test Print</button>
         </div>
         <div class="small" style="margin-top:6px">
-          In Epson Web Config → <em>Configuration → ePOS‑Print</em>: Enable ePOS‑Print and set Device ID (default often <code>local_printer</code>).
+          In Epson Web Config → <em>Configuration → ePOS‑Print</em>: Enable ePOS‑Print and set Device ID (default often <code>local_printer</code> or <code>printer</code>).
         </div>
       </div>
     </div>
@@ -368,27 +368,95 @@ $('#submitOrder').onclick = async ()=>{
 };
 
 /* ===================== Epson ePOS‑Print ===================== */
+// XML escape
+function _xmlEsc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+// Minimal ePOS body (matches your working A6 variant)
+function _buildMinimalBody(text, {feedLines=6, cut="partial"} = {}){
+  const parts = [];
+  parts.push(`  <text>${_xmlEsc(text)}</text>`);
+  if (feedLines && Number.isFinite(feedLines) && feedLines > 0) {
+    parts.push(`  <feed line="${Math.min(10, Math.max(0, feedLines))}"/>`);
+  }
+  if (cut && cut !== "none") {
+    if (cut === "partial") parts.push(`  <cut type="partial"/>`);
+    else if (cut === "feed") parts.push(`  <cut type="feed"/>`);
+    else parts.push(`  <cut/>`);
+  }
+  return `<?xml version="1.0" encoding="utf-8"?>\n` +
+         `<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">\n` +
+         parts.join("\n") + `\n</epos-print>`;
+}
+// SOAP envelope (required on your TM‑m30II)
+function _wrapSOAP(innerXml){
+  return `<?xml version="1.0" encoding="utf-8"?>` +
+         `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">` +
+         `<s:Body>${innerXml}</s:Body></s:Envelope>`;
+}
+async function _sendToPrinter({ip, devid, payload, path="/cgi-bin/epos/service.cgi"}){
+  const url = `http://${ip}${path}?devid=${encodeURIComponent(devid)}&timeout=60000`;
+  const res = await fetch(url, { method:"POST", headers:{ "Content-Type":"text/xml; charset=utf-8" }, body: payload });
+  const txt = await res.text();
+  console.log("[EPSON] HTTP", res.status, txt);
+  return { status: res.status, text: txt };
+}
+/**
+ * printRaw(text, ip, devid)
+ * - Minimal <text>, feed 6, partial cut (retries without cut if schema error)
+ */
 async function printRaw(text, ip, devid){
-  const url=`http://${ip}/cgi-bin/epos/service.cgi?devid=${encodeURIComponent(devid)}&timeout=60000`;
-  const escXml=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const xml=`<?xml version="1.0" encoding="utf-8"?>
-<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
-  <text lang="en" smooth="true" font="font_a" width="1" height="1">${escXml}</text>
-  <cut type="feed"/>
-</epos-print>`;
-  const res=await fetch(url,{method:"POST",headers:{"Content-Type":"text/xml"},body:xml});
-  const t=await res.text(); console.log('Printer response:', t); return t;
+  let job = _buildMinimalBody(String(text), { feedLines: 6, cut: "partial" });
+  let payload = _wrapSOAP(job);
+
+  // Send to service.cgi first
+  let resp = await _sendToPrinter({ ip, devid, payload });
+
+  // Retry without cut if firmware is picky
+  const schemaError = /SchemaError/i.test(resp.text) || /parameter/i.test(resp.text);
+  if (resp.status !== 200 || schemaError){
+    console.warn("[EPSON] Retrying without <cut>…");
+    job = _buildMinimalBody(String(text), { feedLines: 6, cut: "none" });
+    payload = _wrapSOAP(job);
+    resp = await _sendToPrinter({ ip, devid, payload });
+  }
+
+  // Legacy path fallback (harmless to try)
+  if (resp.status === 404 || /not\s*found/i.test(resp.text)){
+    console.warn("[EPSON] service.cgi 404 → trying /cgi-bin/epos/print");
+    resp = await _sendToPrinter({ ip, devid, payload, path: "/cgi-bin/epos/print" });
+  }
+
+  if (resp.status !== 200){
+    throw new Error("Printer error: HTTP " + resp.status + " — " + resp.text);
+  }
+  return resp.text;
 }
 function money(n){ return `$${(+n).toFixed(2)}`; }
 async function printReceipt(order){
   const ip=(localStorage.getItem('printerIp')||'').trim();
   const dev=(localStorage.getItem('printerDev')||'local_printer').trim();
   if(!ip){ console.warn('No printer IP set; skipping print'); return; }
-  let lines=[]; lines.push('FESTIVAL POS'); lines.push(`Order #${order.number}`); lines.push(`Customer: ${order.customer}`);
+
+  // Build a simple, compact text receipt (works with Minimal <text>)
+  const lines=[];
+  lines.push('FESTIVAL POS');
+  lines.push(`Order #${order.number}`);
+  lines.push(`Customer: ${order.customer}`);
   lines.push('------------------------------');
-  order.items.forEach(it=>{ const mods=(it.mods||[]).flatMap(g=>(g.options||[]).map(o=>o.name)).join(', '); lines.push(`${it.qty}x ${it.name}${mods?' ('+mods+')':''}  ${money(it.price*it.qty)}`); });
-  lines.push('------------------------------'); lines.push(`TOTAL: ${money(order.total)}`); lines.push(''); lines.push(new Date().toLocaleString()); lines.push('\n\n');
-  try{ await printRaw(lines.join('\n'), ip, dev); }catch(err){ console.error('Print error', err); alert('Could not print. Check printer IP/Device ID, ePOS‑Print is enabled, and allow insecure content for this site.'); }
+  order.items.forEach(it=>{
+    const mods=(it.mods||[]).flatMap(g=>(g.options||[]).map(o=>o.name)).join(', ');
+    lines.push(`${it.qty}x ${it.name}${mods?' ('+mods+')':''}  ${money(it.price*it.qty)}`);
+  });
+  lines.push('------------------------------');
+  lines.push(`TOTAL: ${money(order.total)}`);
+  lines.push('');
+  lines.push(new Date().toLocaleString());
+
+  try{
+    await printRaw(lines.join('\n'), ip, dev);
+  }catch(err){
+    console.error('Print error', err);
+    alert('Could not print. Check printer IP/Device ID, enable ePOS‑Print, and allow insecure/mixed content for this page.');
+  }
 }
 
 /* ===================== Boot ===================== */
