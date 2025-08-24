@@ -73,7 +73,7 @@
         <div id="menuEmpty" class="muted" style="display:none;margin-top:8px">No items.</div>
       </div>
 
-      <!-- ===== Receipt Printer card (you should SEE this) ===== -->
+      <!-- ===== Receipt Printer card ===== -->
       <div class="card" id="printerCard" style="margin-top:10px">
         <div class="row" style="justify-content:space-between;align-items:center">
           <strong>Receipt Printer</strong>
@@ -371,13 +371,15 @@ $('#submitOrder').onclick = async ()=>{
 async function printRaw(text, ip, devid){
   const url=`http://${ip}/cgi-bin/epos/service.cgi?devid=${encodeURIComponent(devid)}&timeout=60000`;
   const escXml=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  // 👇 CHANGE: add a small feed before a reliable partial cut
+
+  /* CHANGE: feed a few lines, then cut with no extra feed (most reliable across TM series) */
   const xml=`<?xml version="1.0" encoding="utf-8"?>
 <epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
   <text lang="en" smooth="true" font="font_a" width="1" height="1">${escXml}</text>
   <feed line="5"/>
-  <cut type="partial"/>
+  <cut type="no_feed"/>
 </epos-print>`;
+
   const res=await fetch(url,{method:"POST",headers:{"Content-Type":"text/xml"},body:xml});
   const t=await res.text(); console.log('Printer response:', t); return t;
 }
