@@ -40,21 +40,13 @@
   .modal{background:#0f141e;border:1px solid var(--border);border-radius:14px;padding:14px;max-width:520px;width:92%}
   .opt{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed #1b2230}
   .muted{color:var(--muted);font-size:13px}
-
-  /* Header layout tweaks */
   .hdr{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
   .hdr-title{font-size:22px;font-weight:800}
   .hdr-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
   .customer-wrap{margin-top:8px}
-  #customer{
-    width:100%;
-    font-size:20px;
-    padding:14px 16px;
-    border-radius:12px;
-  }
-  @media (max-width:900px){
-    .left-right{grid-template-columns:1fr}
-  }
+  #customer{width:100%;font-size:20px;padding:14px 16px;border-radius:12px}
+  .small{font-size:12px;color:#9fb0c9}
+  @media (max-width:900px){ .left-right{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -89,6 +81,25 @@
         <div id="menu" class="menu-grid"></div>
         <div id="menuEmpty" class="muted" style="display:none;margin-top:8px">No items.</div>
       </div>
+
+      <!-- Printer config -->
+      <div class="card" style="margin-top:10px">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <strong>Receipt Printer</strong>
+          <label class="row" style="gap:6px">
+            <input type="checkbox" id="autoPrint"> Auto‑print on submit
+          </label>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <input id="printerIp" placeholder="Printer IP (e.g. 192.168.4.98)" style="min-width:220px">
+          <input id="printerDev" placeholder="Device ID (e.g. local_printer)" style="min-width:220px">
+          <button id="savePrinter" class="btn ok">Save</button>
+          <button id="testPrint" class="btn gray">Test Print</button>
+        </div>
+        <div class="small" style="margin-top:6px">
+          In Epson Web Config → <em>Configuration → ePOS‑Print</em>: Enable ePOS‑Print and set Device ID (default often <code>local_printer</code>).
+        </div>
+      </div>
     </div>
 
     <!-- CART SIDE -->
@@ -97,8 +108,7 @@
         <h3 style="margin:0 0 8px 0">Order</h3>
         <table id="cartTable">
           <thead><tr><th>Item</th><th>Qty</th><th>Each</th><th>Line</th><th></th></tr></thead>
-          <tbody></tbody>
-        </table>
+        <tbody></tbody></table>
         <div class="total"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
         <div class="row" style="justify-content:space-between;margin-top:10px">
           <button id="clearCart" class="btn gray">Clear</button>
@@ -122,12 +132,12 @@
   </div>
 </div>
 
-<!-- Firebase SDK -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 <script>
-// ---------- Firebase init ----------
+/* ===================== Firebase init ===================== */
 firebase.initializeApp({
   apiKey: "AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
   authDomain: "churchfestivalpos.firebaseapp.com",
@@ -138,7 +148,7 @@ firebase.initializeApp({
 });
 const db=firebase.firestore(), auth=firebase.auth();
 
-// ---------- DOM ----------
+/* ===================== DOM refs ===================== */
 const $=s=>document.querySelector(s);
 const stationTabs=$('#stationTabs'), menu=$('#menu'), menuEmpty=$('#menuEmpty');
 const customer=$('#customer'), search=$('#search');
@@ -149,15 +159,40 @@ const stationsBadge=$('#stationsBadge');
 
 const modMask=$('#modMask'), modTitle=$('#modTitle'), modBody=$('#modBody'), modCancel=$('#modCancel'), modAdd=$('#modAdd');
 
-// ---------- State ----------
+/* ===== Printer UI refs ===== */
+const printerIp=$('#printerIp'), printerDev=$('#printerDev'), savePrinter=$('#savePrinter'), testPrint=$('#testPrint'), autoPrint=$('#autoPrint');
+
+/* ===================== State ===================== */
 const ADMINS = new Set(["smsmofri@gmail.com","george.henin98@gmail.com"].map(x=>x.toLowerCase()));
 let STATIONS_ALL=['Grill','Fryer','Drinks','Pizza']; // fallback
 let FILTER_STATION='__ALL__';
-let MENU=[];      // {id, name, price, station, active, img?, modGroupIds?}
-let MOD_GROUPS=new Map(); // id -> {name, selectType, maxPicks, options:[{name, price}]}
-let CART=[];      // lines with mods & pricing
+let MENU=[];                 // {id, name, price, station, active, img?, modGroupIds?}
+let MOD_GROUPS=new Map();    // id -> {name, selectType, maxPicks, options:[{name, price}]}
+let CART=[];                 // lines with mods & pricing
 
-// ---------- Auth UI ----------
+/* ===== Printer config (localStorage) ===== */
+function loadPrinterPrefs(){
+  printerIp.value  = localStorage.getItem('printerIp')  || '';
+  printerDev.value = localStorage.getItem('printerDev') || 'local_printer';
+  autoPrint.checked = localStorage.getItem('printerAuto') === '1';
+}
+function savePrinterPrefs(){
+  localStorage.setItem('printerIp', printerIp.value.trim());
+  localStorage.setItem('printerDev', printerDev.value.trim() || 'local_printer');
+  localStorage.setItem('printerAuto', autoPrint.checked ? '1' : '0');
+  alert('Printer settings saved to this device.');
+}
+savePrinter.onclick = savePrinterPrefs;
+testPrint.onclick = async()=>{
+  savePrinterPrefs();
+  const ip = printerIp.value.trim();
+  const dev= printerDev.value.trim() || 'local_printer';
+  if(!ip){ alert('Set the printer IP first.'); return; }
+  await printRaw(`*** TEST PRINT ***\n${new Date().toLocaleString()}\n\n`, ip, dev);
+  alert('Test print sent. If nothing prints, check ePOS‑Print is enabled, IP/Device matches, and mixed content is allowed.');
+};
+
+/* ===================== Auth UI ===================== */
 auth.onAuthStateChanged(u=>{
   if(u){ me.textContent=u.email; loginBtn.style.display='none'; logoutBtn.style.display='inline-block'; }
   else { me.textContent='Signed out'; loginBtn.style.display='inline-block'; logoutBtn.style.display='none'; }
@@ -169,14 +204,13 @@ loginBtn.onclick=async()=>{
 };
 logoutBtn.onclick=()=> auth.signOut();
 
-// ---------- Load stations (dynamic) ----------
+/* ===================== Stations ===================== */
 async function loadStations(){
   try{
     const snap=await db.collection('settings').doc('config').get();
     const conf=snap.data();
     if(conf && Array.isArray(conf.stations) && conf.stations.length) STATIONS_ALL=conf.stations;
   }catch(e){}
-  // Build tabs
   stationTabs.innerHTML = `<button class="tab active" data-st="__ALL__">All</button>` +
     STATIONS_ALL.map(s=>`<button class="tab" data-st="${s}">${s}</button>`).join('');
   stationTabs.querySelectorAll('.tab').forEach(btn=>{
@@ -190,7 +224,7 @@ async function loadStations(){
   stationsBadge.textContent = 'Stations: ' + STATIONS_ALL.join(', ');
 }
 
-// ---------- Load menu & mod groups ----------
+/* ===================== Data loads ===================== */
 function loadMenu(){
   db.collection('menu').orderBy('name').onSnapshot(snap=>{
     MENU=[]; snap.forEach(d=>{ const m={id:d.id, ...d.data()}; if(m.active!==false) MENU.push(m); });
@@ -204,7 +238,7 @@ function loadModGroups(){
   });
 }
 
-// ---------- Render menu ----------
+/* ===================== Render menu ===================== */
 function renderMenu(){
   const q=(search.value||'').toLowerCase().trim();
   const items = MENU.filter(m=>{
@@ -225,7 +259,7 @@ function renderMenu(){
 }
 search.oninput=renderMenu;
 
-// ---------- Add to cart flow (with modifiers) ----------
+/* ===================== Add to cart (with modifiers) ===================== */
 function onMenuClick(menuId){
   const m = MENU.find(x=>x.id===menuId);
   if(!m) return;
@@ -344,7 +378,7 @@ function addLine({menuId, name, station, basePrice, mods}){
   renderCart();
 }
 
-// ---------- Cart render / actions ----------
+/* ===================== Cart ===================== */
 function renderCart(){
   cartTBody.innerHTML = CART.map((l, idx)=>{
     const modsHtml = (l.mods&&l.mods.length)
@@ -367,36 +401,18 @@ function renderCart(){
       <td><button class="btn danger" data-del="${idx}">Remove</button></td>
     </tr>`;
   }).join('');
-
-  // wire buttons — call renderCart() so qty text updates immediately
-  cartTBody.querySelectorAll('[data-inc]').forEach(b=>{
-    b.onclick=()=>{ CART[+b.dataset.inc].qty++; renderCart(); };
-  });
-  cartTBody.querySelectorAll('[data-dec]').forEach(b=>{
-    b.onclick=()=>{
-      const i=+b.dataset.dec;
-      CART[i].qty--;
-      if(CART[i].qty<=0){ CART.splice(i,1); }
-      // If you prefer minimum 1 instead of removing, use:
-      // CART[i].qty=Math.max(1,CART[i].qty-1);
-      renderCart();
-    };
-  });
-  cartTBody.querySelectorAll('[data-del]').forEach(b=>{
-    b.onclick=()=>{ CART.splice(+b.dataset.del,1); renderCart(); };
-  });
-
+  cartTBody.querySelectorAll('[data-inc]').forEach(b=> b.onclick=()=>{ CART[+b.dataset.inc].qty++; recalc(); });
+  cartTBody.querySelectorAll('[data-dec]').forEach(b=> b.onclick=()=>{ const i=+b.dataset.dec; CART[i].qty=Math.max(1,CART[i].qty-1); recalc(); });
+  cartTBody.querySelectorAll('[data-del]').forEach(b=> b.onclick=()=>{ CART.splice(+b.dataset.del,1); recalc(); });
   recalc();
 }
 function recalc(){
   CART.forEach(l=> l.lineTotal = l.qty * l.eachPrice);
-  const sub = CART.reduce((a,b)=> a + lRound(b.lineTotal), 0);
+  const sub = CART.reduce((a,b)=> a + b.lineTotal, 0);
   subtotalEl.textContent = `$${sub.toFixed(2)}`;
 }
-// small helper to avoid floating rounding weirdness
-function lRound(n){ return Math.round(n*100)/100; }
 
-// ---------- Submit order ----------
+/* ===================== Order submit ===================== */
 async function nextOrderNumber(){
   const ref = db.collection('meta').doc('order_seq');
   const num = await db.runTransaction(async tx=>{
@@ -428,7 +444,7 @@ $('#submitOrder').onclick = async ()=>{
       status: 'new',
       createdAt: ts,
       updatedAt: ts,
-      customer: cust,            // required & non-empty now
+      customer: cust,
       total: CART.reduce((a,b)=> a + b.lineTotal, 0),
       items: CART.map(l=>({
         menuId: l.menuId,
@@ -443,6 +459,12 @@ $('#submitOrder').onclick = async ()=>{
       }))
     };
     await db.collection('orders').add(order);
+
+    // Print if enabled
+    if(autoPrint.checked){
+      await printReceipt(order);
+    }
+
     CART=[]; renderCart(); customer.value=''; msg.textContent=`Order #${number} placed!`;
     setTimeout(()=> msg.textContent='', 2000);
   }catch(e){
@@ -450,7 +472,54 @@ $('#submitOrder').onclick = async ()=>{
   }
 };
 
-// ---------- Boot ----------
+/* ===================== Epson ePOS‑Print ===================== */
+async function printRaw(text, ip, devid){
+  const url = `http://${ip}/cgi-bin/epos/service.cgi?devid=${encodeURIComponent(devid)}&timeout=60000`;
+  const escXml = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const xml = `<?xml version="1.0" encoding="utf-8"?>
+<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
+  <text lang="en" smooth="true" font="font_a" width="1" height="1">${escXml}</text>
+  <cut type="feed"/>
+</epos-print>`;
+  const res = await fetch(url, { method:"POST", headers:{ "Content-Type":"text/xml" }, body: xml });
+  const t = await res.text();
+  console.log('Printer response:', t);
+  return t;
+}
+function fmtMoney(n){ return `$${(+n).toFixed(2)}`; }
+
+async function printReceipt(order){
+  const ip  = (localStorage.getItem('printerIp')  || '').trim();
+  const dev = (localStorage.getItem('printerDev') || 'local_printer').trim();
+  if(!ip){ console.warn('No printer IP set; skipping print'); return; }
+
+  let lines = [];
+  lines.push('FESTIVAL POS');
+  lines.push(`Order #${order.number}`);
+  lines.push(`Customer: ${order.customer}`);
+  lines.push('------------------------------');
+  order.items.forEach(it=>{
+    const name = `${it.qty}x ${it.name}`;
+    const mods = (it.mods||[]).flatMap(g => (g.options||[]).map(o=>o.name)).join(', ');
+    const line = `${name}${mods? ' ('+mods+')':''}  ${fmtMoney(it.price*it.qty)}`;
+    lines.push(line);
+  });
+  lines.push('------------------------------');
+  lines.push(`TOTAL: ${fmtMoney(order.total)}`);
+  lines.push('');
+  lines.push(new Date().toLocaleString());
+  lines.push('\n\n');
+
+  try{
+    await printRaw(lines.join('\n'), ip, dev);
+  }catch(err){
+    console.error('Print error', err);
+    alert('Could not print. Check printer IP/Device ID, ePOS-Print is enabled, and allow insecure content for this site.');
+  }
+}
+
+/* ===================== Boot ===================== */
+loadPrinterPrefs();
 loadStations();
 loadMenu();
 loadModGroups();
