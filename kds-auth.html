@@ -1,3 +1,4 @@
+<!-- kds-auth.html (full file, SMS-ready enabled) -->
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -55,7 +56,6 @@
   <div id="empty" class="muted" style="margin-top:8px;display:none">No tickets.</div>
 </div>
 
-<!-- Bell sound -->
 <audio id="ding" preload="auto"></audio>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
@@ -74,29 +74,18 @@ const me=$('#me'), login=$('#login'), logout=$('#logout');
 const chips=$('#chips'), stationBadge=$('#stationBadge');
 const showDone=$('#showDone'), grid=$('#grid'), empty=$('#empty'), selectAll=$('#selectAll'), savePref=$('#savePref');
 
-// ====== SOUND (uses your WAV on GitHub Pages) ======
-const SOUND_URL = "https://georghenin.github.io/festival-pos/mixkit-bell-notification-933.wav"; // update if you place it elsewhere
+// ===== Sound =====
+const SOUND_URL = "https://georghenin.github.io/festival-pos/mixkit-bell-notification-933.wav";
 const dingEl = document.getElementById('ding');
 dingEl.src = SOUND_URL;
 const soundCb = document.getElementById('sound');
 let lastSoundTs = Number(localStorage.getItem('kdsLastSoundTs')||'0');
-
-// iOS/Chrome: must unlock audio once with a user gesture
-function armAudioOnce(){
-  window.removeEventListener('click', armAudioOnce, true);
-  try { dingEl.volume = 1.0; dingEl.play().then(()=>dingEl.pause()).catch(()=>{}); } catch(_) {}
-}
+function armAudioOnce(){ window.removeEventListener('click', armAudioOnce, true); try { dingEl.volume = 1.0; dingEl.play().then(()=>dingEl.pause()).catch(()=>{}); } catch(_) {} }
 window.addEventListener('click', armAudioOnce, true);
+function playDing(){ if(!soundCb.checked) return; try { dingEl.currentTime = 0; dingEl.volume = 1.0; dingEl.play().catch(()=>{}); } catch(_) {} }
+function newestTsForKDS(orders){ let n=0; for(const o of orders){ const ts=Number(o.updatedAt||o.createdAt||0); if(ts>n) n=ts; } return n; }
 
-function playDing(){
-  if(!soundCb.checked) return;
-  try { dingEl.currentTime = 0; dingEl.volume = 1.0; dingEl.play().catch(()=>{}); } catch(_) {}
-}
-function newestTsForKDS(orders){
-  let n=0; for(const o of orders){ const ts=Number(o.updatedAt||o.createdAt||0); if(ts>n) n=ts; } return n;
-}
-// ===================================================
-
+// ===== Auth =====
 let STATIONS=['Grill','Fryer','Drinks','Pizza'];
 let selected=new Set(JSON.parse(localStorage.getItem('kdsStations')||'[]'));
 let lastSnapshot=null;
@@ -138,7 +127,7 @@ function modsHTML(mods){
 function renderTickets(snap){
   if(!snap){ grid.innerHTML=''; empty.style.display='block'; return; }
   const includeCompleted = !!showDone.checked;
-  const shown=[]; // for sound
+  const shown=[];
 
   const html=[];
   snap.forEach(d=>{
@@ -173,7 +162,6 @@ function renderTickets(snap){
   grid.innerHTML = html.join('');
   empty.style.display = html.length? 'none':'block';
 
-  // 🔔 Sound if a newer order is present
   const newest = newestTsForKDS(shown);
   if(newest && newest > lastSoundTs){ playDing(); lastSoundTs=newest; localStorage.setItem('kdsLastSoundTs', String(lastSoundTs)); }
 
@@ -182,14 +170,26 @@ function renderTickets(snap){
   });
 }
 
-// mark ONLY the visible station's items as ready
+const FN_BASE = ""; // same as in POS; can hardcode full CF URL if you prefer
+async function callFn(path, body){
+  try{
+    const url = (FN_BASE || "https://us-central1-churchfestivalpos.cloudfunctions.net") + path;
+    const r = await fetch(url, { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) });
+    return await r.json();
+  }catch(e){ return {error: String(e)}; }
+}
+
+// mark ONLY visible station's items as ready; if ALL items become ready here, send SMS once
 async function setReadyForThisStation(orderId){
   const now=Date.now();
   const ref=db.collection('orders').doc(orderId);
+  let becameReady=false, orderPhone=null, orderNumber=null, orderCustomer=null;
+
   try{
     await db.runTransaction(async tx=>{
       const snap=await tx.get(ref); if(!snap.exists) return;
-      const o=snap.data(); const items=(o.items||[]).map(it=>{
+      const o=snap.data();
+      const items=(o.items||[]).map(it=>{
         if(itemMatchesStations(it) && !it.ready){
           return {...it, ready:true, readyAt: now};
         }
@@ -197,14 +197,24 @@ async function setReadyForThisStation(orderId){
       });
       const allReady = items.length && items.every(i=>i.ready);
       const updates = { items, updatedAt: now };
-      if(allReady){
+      if(allReady && o.status!=='ready'){
         updates.status = 'ready';
         if(!o.readyAt) updates.readyAt = now;
+        becameReady = true;
+        orderPhone   = o.phone || null;
+        orderNumber  = o.number;
+        orderCustomer= o.customer || null;
       }else{
         updates.status = 'partial';
       }
       tx.update(ref, updates);
     });
+
+    // After commit, fire SMS once
+    if(becameReady && orderPhone){
+      callFn("/sendReadySms", { to: orderPhone, orderNumber, customer: orderCustomer })
+        .then(r => { if(r?.error) console.warn("SMS ready error", r.error); });
+    }
   }catch(e){ alert(e.message); }
 }
 
