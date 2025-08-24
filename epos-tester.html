@@ -1,23 +1,48 @@
-<!doctype html><meta charset="utf-8"><title>ePOS Tester</title>
-<style>body{font:14px system-ui;background:#0d0f13;color:#eee;padding:16px}
-input,button{font:inherit;padding:8px;border-radius:8px;border:1px solid #333;background:#121826;color:#eee}
-#out{white-space:pre-wrap;border:1px solid #333;padding:10px;border-radius:8px;margin-top:10px;background:#0f141e}</style>
-<h2>Epson ePOS‑Print Tester</h2>
-<p>IP: <input id="ip" value="192.168.4.98" size="15">
-   Device ID: <input id="devid" value="local_printer" size="15">
-   <button id="go">Send Test</button></p>
-<div id="out">Waiting…</div>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Epson ePOS‑Print Tester (correct XML)</title>
+  <style>
+    body{background:#0d0f13;color:#eaf0f6;font-family:system-ui;margin:0;padding:20px}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    input,button{font:inherit;border-radius:8px;border:1px solid #1b2230;padding:10px 12px;background:#121826;color:#eaf0f6}
+    button{background:#5b9bff;color:#fff;border:none;cursor:pointer}
+    pre{white-space:pre-wrap;background:#0f141e;border:1px solid #1b2230;border-radius:12px;padding:12px;margin-top:12px}
+  </style>
+</head>
+<body>
+  <h2>Epson ePOS‑Print Tester</h2>
+  <div class="row">
+    <input id="ip" placeholder="Printer IP (e.g. 192.168.4.98)" style="min-width:260px">
+    <input id="devid" placeholder="Device ID (e.g. local_printer)" value="local_printer" style="min-width:220px">
+    <button id="send">Send Test</button>
+  </div>
+  <pre id="out">Waiting…</pre>
+
 <script>
-document.querySelector('#go').onclick=async()=>{
-  const ip=document.querySelector('#ip').value.trim();
-  const devid=document.querySelector('#devid').value.trim()||'local_printer';
-  const url=`http://${ip}/cgi-bin/epos/service.cgi?devid=${encodeURIComponent(devid)}&timeout=10000`;
-  const xml=`<?xml version="1.0" encoding="utf-8"?>
-<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print"><text>*** TEST ***\n${new Date().toLocaleString()}</text><cut type="feed"/></epos-print>`;
+async function send(ip, devid, text){
+  const url = `http://${ip}/cgi-bin/epos/service.cgi?devid=${encodeURIComponent(devid)}&timeout=60000`;
+  const esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const xml = `<?xml version="1.0" encoding="utf-8"?>
+<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
+  <text lang="en" smooth="true" font="font_a" width="1" height="1">${esc}</text>
+  <cut type="feed"/>
+</epos-print>`;
+  const res = await fetch(url, { method:'POST', headers:{'Content-Type':'text/xml'}, body: xml });
+  return { status: res.status, text: await res.text() };
+}
+
+const ip=document.getElementById('ip'), devid=document.getElementById('devid'), out=document.getElementById('out');
+document.getElementById('send').onclick = async ()=>{
+  out.textContent = 'Sending… (make sure Chrome allows insecure content for this site)';
   try{
-    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/xml'},body:xml});
-    const t=await r.text();
-    out.textContent=`HTTP ${r.status}\n\n${t}`;
-  }catch(e){ out.textContent='Error: '+e.message; }
+    const r = await send(ip.value.trim(), devid.value.trim() || 'local_printer', `*** TEST PRINT ***\n${new Date().toLocaleString()}\n`);
+    out.textContent = `HTTP ${r.status}\n\n${r.text}`;
+  }catch(e){
+    out.textContent = 'Fetch error: ' + e.message + '\n(Usually mixed-content blocking or wrong IP)';
+  }
 };
 </script>
+</body>
+</html>
