@@ -367,16 +367,34 @@ function renderCart(){
       <td><button class="btn danger" data-del="${idx}">Remove</button></td>
     </tr>`;
   }).join('');
-  cartTBody.querySelectorAll('[data-inc]').forEach(b=> b.onclick=()=>{ CART[+b.dataset.inc].qty++; recalc(); });
-  cartTBody.querySelectorAll('[data-dec]').forEach(b=> b.onclick=()=>{ const i=+b.dataset.dec; CART[i].qty=Math.max(1,CART[i].qty-1); recalc(); });
-  cartTBody.querySelectorAll('[data-del]').forEach(b=> b.onclick=()=>{ CART.splice(+b.dataset.del,1); recalc(); });
+
+  // wire buttons — call renderCart() so qty text updates immediately
+  cartTBody.querySelectorAll('[data-inc]').forEach(b=>{
+    b.onclick=()=>{ CART[+b.dataset.inc].qty++; renderCart(); };
+  });
+  cartTBody.querySelectorAll('[data-dec]').forEach(b=>{
+    b.onclick=()=>{
+      const i=+b.dataset.dec;
+      CART[i].qty--;
+      if(CART[i].qty<=0){ CART.splice(i,1); }
+      // If you prefer minimum 1 instead of removing, use:
+      // CART[i].qty=Math.max(1,CART[i].qty-1);
+      renderCart();
+    };
+  });
+  cartTBody.querySelectorAll('[data-del]').forEach(b=>{
+    b.onclick=()=>{ CART.splice(+b.dataset.del,1); renderCart(); };
+  });
+
   recalc();
 }
 function recalc(){
   CART.forEach(l=> l.lineTotal = l.qty * l.eachPrice);
-  const sub = CART.reduce((a,b)=> a + b.lineTotal, 0);
+  const sub = CART.reduce((a,b)=> a + lRound(b.lineTotal), 0);
   subtotalEl.textContent = `$${sub.toFixed(2)}`;
 }
+// small helper to avoid floating rounding weirdness
+function lRound(n){ return Math.round(n*100)/100; }
 
 // ---------- Submit order ----------
 async function nextOrderNumber(){
