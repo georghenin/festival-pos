@@ -1,280 +1,324 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Back Office — Orders</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --accent:#22d3ee; --ok:#10b981; --warn:#f59e0b; --bad:#ef4444; --text:#e5e7eb; }
-    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; background:var(--bg); color:var(--text); }
-    header { display:flex; gap:12px; align-items:center; padding:14px 18px; border-bottom:1px solid #1f2937; position:sticky; top:0; background:rgba(15,23,42,.85); backdrop-filter: blur(6px); }
-    header h1 { font-size:18px; margin:0 12px 0 0; }
-    input, select, button { background:#0b1220; color:var(--text); border:1px solid #1f2937; border-radius:10px; padding:10px 12px; }
-    button { cursor:pointer; }
-    button.primary { background:linear-gradient(180deg,#0ea5e9,#0284c7); border:none; }
-    button.ghost { background:transparent; border:1px dashed #334155; }
-    .wrap { padding:18px; max-width:1200px; margin:0 auto; }
-    .grid { display:grid; grid-template-columns: 2fr 1.2fr 1fr 1.4fr 1fr 1fr; gap:8px; padding:10px 12px; border-bottom:1px solid #1f2937; align-items:center; }
-    .grid.head { font-weight:600; color:#cbd5e1; position:sticky; top:64px; background:#0f172a; z-index:1; }
-    .row { transition: background .15s; }
-    .row:hover { background:#0b1220; }
-    .pill { font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid #334155; color:#cbd5e1; display:inline-block; }
-    .pill.ok { border-color:#064e3b; color:#a7f3d0; }
-    .pill.bad { border-color:#7f1d1d; color:#fecaca; }
-    .muted { color:var(--muted); font-size:12px; }
-    .flex { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    .spacer { flex:1; }
-    dialog { width: min(760px, 92vw); background:var(--card); color:var(--text); border:1px solid #1f2937; border-radius:16px; padding:0; }
-    dialog header { position:sticky; top:0; }
-    .modal-body { padding:16px 18px 20px; max-height:70vh; overflow:auto; }
-    .kv { display:grid; grid-template-columns: 160px 1fr; gap:6px 14px; margin:8px 0 14px; }
-    .items { border:1px solid #1f2937; border-radius:14px; overflow:hidden; }
-    .items .h { display:grid; grid-template-columns: 1.6fr 0.6fr 0.6fr 0.8fr; padding:10px 12px; background:#0b1220; border-bottom:1px solid #1f2937; }
-    .items .r { display:grid; grid-template-columns: 1.6fr 0.6fr 0.6fr 0.8fr; padding:10px 12px; border-bottom:1px solid #0b1220; }
-    .danger { background:linear-gradient(180deg,#ef4444,#dc2626); border:none; }
-    .notice { font-size:12px; color:#cbd5e1; }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Back Office — Orders</title>
+<style>
+  :root{
+    --bg:#0d0f13; --card:#0f141e; --fg:#f5f7fa; --muted:#95a0ad;
+    --border:#1b2230; --accent:#5b9bff; --ok:#2fd28f; --warn:#ffb020; --danger:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  header{position:sticky;top:0;background:#0d0f13d0;backdrop-filter:saturate(1.2) blur(6px);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;gap:10px;align-items:center;z-index:5}
+  h1{margin:0;font-size:18px}
+  input,select,button{background:#0c111b;color:var(--fg);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  button{cursor:pointer}
+  .primary{background:var(--accent);color:#fff;border:none}
+  .ghost{background:#0c111b}
+  .wrap{max-width:1200px;margin:0 auto;padding:16px}
+  .grid.head,.grid.row{display:grid;grid-template-columns:2fr 0.8fr 1fr 1.6fr 0.9fr 0.8fr;gap:8px;padding:10px 12px;align-items:center}
+  .grid.head{position:sticky;top:66px;background:#0d0f13;border-bottom:1px solid var(--border);font-weight:600;color:#cbd5e1;z-index:4}
+  .grid.row{border-bottom:1px solid #0e1320}
+  .grid.row:hover{background:#0b101a}
+  .pill{display:inline-block;border:1px solid var(--border);background:#0f1420;color:#a7b0bd;border-radius:999px;padding:4px 8px;font-size:12px}
+  .pill.ok{color:#0b0e14;background:var(--ok);border:none}
+  .pill.bad{color:#0b0e14;background:var(--danger);border:none}
+  .muted{color:var(--muted);font-size:13px}
+  dialog{width:min(880px,92vw);border:1px solid var(--border);border-radius:16px;padding:0;background:var(--card);color:var(--fg)}
+  dialog header{display:flex;gap:8px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border)}
+  .modal-body{max-height:70vh;overflow:auto;padding:14px}
+  .kv{display:grid;grid-template-columns:160px 1fr;gap:6px 12px;margin-bottom:12px}
+  .items{border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:8px}
+  .items .h,.items .r{display:grid;grid-template-columns:1.6fr 0.6fr 0.7fr 0.8fr;gap:8px;padding:10px 12px}
+  .items .h{background:#0c111b;border-bottom:1px solid var(--border);font-weight:600;color:#cbd5e1}
+  .items .r{border-bottom:1px solid #0e1320}
+  .danger{background:var(--danger);border:none;color:#0b0e14}
+</style>
 </head>
 <body>
   <header>
     <h1>Back Office — Orders</h1>
-    <input id="searchInput" placeholder="Search by name…" />
-    <input id="fromDate" type="date" />
-    <input id="toDate" type="date" />
-    <select id="statusFilter">
+    <input id="search" placeholder="Search by customer name…"/>
+    <input id="from" type="date"/><input id="to" type="date"/>
+    <select id="status">
       <option value="any">Any status</option>
-      <option value="open">Open</option>
-      <option value="completed">Completed</option>
-      <option value="refunded">Refunded</option>
+      <option value="active">active</option>
+      <option value="ready">ready</option>
+      <option value="picked_up">picked_up</option>
+      <option value="refunded">refunded</option>
     </select>
-    <button id="applyFilters" class="primary">Apply</button>
-    <div class="spacer"></div>
-    <a href="./backoffice-analytics.html"><button class="ghost">Go to Analytics</button></a>
+    <button id="apply" class="primary">Apply</button>
+    <div style="flex:1"></div>
+    <a href="backoffice-analytics.html"><button class="ghost">Analytics</button></a>
   </header>
 
   <div class="wrap">
     <div class="grid head">
-      <div>Name</div><div>Total</div><div>Station</div><div>Created</div><div>Status</div><div>Action</div>
+      <div>Customer</div><div>Total</div><div>Station</div><div>Created</div><div>Status</div><div>Action</div>
     </div>
-    <div id="ordersList"></div>
-    <div class="muted" id="emptyState" style="display:none; padding:18px 4px;">No orders match your filters.</div>
+    <div id="list"></div>
+    <div id="empty" class="muted" style="display:none;padding:14px">No orders match your filters.</div>
+    <div style="text-align:center;margin-top:12px">
+      <button id="more" class="ghost" style="display:none">Load more…</button>
+    </div>
   </div>
 
-  <dialog id="orderModal">
+  <dialog id="dlg">
     <header>
-      <h1>Order Details</h1>
-      <div class="spacer"></div>
-      <button id="closeModal" class="ghost" style="margin-right:8px;">Close</button>
+      <h1 style="font-size:16px;margin:0">Order Details</h1>
+      <div style="flex:1"></div>
+      <button id="close" class="ghost">Close</button>
     </header>
     <div class="modal-body">
       <div class="kv">
-        <div class="muted">Customer</div><div id="mName">—</div>
-        <div class="muted">Order ID</div><div id="mId">—</div>
-        <div class="muted">Total</div><div id="mTotal">—</div>
-        <div class="muted">Station</div><div id="mStation">—</div>
-        <div class="muted">Created</div><div id="mCreated">—</div>
-        <div class="muted">Status</div><div id="mStatus">—</div>
+        <div class="muted">Order ID</div><div id="m_id">—</div>
+        <div class="muted">Customer</div><div id="m_cust">—</div>
+        <div class="muted">Total</div><div id="m_total">—</div>
+        <div class="muted">Station</div><div id="m_station">—</div>
+        <div class="muted">Created</div><div id="m_created">—</div>
+        <div class="muted">Status</div><div id="m_status">—</div>
+        <div class="muted">Ticket #</div><div id="m_number">—</div>
       </div>
 
       <div class="items">
-        <div class="h"><div>Item</div><div>Qty</div><div>Price</div><div>Line</div></div>
-        <div id="mItems"></div>
+        <div class="h"><div>Item / Variant</div><div>Qty</div><div>Price</div><div>Line</div></div>
+        <div id="m_items"></div>
       </div>
 
-      <div style="margin-top:14px;" class="flex">
-        <button id="refundBtn" class="danger">Refund Order</button>
-        <span class="notice">Refunds are logged to <code>refunds</code> for auditing.</span>
+      <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+        <button id="refund" class="danger">Refund Order</button>
+        <span class="muted">Refund marks this order as <b>refunded</b> and logs an entry in <code>refunds</code>.</span>
       </div>
     </div>
   </dialog>
 
-  <!-- Firebase (modular SDK) -->
-  <script type="module">
-    // --- Firebase init ---
-    // If your project already uses a shared config script, you can replace this block
-    // with: import { app, db } from './your-existing-firebase-init.js'
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import {
-      getFirestore, collection, query, where, orderBy, limit, onSnapshot, getDocs, doc, updateDoc, addDoc, serverTimestamp
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  <!-- Firebase (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+  <script>
+  // ---------- config ----------
+  const ADMIN_EMAILS = ["smsmofri@gmail.com","george.henin98@gmail.com"]; // extend if needed
+  const config = { apiKey:"AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM", authDomain:"churchfestivalpos.firebaseapp.com", projectId:"churchfestivalpos" };
+  firebase.initializeApp(config);
+  const db = firebase.firestore();
+  const auth = firebase.auth();
 
-    // TODO: Replace with your actual config OR load from an existing shared file.
-    // You can safely copy the same config used in your current POS page.
-    const firebaseConfig = window.FIREBASE_CONFIG || {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_DOMAIN",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_BUCKET",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
+  // ---------- UI refs ----------
+  const elList = document.getElementById("list");
+  const elEmpty = document.getElementById("empty");
+  const elMore = document.getElementById("more");
+  const elSearch = document.getElementById("search");
+  const elFrom = document.getElementById("from");
+  const elTo = document.getElementById("to");
+  const elStatus = document.getElementById("status");
+  const elApply = document.getElementById("apply");
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+  // dialog refs
+  const dlg = document.getElementById("dlg");
+  const btnClose = document.getElementById("close");
+  const btnRefund = document.getElementById("refund");
+  const m_id = document.getElementById("m_id");
+  const m_cust = document.getElementById("m_cust");
+  const m_total = document.getElementById("m_total");
+  const m_station = document.getElementById("m_station");
+  const m_created = document.getElementById("m_created");
+  const m_status = document.getElementById("m_status");
+  const m_number = document.getElementById("m_number");
+  const m_items = document.getElementById("m_items");
 
-    // --- UI refs ---
-    const ordersList = document.getElementById('ordersList');
-    const emptyState = document.getElementById('emptyState');
-    const searchInput = document.getElementById('searchInput');
-    const fromDate = document.getElementById('fromDate');
-    const toDate = document.getElementById('toDate');
-    const statusFilter = document.getElementById('statusFilter');
-    const applyFilters = document.getElementById('applyFilters');
+  // ---------- helpers ----------
+  const fmt = n => `$${(Number(n||0)).toFixed(2)}`;
+  const tsText = ms => ms ? new Date(ms).toLocaleString() : "—";
+  function lineTotal(qty, price){ return Number(qty||1) * Number(price||0); }
 
-    // Modal refs
-    const orderModal = document.getElementById('orderModal');
-    const closeModal = document.getElementById('closeModal');
-    const mName = document.getElementById('mName');
-    const mId = document.getElementById('mId');
-    const mTotal = document.getElementById('mTotal');
-    const mStation = document.getElementById('mStation');
-    const mCreated = document.getElementById('mCreated');
-    const mStatus = document.getElementById('mStatus');
-    const mItems = document.getElementById('mItems');
-    const refundBtn = document.getElementById('refundBtn');
+  // try to pull variants/mods into visible lines under each item
+  function itemLines(it){
+    const baseName = it.name || "—";
+    const qty = Number(it.qty || 1);
+    const price = Number(it.price || 0);
+    const lines = [{ label: baseName, qty, price }];
 
-    let cachedOrders = [];      // client-side cache for search/filter
-    let currentSelection = null;
+    // mods can be:
+    // 1) array of groups [{groupName, options:[{name, price}]}]
+    // 2) array of simple selected mods [{name, price, qty?}]
+    // 3) single object {name, price, qty?}
+    const mods = it.mods;
 
-    // Helpers
-    function tsToText(ts) {
-      if (!ts) return '—';
-      const d = ts.toDate ? ts.toDate() : new Date(ts);
-      return d.toLocaleString();
+    // case 1
+    if (Array.isArray(mods) && mods.length && mods[0]?.options) {
+      mods.forEach(g=>{
+        (g.options||[]).forEach(opt=>{
+          lines.push({ label: `${baseName} – ${g.groupName}: ${opt.name}`, qty, price: Number(opt.price||0) });
+        });
+      });
+    } else if (Array.isArray(mods)) { // case 2
+      mods.forEach(m=>{
+        lines.push({ label: `${baseName} – ${m.name}`, qty: Number(m.qty||qty), price: Number(m.price||0) });
+      });
+    } else if (mods && typeof mods === 'object') { // case 3
+      lines.push({ label: `${baseName} – ${mods.name}`, qty: Number(mods.qty||qty), price: Number(mods.price||0) });
     }
-    function fmt(n) { return `$${(Number(n||0)).toFixed(2)}`; }
+    return lines;
+  }
 
-    function renderRows(rows) {
-      ordersList.innerHTML = '';
-      if (!rows.length) { emptyState.style.display = 'block'; return; }
-      emptyState.style.display = 'none';
+  // ---------- state ----------
+  let buffer = [];       // cached docs for client filtering
+  let lastDoc = null;    // for pagination
+  let unsub = null;      // live listener (for first page only)
 
-      for (const o of rows) {
-        const r = document.createElement('div');
-        r.className = 'grid row';
-        r.innerHTML = `
-          <div>${o.customerName || '—'}</div>
-          <div>${fmt(o.total)}</div>
-          <div>${o.station || '—'}</div>
-          <div>${tsToText(o.createdAt)}</div>
-          <div>
-            <span class="pill ${o.status==='refunded'?'bad': (o.status==='completed'?'ok':'')}">
-              ${o.status || '—'}
-            </span>
-          </div>
-          <div><button data-id="${o._id}" class="ghost">Open</button></div>
-        `;
-        r.querySelector('button').addEventListener('click', () => openModal(o._id));
-        ordersList.appendChild(r);
-      }
+  // default dates (last 7 days)
+  const today = new Date();
+  const start = new Date(); start.setDate(today.getDate()-6);
+  elFrom.value = start.toISOString().slice(0,10);
+  elTo.value = today.toISOString().slice(0,10);
+
+  // load first page live (latest 1000)
+  async function loadFirst(){
+    if (unsub) unsub();
+    buffer = []; lastDoc = null;
+    elList.innerHTML = ""; elEmpty.style.display = "none";
+    const q = db.collection("orders").orderBy("createdAt","desc").limit(1000);
+    unsub = q.onSnapshot(snap=>{
+      buffer = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+      applyFilters();
+      lastDoc = snap.docs[snap.docs.length-1] || null;
+      elMore.style.display = lastDoc ? "inline-block" : "none";
+    });
+  }
+
+  // load more (older) once, not live
+  async function loadMore(){
+    if (!lastDoc) return;
+    const q = db.collection("orders").orderBy("createdAt","desc").startAfter(lastDoc).limit(1000);
+    const snap = await q.get();
+    buffer = buffer.concat(snap.docs.map(d=>({ id:d.id, ...d.data() })));
+    applyFilters();
+    lastDoc = snap.docs[snap.docs.length-1] || null;
+    elMore.style.display = lastDoc ? "inline-block" : "none";
+  }
+
+  function applyFilters(){
+    const q = (elSearch.value||"").trim().toLowerCase();
+    const s = elStatus.value;
+    const fd = elFrom.value ? new Date(elFrom.value+"T00:00:00").getTime() : null;
+    const td = elTo.value ? new Date(elTo.value+"T23:59:59").getTime() : null;
+
+    const rows = buffer.filter(o=>{
+      if (q && !(o.customer||"").toLowerCase().includes(q)) return false;
+      if (s !== "any" && (o.status||"") !== s) return false;
+      const ms = o.createdAt || 0;
+      if (fd && ms < fd) return false;
+      if (td && ms > td) return false;
+      return true;
+    });
+
+    elList.innerHTML = "";
+    if (!rows.length){ elEmpty.style.display = "block"; return; }
+    elEmpty.style.display = "none";
+
+    rows.forEach(o=>{
+      const row = document.createElement("div");
+      row.className = "grid row";
+      row.innerHTML = `
+        <div>${o.customer||"—"}</div>
+        <div>${fmt(o.total)}</div>
+        <div>${o.station||"—"}</div>
+        <div>${tsText(o.createdAt)}</div>
+        <div>${o.status==="refunded" ? '<span class="pill bad">refunded</span>' :
+                 o.status==="picked_up" ? '<span class="pill ok">picked_up</span>' :
+                 `<span class="pill">${o.status||"—"}</span>`}</div>
+        <div><button class="ghost" data-id="${o.id}">Open</button></div>`;
+      row.querySelector("button").addEventListener("click", ()=>openModal(o.id));
+      elList.appendChild(row);
+    });
+  }
+
+  async function openModal(id){
+    const o = buffer.find(x=>x.id===id);
+    if (!o) return;
+
+    m_id.textContent = id;
+    m_cust.textContent = o.customer || "—";
+    m_total.textContent = fmt(o.total);
+    m_station.textContent = o.station || "—";
+    m_created.textContent = tsText(o.createdAt);
+    m_status.textContent = o.status || "—";
+    m_number.textContent = o.number ?? "—";
+
+    m_items.innerHTML = "";
+    (Array.isArray(o.items) ? o.items : []).forEach(it=>{
+      itemLines(it).forEach(L=>{
+        const div = document.createElement("div");
+        div.className = "r";
+        div.innerHTML = `<div>${L.label}</div><div>${L.qty}</div><div>${fmt(L.price)}</div><div>${fmt(lineTotal(L.qty,L.price))}</div>`;
+        m_items.appendChild(div);
+      });
+    });
+
+    // Enable/disable refund button based on status + auth
+    btnRefund.disabled = (o.status==="refunded");
+    btnRefund.dataset.id = id;
+    btnRefund.dataset.total = Number(o.total||0);
+    dlg.showModal();
+  }
+
+  btnClose.addEventListener("click",()=>dlg.close());
+
+  // Refund flow: mark order, log audit
+  btnRefund.addEventListener("click", async ()=>{
+    const u = auth.currentUser;
+    if (!u || !ADMIN_EMAILS.includes(u.email)){
+      alert("You must be signed in as an admin to refund.");
+      return;
     }
+    const id = btnRefund.dataset.id;
+    const reason = prompt("Refund reason (optional):","") || null;
+    if (!confirm("Confirm refund of this entire order?")) return;
 
-    function applyClientFilters() {
-      const q = (searchInput.value || '').trim().toLowerCase();
-      const stat = statusFilter.value;
-      const fd = fromDate.value ? new Date(fromDate.value + 'T00:00:00') : null;
-      const td = toDate.value ? new Date(toDate.value + 'T23:59:59') : null;
-
-      const filtered = cachedOrders.filter(o => {
-        if (q && !(o.customerName||'').toLowerCase().includes(q)) return false;
-        if (stat !== 'any' && (o.status||'') !== stat) return false;
-        const d = o.createdAt?.toDate ? o.createdAt.toDate() : (o.createdAt? new Date(o.createdAt): null);
-        if (fd && d && d < fd) return false;
-        if (td && d && d > td) return false;
-        return true;
+    const now = Date.now();
+    try{
+      const ref = db.collection("orders").doc(id);
+      await ref.update({
+        status:"refunded",
+        refunded:true,
+        refundedAt:now,
+        refundReason:reason,
+        refundedBy:u.email
       });
 
-      renderRows(filtered);
+      // read a copy for audit
+      const snap = await ref.get();
+      const o = snap.data() || {};
+      await db.collection("refunds").add({
+        orderId:id,
+        customer:o.customer||null,
+        total:o.total||0,
+        station:o.station||null,
+        createdAt:o.createdAt||null,
+        refundedAt:now,
+        refundedBy:u.email,
+        refundReason:reason,
+        items:o.items||[]
+      });
+
+      alert("Order refunded.");
+      dlg.close();
+    }catch(e){
+      console.error(e);
+      alert("Refund failed. See console.");
     }
+  });
 
-    applyFilters.addEventListener('click', applyClientFilters);
-    searchInput.addEventListener('input', applyClientFilters);
+  // wire controls
+  elApply.addEventListener("click", applyFilters);
+  elSearch.addEventListener("input", applyFilters);
+  elMore.addEventListener("click", loadMore);
 
-    // Live subscription (most recent 500; adjust as you like)
-    // If you want true date-filtered server queries, we can add range conditions w/ a composite index.
-    const qLive = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(500));
-    onSnapshot(qLive, (snap) => {
-      cachedOrders = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-      applyClientFilters();
-    });
-
-    async function openModal(id) {
-      const order = cachedOrders.find(x => x._id === id);
-      if (!order) return;
-
-      currentSelection = order;
-      mName.textContent = order.customerName || '—';
-      mId.textContent = order._id;
-      mTotal.textContent = fmt(order.total);
-      mStation.textContent = order.station || '—';
-      mCreated.textContent = tsToText(order.createdAt);
-      mStatus.textContent = order.status || '—';
-
-      const items = Array.isArray(order.items) ? order.items : [];
-      mItems.innerHTML = '';
-      for (const it of items) {
-        const line = Number((it.qty||1) * (it.price||0));
-        const div = document.createElement('div');
-        div.className = 'r';
-        div.innerHTML = `
-          <div>${it.name || '—'}</div>
-          <div>${it.qty ?? 1}</div>
-          <div>${fmt(it.price || 0)}</div>
-          <div>${fmt(line)}</div>
-        `;
-        mItems.appendChild(div);
-      }
-
-      // toggle refund button
-      refundBtn.disabled = (order.status === 'refunded');
-      orderModal.showModal();
-    }
-
-    closeModal.addEventListener('click', () => orderModal.close());
-
-    refundBtn.addEventListener('click', async () => {
-      if (!currentSelection) return;
-      if (currentSelection.status === 'refunded') return;
-
-      const reason = prompt("Refund reason (optional):", "");
-      if (!confirm("Confirm refund this order?\nThis marks the order as refunded and logs it.")) return;
-
-      try {
-        // mark order as refunded
-        const orderRef = doc(db, 'orders', currentSelection._id);
-        await updateDoc(orderRef, {
-          status: 'refunded',
-          refunded: true,
-          refundedAt: serverTimestamp(),
-          refundReason: reason || null
-        });
-
-        // log refund entry
-        await addDoc(collection(db, 'refunds'), {
-          orderId: currentSelection._id,
-          customerName: currentSelection.customerName || null,
-          total: currentSelection.total || 0,
-          station: currentSelection.station || null,
-          items: currentSelection.items || [],
-          createdAt: currentSelection.createdAt || null,
-          refundedAt: serverTimestamp(),
-          refundReason: reason || null
-        });
-
-        alert('Order refunded.');
-        orderModal.close();
-
-      } catch (e) {
-        console.error(e);
-        alert('Refund failed. Check console/logs.');
-      }
-    });
-
-    // Set default date range (last 7 days)
-    const today = new Date();
-    const start = new Date(); start.setDate(today.getDate()-6);
-    fromDate.value = start.toISOString().slice(0,10);
-    toDate.value = today.toISOString().slice(0,10);
+  // kick off
+  loadFirst();
   </script>
 </body>
 </html>
