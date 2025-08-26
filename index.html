@@ -21,7 +21,7 @@
   .card h3{margin:0 0 8px 0}
   .muted{color:var(--muted);font-size:13px}
   a.btn{display:inline-block;margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--accent);color:#fff;text-decoration:none}
-  code{font-family:ui-monospace,monospace;font-size:12px;background:#0b101a;border:1px solid #1b2230;border-radius:8px;padding:2px 6px;color:#dbe5f6}
+  code{font-family:ui-monospace,monospace;font-size:12px;background:#0c111b;border:1px solid #1b2230;border-radius:8px;padding:2px 6px;color:#dbe5f6}
   footer{margin-top:20px;color:var(--muted);font-size:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
   .pill{display:inline-block;border:1px solid var(--border);background:#0f1420;color:#a7b0bd;border-radius:999px;padding:6px 10px}
   .status{margin:0 0 20px 0;display:flex;gap:12px;flex-wrap:wrap}
@@ -33,7 +33,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Festival POS – Launchpad <span class="muted" style="font-size:12px">v2025‑08‑20</span></h1>
+  <h1>Festival POS – Launchpad <span class="muted" style="font-size:12px">v2025-08-20</span></h1>
   <p class="sub">Tap a tile below on each iPad to open the correct screen. For best results, in Safari use <b>Share → Add to Home Screen</b>.</p>
 
   <!-- Quick checks -->
@@ -43,24 +43,25 @@
     <span id="net" class="warn">Checking Network…</span>
   </div>
 
-  <!-- OPERATIONS -->
+  <!-- POS & Displays -->
   <div class="section">
-    <h2>Operations</h2>
+    <h2>POS & Displays</h2>
     <div class="grid">
+
       <!-- POS -->
       <div class="card">
-        <h3>Point of Sale (POS)</h3>
-        <p class="muted">Cashier order entry. Supports customer name, station filter, and optional item images/modifiers.</p>
+        <h3>POS — Order Station</h3>
+        <p class="muted">Take orders and print receipts (Epson). Auto-print enabled.</p>
         <a class="btn" href="pos-cloudmenu.html">Open POS</a>
       </div>
 
-      <!-- KDS (auth) -->
+      <!-- KDS Auth (Stations) -->
       <div class="card">
         <h3>Kitchen Display (KDS)</h3>
-        <p class="muted">Per‑iPad station filters; “Active” + “Completed” views; sound on new tickets.</p>
+        <p class="muted">Prep queues by station. Use the buttons inside to open each KDS (“Active / Completed”).</p>
         <a class="btn" href="kds-auth.html">Open KDS</a>
         <ul class="muted">
-          <li>URL filter: <code>kds-auth.html?station=Grill,Fryer</code></li>
+          <li>Use station buttons for Grill, Shawarma and Gyro, Veggie and More, etc.</li>
         </ul>
       </div>
 
@@ -74,7 +75,7 @@
       <!-- Optional: Public Pickup -->
       <div class="card">
         <h3>Pickup Display (Public)</h3>
-        <p class="muted">Read‑only board for customers. Shows Ready orders and names.</p>
+        <p class="muted">Read-only board for customers. Shows Ready orders and names.</p>
         <a class="btn" href="pickup-v3.html">Open Public Pickup</a>
       </div>
     </div>
@@ -87,32 +88,46 @@
       <!-- Menu Admin -->
       <div class="card">
         <h3>Menu Admin</h3>
-        <p class="muted">Manage items: Name, Price, Station, Active, Image URL. Inline editing. Admin sign‑in required.</p>
+        <p class="muted">Manage items: Name, Price, Station, Active, Image URL. Inline editing. Admin sign-in required.</p>
         <a class="btn" href="menu-admin.html">Open Menu Admin</a>
         <ul class="muted">
           <li>Admins: <code>smsmofri@gmail.com</code>, <code>george.henin98@gmail.com</code></li>
         </ul>
       </div>
 
-      <!-- Modifiers Admin -->
+      <!-- Mod Groups Admin -->
       <div class="card">
-        <h3>Modifiers Admin</h3>
-        <p class="muted">Create/edit modifier groups (e.g., “Pick 3 meats”), then assign to items.</p>
-        <a class="btn" href="mod-groups-admin.html">Open Modifiers Admin</a>
+        <h3>Modifier Groups</h3>
+        <p class="muted">Create and edit modifier groups/options used by menu items.</p>
+        <a class="btn" href="mod-groups-admin.html">Open Modifier Groups</a>
       </div>
 
       <!-- Stations Admin -->
       <div class="card">
         <h3>Stations Admin</h3>
-        <p class="muted">Edit the list of kitchen stations (e.g., Grill, Fryer, Drinks, Pizza). KDS & POS read these dynamically.</p>
+        <p class="muted">Create / rename kitchen stations for routing and reporting.</p>
         <a class="btn" href="stations-admin.html">Open Stations Admin</a>
+      </div>
+
+      <!-- NEW: Back Office — Orders -->
+      <div class="card">
+        <h3>Back Office — Orders</h3>
+        <p class="muted">Search by name, view full order (with variants), refund & log audit.</p>
+        <a class="btn" href="backoffice-orders.html">Open Orders Manager</a>
+      </div>
+
+      <!-- NEW: Back Office — Sales & Analytics -->
+      <div class="card">
+        <h3>Back Office — Sales & Analytics</h3>
+        <p class="muted">Daily totals (default: non-refunded), item breakdown, and mod/variant impact. Filters + CSV export.</p>
+        <a class="btn" href="backoffice-analytics.html">Open Sales & Analytics</a>
       </div>
     </div>
   </div>
 
   <footer>
     <span class="pill">Firebase: <b>churchfestivalpos</b></span>
-    <span class="muted">Tip: If an iPad looks stale, pull down to refresh (or add <code>?nocache=...</code> to the URL).</span>
+    <span class="muted">Tip: If an iPad looks stale, pull down to refresh (or add <code>?nocache=…</code> to the URL).</span>
   </footer>
 </div>
 
