@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Back Office — Sales & Analytics</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; background:var(--bg); color:var(--text); }
+    header { display:flex; gap:12px; align-items:center; padding:14px 18px; border-bottom:1px solid #1f2937; position:sticky; top:0; background:rgba(15,23,42,.85); backdrop-filter: blur(6px); }
+    header h1 { font-size:18px; margin:0 12px 0 0; }
+    input, select, button { background:#0b1220; color:var(--text); border:1px solid #1f2937; border-radius:10px; padding:10px 12px; }
+    button { cursor:pointer; }
+    button.primary { background:linear-gradient(180deg,#0ea5e9,#0284c7); border:none; }
+    .wrap { padding:18px; max-width:1200px; margin:0 auto; }
+    .cards { display:grid; grid-template-columns: repeat(3, 1fr); gap:14px; }
+    .card { background:var(--card); border:1px solid #1f2937; border-radius:16px; padding:14px; }
+    .metric { font-size:28px; font-weight:700; }
+    .muted { color:var(--muted); font-size:12px; }
+    .chart-card { padding:16px; }
+    .filters { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
+    .table { margin-top:16px; border:1px solid #1f2937; border-radius:16px; overflow:hidden; }
+    .thead, .trow { display:grid; grid-template-columns: 1.6fr 0.6fr 0.8fr 0.8fr; gap:8px; padding:10px 12px; }
+    .thead { background:#0b1220; border-bottom:1px solid #1f2937; font-weight:600; color:#cbd5e1; }
+    .trow { border-bottom:1px solid #0b1220; }
+    .pill { font-size:12px; padding:3px 8px; border-radius:999px; border:1px solid #334155; color:#cbd5e1; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Back Office — Sales & Analytics</h1>
+    <input id="fromDate" type="date" />
+    <input id="toDate" type="date" />
+    <select id="stationFilter">
+      <option value="any">All stations</option>
+    </select>
+    <input id="itemSearch" placeholder="Search item…" />
+    <button id="apply" class="primary">Apply</button>
+    <div style="flex:1"></div>
+    <a href="./backoffice-orders.html"><button>Orders</button></a>
+  </header>
+
+  <div class="wrap">
+    <div class="cards">
+      <div class="card">
+        <div class="muted">Total Sales</div>
+        <div id="mTotal" class="metric">$0.00</div>
+      </div>
+      <div class="card">
+        <div class="muted">Orders Count</div>
+        <div id="mOrders" class="metric">0</div>
+      </div>
+      <div class="card">
+        <div class="muted">Refunds</div>
+        <div id="mRefunds" class="metric">$0.00</div>
+      </div>
+    </div>
+
+    <div class="card chart-card" style="margin-top:16px;">
+      <div class="muted">Daily Sales</div>
+      <canvas id="salesChart" height="120"></canvas>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="filters">
+        <span class="muted">Item breakdown (qty & revenue). Refunded orders are excluded.</span>
+      </div>
+      <div class="table">
+        <div class="thead">
+          <div>Item</div><div>Qty</div><div>Revenue</div><div>Station</div>
+        </div>
+        <div id="itemsBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getFirestore, collection, query, where, orderBy, getDocs
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = window.FIREBASE_CONFIG || {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_BUCKET",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // UI refs
+    const fromDate = document.getElementById('fromDate');
+    const toDate = document.getElementById('toDate');
+    const stationFilter = document.getElementById('stationFilter');
+    const itemSearch = document.getElementById('itemSearch');
+    const applyBtn = document.getElementById('apply');
+
+    const mTotal = document.getElementById('mTotal');
+    const mOrders = document.getElementById('mOrders');
+    const mRefunds = document.getElementById('mRefunds');
+    const itemsBody = document.getElementById('itemsBody');
+
+    // default dates (last 14 days)
+    const today = new Date();
+    const start = new Date(); start.setDate(today.getDate()-13);
+    fromDate.value = start.toISOString().slice(0,10);
+    toDate.value = today.toISOString().slice(0,10);
+
+    // Sales chart
+    const ctx = document.getElementById('salesChart').getContext('2d');
+    let chart = new Chart(ctx, {
+      type: 'line',
+      data: { labels: [], datasets: [{ label: 'Daily Sales', data: [] }] },
+      options: {
+        responsive:true,
+        plugins:{ legend:{ display:false }},
+        scales:{ x:{ grid:{ display:false } }, y:{ ticks:{ callback:v=>'$'+Number(v).toFixed(0) } } }
+      }
+    });
+
+    // Load stations list once from existing orders (so filter feels native)
+    async function loadStations() {
+      const q1 = query(collection(db,'orders'), orderBy('createdAt','desc'));
+      const snap = await getDocs(q1);
+      const stations = new Set();
+      snap.forEach(d=>{
+        const st = d.data().station;
+        if (st) stations.add(st);
+      });
+      const arr = Array.from(stations).sort();
+      for (const s of arr) {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        stationFilter.appendChild(opt);
+      }
+    }
+
+    function fmt(n){ return `$${(Number(n||0)).toFixed(2)}`; }
+    function ymd(d){ return d.toISOString().slice(0,10); }
+
+    async function run() {
+      const fd = new Date(fromDate.value + 'T00:00:00');
+      const td = new Date(toDate.value + 'T23:59:59');
+      const station = stationFilter.value;
+
+      // NOTE: For server-side date filtering, we assume an index on createdAt.
+      // If you prefer doing it fully server-side, we can add where(createdAt, '>=', ..) etc
+      // and a 'status != refunded' filter using a field equal-to on status and filter client-side for refund.
+      const q1 = query(collection(db,'orders'), orderBy('createdAt','desc'));
+      const snap = await getDocs(q1);
+
+      // Prepare structures
+      const perDay = new Map();     // yyy-mm-dd -> total
+      const itemsAgg = new Map();   // key:name|station -> {name, station, qty, revenue}
+      let total = 0;
+      let ordersCount = 0;
+      let refundsTotal = 0;
+
+      snap.forEach(d=>{
+        const o = d.data();
+        const created = o.createdAt?.toDate ? o.createdAt.toDate() : null;
+        if (!created) return;
+        if (created < fd || created > td) return;
+
+        // Station filter (order-level)
+        if (station !== 'any' && (o.station||'') !== station) return;
+
+        // Refund handling
+        if (o.status === 'refunded') {
+          refundsTotal += Number(o.total || 0);
+          return; // exclude from totals & item breakdowns
+        }
+
+        total += Number(o.total || 0);
+        ordersCount += 1;
+
+        const dayKey = ymd(created);
+        perDay.set(dayKey, (perDay.get(dayKey)||0) + Number(o.total||0));
+
+        // Items breakdown (we also respect station filter at item level)
+        const items = Array.isArray(o.items) ? o.items : [];
+        for (const it of items) {
+          // If filtering by station, either keep order station filter above,
+          // OR use per-item station if you track that: prefer per-item if present
+          const itStation = it.station || o.station || null;
+          if (station !== 'any' && itStation !== station) continue;
+
+          const key = `${it.name||'—'}|${itStation||'—'}`;
+          const prev = itemsAgg.get(key) || { name: it.name||'—', station: itStation||'—', qty:0, revenue:0 };
+          const qty = Number(it.qty || 1);
+          const price = Number(it.price || 0);
+          prev.qty += qty;
+          prev.revenue += qty * price;
+          itemsAgg.set(key, prev);
+        }
+      });
+
+      // Update metrics
+      mTotal.textContent = fmt(total);
+      mOrders.textContent = String(ordersCount);
+      mRefunds.textContent = fmt(refundsTotal);
+
+      // Build full date axis (inclusive)
+      const days = [];
+      for (let d=new Date(fd); d<=td; d.setDate(d.getDate()+1)) {
+        days.push(ymd(d));
+      }
+      const data = days.map(k => perDay.get(k)||0);
+      chart.data.labels = days;
+      chart.data.datasets[0].data = data;
+      chart.update();
+
+      // Render item table with optional item search
+      const q = (itemSearch.value||'').trim().toLowerCase();
+      const arr = Array.from(itemsAgg.values())
+        .filter(x => !q || (x.name||'').toLowerCase().includes(q))
+        .sort((a,b)=> b.revenue - a.revenue);
+
+      itemsBody.innerHTML = '';
+      for (const row of arr) {
+        const div = document.createElement('div');
+        div.className = 'trow';
+        div.innerHTML = `
+          <div>${row.name}</div>
+          <div>${row.qty}</div>
+          <div>${fmt(row.revenue)}</div>
+          <div><span class="pill">${row.station}</span></div>
+        `;
+        itemsBody.appendChild(div);
+      }
+    }
+
+    applyBtn.addEventListener('click', run);
+    itemSearch.addEventListener('input', run);
+
+    await loadStations();
+    await run();
+  </script>
+</body>
+</html>
