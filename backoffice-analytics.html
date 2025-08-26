@@ -1,43 +1,49 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Back Office — Sales & Analytics</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --text:#e5e7eb; }
-    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; background:var(--bg); color:var(--text); }
-    header { display:flex; gap:12px; align-items:center; padding:14px 18px; border-bottom:1px solid #1f2937; position:sticky; top:0; background:rgba(15,23,42,.85); backdrop-filter: blur(6px); }
-    header h1 { font-size:18px; margin:0 12px 0 0; }
-    input, select, button { background:#0b1220; color:var(--text); border:1px solid #1f2937; border-radius:10px; padding:10px 12px; }
-    button { cursor:pointer; }
-    button.primary { background:linear-gradient(180deg,#0ea5e9,#0284c7); border:none; }
-    .wrap { padding:18px; max-width:1200px; margin:0 auto; }
-    .cards { display:grid; grid-template-columns: repeat(3, 1fr); gap:14px; }
-    .card { background:var(--card); border:1px solid #1f2937; border-radius:16px; padding:14px; }
-    .metric { font-size:28px; font-weight:700; }
-    .muted { color:var(--muted); font-size:12px; }
-    .chart-card { padding:16px; }
-    .filters { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
-    .table { margin-top:16px; border:1px solid #1f2937; border-radius:16px; overflow:hidden; }
-    .thead, .trow { display:grid; grid-template-columns: 1.6fr 0.6fr 0.8fr 0.8fr; gap:8px; padding:10px 12px; }
-    .thead { background:#0b1220; border-bottom:1px solid #1f2937; font-weight:600; color:#cbd5e1; }
-    .trow { border-bottom:1px solid #0b1220; }
-    .pill { font-size:12px; padding:3px 8px; border-radius:999px; border:1px solid #334155; color:#cbd5e1; }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Back Office — Sales & Analytics</title>
+<style>
+  :root{
+    --bg:#0d0f13; --card:#0f141e; --fg:#f5f7fa; --muted:#95a0ad;
+    --border:#1b2230; --accent:#5b9bff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  header{position:sticky;top:0;background:#0d0f13d0;backdrop-filter:saturate(1.2) blur(6px);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;gap:10px;align-items:center;z-index:5}
+  h1{margin:0;font-size:18px}
+  input,select,button{background:#0c111b;color:var(--fg);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  button{cursor:pointer}
+  .primary{background:var(--accent);color:#fff;border:none}
+  .wrap{max-width:1200px;margin:0 auto;padding:16px}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
+  .metric{font-size:28px;font-weight:700}
+  .muted{color:var(--muted);font-size:13px}
+  .table{margin-top:12px;border:1px solid var(--border);border-radius:16px;overflow:hidden}
+  .thead,.trow{display:grid;grid-template-columns:1.6fr 0.6fr 0.8fr 0.8fr;gap:8px;padding:10px 12px}
+  .thead{background:#0c111b;border-bottom:1px solid var(--border);font-weight:600;color:#cbd5e1}
+  .trow{border-bottom:1px solid #0e1320}
+  .pill{display:inline-block;border:1px solid var(--border);background:#0f1420;color:#a7b0bd;border-radius:999px;padding:4px 8px;font-size:12px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .little{font-size:12px}
+  .msel{min-width:220px}
+</style>
 </head>
 <body>
   <header>
     <h1>Back Office — Sales & Analytics</h1>
-    <input id="fromDate" type="date" />
-    <input id="toDate" type="date" />
-    <select id="stationFilter">
-      <option value="any">All stations</option>
-    </select>
-    <input id="itemSearch" placeholder="Search item…" />
-    <button id="apply" class="primary">Apply</button>
+    <input id="from" type="date"/><input id="to" type="date"/>
+    <select id="stations" class="msel" multiple title="Stations (multi-select)"></select>
+    <input id="itemSearch" placeholder="Search item…"/>
+    <label class="row little" title="If ON, only count orders with status = picked_up">
+      <input type="checkbox" id="pickedOnly"/> picked_up only
+    </label>
+    <button id="run" class="primary">Run</button>
     <div style="flex:1"></div>
-    <a href="./backoffice-orders.html"><button>Orders</button></a>
+    <a href="backoffice-orders.html"><button>Orders</button></a>
   </header>
 
   <div class="wrap">
@@ -45,204 +51,270 @@
       <div class="card">
         <div class="muted">Total Sales</div>
         <div id="mTotal" class="metric">$0.00</div>
+        <div class="little muted">Default counts all non-refunded orders</div>
       </div>
       <div class="card">
         <div class="muted">Orders Count</div>
         <div id="mOrders" class="metric">0</div>
       </div>
       <div class="card">
-        <div class="muted">Refunds</div>
+        <div class="muted">Refunds (excluded)</div>
         <div id="mRefunds" class="metric">$0.00</div>
       </div>
     </div>
 
-    <div class="card chart-card" style="margin-top:16px;">
-      <div class="muted">Daily Sales</div>
-      <canvas id="salesChart" height="120"></canvas>
+    <div class="card" style="margin-top:16px">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div class="muted">Daily Sales</div>
+        <div class="row little">
+          <button id="exportDaily">Export CSV</button>
+        </div>
+      </div>
+      <canvas id="chart" height="120"></canvas>
     </div>
 
-    <div class="card" style="margin-top:16px;">
-      <div class="filters">
-        <span class="muted">Item breakdown (qty & revenue). Refunded orders are excluded.</span>
-      </div>
-      <div class="table">
-        <div class="thead">
-          <div>Item</div><div>Qty</div><div>Revenue</div><div>Station</div>
+    <div class="grid2" style="margin-top:16px">
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <div class="muted">Item Breakdown (qty & revenue) — excludes refunded</div>
+          <div class="row little">
+            <button id="exportItems">Export CSV</button>
+          </div>
         </div>
-        <div id="itemsBody"></div>
+        <div class="table">
+          <div class="thead"><div>Item</div><div>Qty</div><div>Revenue</div><div>Station</div></div>
+          <div id="itemsBody"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <div class="muted">Mod / Variant Impact (qty & revenue from mod prices)</div>
+          <div class="row little">
+            <button id="exportMods">Export CSV</button>
+          </div>
+        </div>
+        <div class="table">
+          <div class="thead"><div>Variant</div><div>Qty</div><div>Revenue</div><div>Station</div></div>
+          <div id="modsBody"></div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+  <script>
+  // ---------- Firebase ----------
+  const config = { apiKey:"AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM", authDomain:"churchfestivalpos.firebaseapp.com", projectId:"churchfestivalpos" };
+  firebase.initializeApp(config);
+  const db = firebase.firestore();
 
-  <!-- Firebase -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import {
-      getFirestore, collection, query, where, orderBy, getDocs
-    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  // ---------- UI refs ----------
+  const elFrom = document.getElementById("from");
+  const elTo = document.getElementById("to");
+  const elStations = document.getElementById("stations");
+  const elItemSearch = document.getElementById("itemSearch");
+  const elPickedOnly = document.getElementById("pickedOnly");
+  const btnRun = document.getElementById("run");
+  const mTotal = document.getElementById("mTotal");
+  const mOrders = document.getElementById("mOrders");
+  const mRefunds = document.getElementById("mRefunds");
+  const itemsBody = document.getElementById("itemsBody");
+  const modsBody = document.getElementById("modsBody");
 
-    const firebaseConfig = window.FIREBASE_CONFIG || {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_DOMAIN",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_BUCKET",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+  const btnDailyCSV = document.getElementById("exportDaily");
+  const btnItemsCSV = document.getElementById("exportItems");
+  const btnModsCSV  = document.getElementById("exportMods");
 
-    // UI refs
-    const fromDate = document.getElementById('fromDate');
-    const toDate = document.getElementById('toDate');
-    const stationFilter = document.getElementById('stationFilter');
-    const itemSearch = document.getElementById('itemSearch');
-    const applyBtn = document.getElementById('apply');
+  // defaults: last 14 days
+  const today = new Date();
+  const start = new Date(); start.setDate(today.getDate()-13);
+  elFrom.value = start.toISOString().slice(0,10);
+  elTo.value = today.toISOString().slice(0,10);
 
-    const mTotal = document.getElementById('mTotal');
-    const mOrders = document.getElementById('mOrders');
-    const mRefunds = document.getElementById('mRefunds');
-    const itemsBody = document.getElementById('itemsBody');
+  // Chart
+  const ctx = document.getElementById("chart").getContext("2d");
+  let chart = new Chart(ctx,{
+    type:"line",
+    data:{ labels:[], datasets:[{label:"Daily Sales", data:[]}] },
+    options:{ responsive:true, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{ticks:{callback:v=>'$'+Number(v).toFixed(0)}}}}
+  });
 
-    // default dates (last 14 days)
-    const today = new Date();
-    const start = new Date(); start.setDate(today.getDate()-13);
-    fromDate.value = start.toISOString().slice(0,10);
-    toDate.value = today.toISOString().slice(0,10);
+  const fmt = n => `$${(Number(n||0)).toFixed(2)}`;
+  const ymd = d => d.toISOString().slice(0,10);
+  const toMs = s => new Date(s).getTime();
 
-    // Sales chart
-    const ctx = document.getElementById('salesChart').getContext('2d');
-    let chart = new Chart(ctx, {
-      type: 'line',
-      data: { labels: [], datasets: [{ label: 'Daily Sales', data: [] }] },
-      options: {
-        responsive:true,
-        plugins:{ legend:{ display:false }},
-        scales:{ x:{ grid:{ display:false } }, y:{ ticks:{ callback:v=>'$'+Number(v).toFixed(0) } } }
-      }
+  // stations list (once)
+  async function loadStations(){
+    const snap = await db.collection("orders").orderBy("createdAt","desc").limit(800).get();
+    const set = new Set();
+    snap.forEach(d=>{ const st = d.data().station; if (st) set.add(st); });
+    Array.from(set).sort().forEach(st=>{
+      const o = document.createElement("option"); o.value = st; o.textContent = st; elStations.appendChild(o);
+    });
+  }
+
+  // helpers to extract variant/mod lines
+  function variantLines(item){
+    const base = item.name || "—";
+    const qtyBase = Number(item.qty||1);
+    const res = [];
+
+    const mods = item.mods;
+    if (Array.isArray(mods) && mods.length && mods[0]?.options){ // group->options
+      mods.forEach(g=>{
+        (g.options||[]).forEach(opt=>{
+          res.push({ name:`${base} – ${g.groupName}: ${opt.name}`, qty: qtyBase, price: Number(opt.price||0), station: (item.station||null) });
+        });
+      });
+    } else if (Array.isArray(mods)) { // simple array [{name, price, qty?}]
+      mods.forEach(m=>{
+        res.push({ name:`${base} – ${m.name}`, qty: Number(m.qty||qtyBase), price: Number(m.price||0), station:(item.station||null) });
+      });
+    } else if (mods && typeof mods === 'object') { // single object
+      res.push({ name:`${base} – ${mods.name}`, qty: Number(mods.qty||qtyBase), price: Number(mods.price||0), station:(item.station||null) });
+    }
+    return res;
+  }
+
+  function getSelectedStations(){
+    return Array.from(elStations.selectedOptions).map(o=>o.value);
+  }
+
+  function stationAllowed(orderStation, itemStation, selected){
+    if (!selected.length) return true; // none selected == all
+    const st = itemStation || orderStation || null;
+    return st && selected.includes(st);
+  }
+
+  async function run(){
+    const fd = toMs(elFrom.value+"T00:00:00");
+    const td = toMs(elTo.value+"T23:59:59");
+    const stationSel = getSelectedStations();
+    const pickedOnly = elPickedOnly.checked;
+    const searchQ = (elItemSearch.value||"").trim().toLowerCase();
+
+    // server read (client filtering for status/date to avoid composite-index surprises)
+    const snap = await db.collection("orders").orderBy("createdAt","desc").get();
+
+    const perDay = new Map();        // yyyy-mm-dd -> total
+    const itemsAgg = new Map();      // key name|station -> {name, station, qty, revenue}
+    const modsAgg = new Map();       // key variant|station -> {name, station, qty, revenue}
+    let total = 0, ordersCount = 0, refundsTotal = 0;
+
+    snap.forEach(doc=>{
+      const o = doc.data() || {};
+      const ms = o.createdAt || 0;
+      if (ms < fd || ms > td) return;
+
+      // exclude refunded from totals + breakdowns
+      if (o.status === "refunded"){ refundsTotal += Number(o.total||0); return; }
+
+      // optional picked_up-only view
+      if (pickedOnly && o.status !== "picked_up") return;
+
+      // per-day totals
+      const day = ymd(new Date(ms));
+      perDay.set(day, (perDay.get(day)||0) + Number(o.total||0));
+      ordersCount += 1;
+      total += Number(o.total||0);
+
+      const items = Array.isArray(o.items) ? o.items : [];
+      items.forEach(it=>{
+        const itStation = it.station || o.station || null;
+        if (!stationAllowed(o.station, it.station, stationSel)) return;
+
+        // base item aggregation
+        const key = `${it.name||"—"}|${itStation||"—"}`;
+        const prev = itemsAgg.get(key) || { name:it.name||"—", station:itStation||"—", qty:0, revenue:0 };
+        const qty = Number(it.qty||1), price = Number(it.price||0);
+        prev.qty += qty;
+        prev.revenue += qty * price;
+        itemsAgg.set(key, prev);
+
+        // variant/mod impact aggregation (based on mod prices)
+        variantLines(it).forEach(v=>{
+          const k = `${v.name}|${(v.station||"—")}`;
+          const pv = modsAgg.get(k) || { name:v.name, station:(v.station||"—"), qty:0, revenue:0 };
+          pv.qty += Number(v.qty||0);
+          pv.revenue += Number(v.qty||0) * Number(v.price||0);
+          modsAgg.set(k, pv);
+        });
+      });
     });
 
-    // Load stations list once from existing orders (so filter feels native)
-    async function loadStations() {
-      const q1 = query(collection(db,'orders'), orderBy('createdAt','desc'));
-      const snap = await getDocs(q1);
-      const stations = new Set();
-      snap.forEach(d=>{
-        const st = d.data().station;
-        if (st) stations.add(st);
-      });
-      const arr = Array.from(stations).sort();
-      for (const s of arr) {
-        const opt = document.createElement('option');
-        opt.value = s;
-        opt.textContent = s;
-        stationFilter.appendChild(opt);
-      }
-    }
+    // Update metrics
+    mTotal.textContent = fmt(total);
+    mOrders.textContent = String(ordersCount);
+    mRefunds.textContent = fmt(refundsTotal);
 
-    function fmt(n){ return `$${(Number(n||0)).toFixed(2)}`; }
-    function ymd(d){ return d.toISOString().slice(0,10); }
+    // Daily chart
+    const days = [];
+    for (let d=new Date(fd); d<=td; d.setDate(d.getDate()+1)) days.push(ymd(d));
+    const dayData = days.map(k=> perDay.get(k)||0 );
+    chart.data.labels = days;
+    chart.data.datasets[0].data = dayData;
+    chart.update();
 
-    async function run() {
-      const fd = new Date(fromDate.value + 'T00:00:00');
-      const td = new Date(toDate.value + 'T23:59:59');
-      const station = stationFilter.value;
+    // Render item table
+    const itemsArr = Array.from(itemsAgg.values())
+      .filter(x=> !searchQ || (x.name||"").toLowerCase().includes(searchQ))
+      .sort((a,b)=> b.revenue - a.revenue);
+    itemsBody.innerHTML = "";
+    itemsArr.forEach(r=>{
+      const div = document.createElement("div");
+      div.className = "trow";
+      div.innerHTML = `<div>${r.name}</div><div>${r.qty}</div><div>${fmt(r.revenue)}</div><div><span class="pill">${r.station}</span></div>`;
+      itemsBody.appendChild(div);
+    });
 
-      // NOTE: For server-side date filtering, we assume an index on createdAt.
-      // If you prefer doing it fully server-side, we can add where(createdAt, '>=', ..) etc
-      // and a 'status != refunded' filter using a field equal-to on status and filter client-side for refund.
-      const q1 = query(collection(db,'orders'), orderBy('createdAt','desc'));
-      const snap = await getDocs(q1);
+    // Render mods/variants table
+    const modsArr = Array.from(modsAgg.values())
+      .filter(x=> !searchQ || (x.name||"").toLowerCase().includes(searchQ))
+      .sort((a,b)=> b.revenue - a.revenue);
+    modsBody.innerHTML = "";
+    modsArr.forEach(r=>{
+      const div = document.createElement("div");
+      div.className = "trow";
+      div.innerHTML = `<div>${r.name}</div><div>${r.qty}</div><div>${fmt(r.revenue)}</div><div><span class="pill">${r.station}</span></div>`;
+      modsBody.appendChild(div);
+    });
 
-      // Prepare structures
-      const perDay = new Map();     // yyy-mm-dd -> total
-      const itemsAgg = new Map();   // key:name|station -> {name, station, qty, revenue}
-      let total = 0;
-      let ordersCount = 0;
-      let refundsTotal = 0;
+    // CSV exports
+    btnDailyCSV.onclick = ()=>{
+      const rows = [["Date","Sales"]];
+      chart.data.labels.forEach((lab,i)=> rows.push([lab, String(chart.data.datasets[0].data[i]||0)]));
+      downloadCSV(rows,"daily_sales.csv");
+    };
+    btnItemsCSV.onclick = ()=>{
+      const rows = [["Item","Qty","Revenue","Station"]];
+      itemsArr.forEach(r=> rows.push([r.name, String(r.qty), String(r.revenue), r.station]));
+      downloadCSV(rows,"item_breakdown.csv");
+    };
+    btnModsCSV.onclick = ()=>{
+      const rows = [["Variant","Qty","Revenue","Station"]];
+      modsArr.forEach(r=> rows.push([r.name, String(r.qty), String(r.revenue), r.station]));
+      downloadCSV(rows,"mod_variant_impact.csv");
+    };
+  }
 
-      snap.forEach(d=>{
-        const o = d.data();
-        const created = o.createdAt?.toDate ? o.createdAt.toDate() : null;
-        if (!created) return;
-        if (created < fd || created > td) return;
+  function downloadCSV(rows, filename){
+    const csv = rows.map(r=> r.map(x=>{
+      const s = String(x??"");
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+    }).join("," )).join("\n");
+    const blob = new Blob([csv],{type:"text/csv;charset=utf-8;"});
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement("a"),{href:url,download:filename});
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  }
 
-        // Station filter (order-level)
-        if (station !== 'any' && (o.station||'') !== station) return;
+  btnRun.addEventListener("click", run);
+  elItemSearch.addEventListener("input", run);
 
-        // Refund handling
-        if (o.status === 'refunded') {
-          refundsTotal += Number(o.total || 0);
-          return; // exclude from totals & item breakdowns
-        }
-
-        total += Number(o.total || 0);
-        ordersCount += 1;
-
-        const dayKey = ymd(created);
-        perDay.set(dayKey, (perDay.get(dayKey)||0) + Number(o.total||0));
-
-        // Items breakdown (we also respect station filter at item level)
-        const items = Array.isArray(o.items) ? o.items : [];
-        for (const it of items) {
-          // If filtering by station, either keep order station filter above,
-          // OR use per-item station if you track that: prefer per-item if present
-          const itStation = it.station || o.station || null;
-          if (station !== 'any' && itStation !== station) continue;
-
-          const key = `${it.name||'—'}|${itStation||'—'}`;
-          const prev = itemsAgg.get(key) || { name: it.name||'—', station: itStation||'—', qty:0, revenue:0 };
-          const qty = Number(it.qty || 1);
-          const price = Number(it.price || 0);
-          prev.qty += qty;
-          prev.revenue += qty * price;
-          itemsAgg.set(key, prev);
-        }
-      });
-
-      // Update metrics
-      mTotal.textContent = fmt(total);
-      mOrders.textContent = String(ordersCount);
-      mRefunds.textContent = fmt(refundsTotal);
-
-      // Build full date axis (inclusive)
-      const days = [];
-      for (let d=new Date(fd); d<=td; d.setDate(d.getDate()+1)) {
-        days.push(ymd(d));
-      }
-      const data = days.map(k => perDay.get(k)||0);
-      chart.data.labels = days;
-      chart.data.datasets[0].data = data;
-      chart.update();
-
-      // Render item table with optional item search
-      const q = (itemSearch.value||'').trim().toLowerCase();
-      const arr = Array.from(itemsAgg.values())
-        .filter(x => !q || (x.name||'').toLowerCase().includes(q))
-        .sort((a,b)=> b.revenue - a.revenue);
-
-      itemsBody.innerHTML = '';
-      for (const row of arr) {
-        const div = document.createElement('div');
-        div.className = 'trow';
-        div.innerHTML = `
-          <div>${row.name}</div>
-          <div>${row.qty}</div>
-          <div>${fmt(row.revenue)}</div>
-          <div><span class="pill">${row.station}</span></div>
-        `;
-        itemsBody.appendChild(div);
-      }
-    }
-
-    applyBtn.addEventListener('click', run);
-    itemSearch.addEventListener('input', run);
-
-    await loadStations();
-    await run();
+  loadStations().then(run);
   </script>
 </body>
 </html>
