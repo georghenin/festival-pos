@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Back Office — Orders</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --accent:#22d3ee; --ok:#10b981; --warn:#f59e0b; --bad:#ef4444; --text:#e5e7eb; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; background:var(--bg); color:var(--text); }
+    header { display:flex; gap:12px; align-items:center; padding:14px 18px; border-bottom:1px solid #1f2937; position:sticky; top:0; background:rgba(15,23,42,.85); backdrop-filter: blur(6px); }
+    header h1 { font-size:18px; margin:0 12px 0 0; }
+    input, select, button { background:#0b1220; color:var(--text); border:1px solid #1f2937; border-radius:10px; padding:10px 12px; }
+    button { cursor:pointer; }
+    button.primary { background:linear-gradient(180deg,#0ea5e9,#0284c7); border:none; }
+    button.ghost { background:transparent; border:1px dashed #334155; }
+    .wrap { padding:18px; max-width:1200px; margin:0 auto; }
+    .grid { display:grid; grid-template-columns: 2fr 1.2fr 1fr 1.4fr 1fr 1fr; gap:8px; padding:10px 12px; border-bottom:1px solid #1f2937; align-items:center; }
+    .grid.head { font-weight:600; color:#cbd5e1; position:sticky; top:64px; background:#0f172a; z-index:1; }
+    .row { transition: background .15s; }
+    .row:hover { background:#0b1220; }
+    .pill { font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid #334155; color:#cbd5e1; display:inline-block; }
+    .pill.ok { border-color:#064e3b; color:#a7f3d0; }
+    .pill.bad { border-color:#7f1d1d; color:#fecaca; }
+    .muted { color:var(--muted); font-size:12px; }
+    .flex { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .spacer { flex:1; }
+    dialog { width: min(760px, 92vw); background:var(--card); color:var(--text); border:1px solid #1f2937; border-radius:16px; padding:0; }
+    dialog header { position:sticky; top:0; }
+    .modal-body { padding:16px 18px 20px; max-height:70vh; overflow:auto; }
+    .kv { display:grid; grid-template-columns: 160px 1fr; gap:6px 14px; margin:8px 0 14px; }
+    .items { border:1px solid #1f2937; border-radius:14px; overflow:hidden; }
+    .items .h { display:grid; grid-template-columns: 1.6fr 0.6fr 0.6fr 0.8fr; padding:10px 12px; background:#0b1220; border-bottom:1px solid #1f2937; }
+    .items .r { display:grid; grid-template-columns: 1.6fr 0.6fr 0.6fr 0.8fr; padding:10px 12px; border-bottom:1px solid #0b1220; }
+    .danger { background:linear-gradient(180deg,#ef4444,#dc2626); border:none; }
+    .notice { font-size:12px; color:#cbd5e1; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Back Office — Orders</h1>
+    <input id="searchInput" placeholder="Search by name…" />
+    <input id="fromDate" type="date" />
+    <input id="toDate" type="date" />
+    <select id="statusFilter">
+      <option value="any">Any status</option>
+      <option value="open">Open</option>
+      <option value="completed">Completed</option>
+      <option value="refunded">Refunded</option>
+    </select>
+    <button id="applyFilters" class="primary">Apply</button>
+    <div class="spacer"></div>
+    <a href="./backoffice-analytics.html"><button class="ghost">Go to Analytics</button></a>
+  </header>
+
+  <div class="wrap">
+    <div class="grid head">
+      <div>Name</div><div>Total</div><div>Station</div><div>Created</div><div>Status</div><div>Action</div>
+    </div>
+    <div id="ordersList"></div>
+    <div class="muted" id="emptyState" style="display:none; padding:18px 4px;">No orders match your filters.</div>
+  </div>
+
+  <dialog id="orderModal">
+    <header>
+      <h1>Order Details</h1>
+      <div class="spacer"></div>
+      <button id="closeModal" class="ghost" style="margin-right:8px;">Close</button>
+    </header>
+    <div class="modal-body">
+      <div class="kv">
+        <div class="muted">Customer</div><div id="mName">—</div>
+        <div class="muted">Order ID</div><div id="mId">—</div>
+        <div class="muted">Total</div><div id="mTotal">—</div>
+        <div class="muted">Station</div><div id="mStation">—</div>
+        <div class="muted">Created</div><div id="mCreated">—</div>
+        <div class="muted">Status</div><div id="mStatus">—</div>
+      </div>
+
+      <div class="items">
+        <div class="h"><div>Item</div><div>Qty</div><div>Price</div><div>Line</div></div>
+        <div id="mItems"></div>
+      </div>
+
+      <div style="margin-top:14px;" class="flex">
+        <button id="refundBtn" class="danger">Refund Order</button>
+        <span class="notice">Refunds are logged to <code>refunds</code> for auditing.</span>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Firebase (modular SDK) -->
+  <script type="module">
+    // --- Firebase init ---
+    // If your project already uses a shared config script, you can replace this block
+    // with: import { app, db } from './your-existing-firebase-init.js'
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getFirestore, collection, query, where, orderBy, limit, onSnapshot, getDocs, doc, updateDoc, addDoc, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    // TODO: Replace with your actual config OR load from an existing shared file.
+    // You can safely copy the same config used in your current POS page.
+    const firebaseConfig = window.FIREBASE_CONFIG || {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_BUCKET",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // --- UI refs ---
+    const ordersList = document.getElementById('ordersList');
+    const emptyState = document.getElementById('emptyState');
+    const searchInput = document.getElementById('searchInput');
+    const fromDate = document.getElementById('fromDate');
+    const toDate = document.getElementById('toDate');
+    const statusFilter = document.getElementById('statusFilter');
+    const applyFilters = document.getElementById('applyFilters');
+
+    // Modal refs
+    const orderModal = document.getElementById('orderModal');
+    const closeModal = document.getElementById('closeModal');
+    const mName = document.getElementById('mName');
+    const mId = document.getElementById('mId');
+    const mTotal = document.getElementById('mTotal');
+    const mStation = document.getElementById('mStation');
+    const mCreated = document.getElementById('mCreated');
+    const mStatus = document.getElementById('mStatus');
+    const mItems = document.getElementById('mItems');
+    const refundBtn = document.getElementById('refundBtn');
+
+    let cachedOrders = [];      // client-side cache for search/filter
+    let currentSelection = null;
+
+    // Helpers
+    function tsToText(ts) {
+      if (!ts) return '—';
+      const d = ts.toDate ? ts.toDate() : new Date(ts);
+      return d.toLocaleString();
+    }
+    function fmt(n) { return `$${(Number(n||0)).toFixed(2)}`; }
+
+    function renderRows(rows) {
+      ordersList.innerHTML = '';
+      if (!rows.length) { emptyState.style.display = 'block'; return; }
+      emptyState.style.display = 'none';
+
+      for (const o of rows) {
+        const r = document.createElement('div');
+        r.className = 'grid row';
+        r.innerHTML = `
+          <div>${o.customerName || '—'}</div>
+          <div>${fmt(o.total)}</div>
+          <div>${o.station || '—'}</div>
+          <div>${tsToText(o.createdAt)}</div>
+          <div>
+            <span class="pill ${o.status==='refunded'?'bad': (o.status==='completed'?'ok':'')}">
+              ${o.status || '—'}
+            </span>
+          </div>
+          <div><button data-id="${o._id}" class="ghost">Open</button></div>
+        `;
+        r.querySelector('button').addEventListener('click', () => openModal(o._id));
+        ordersList.appendChild(r);
+      }
+    }
+
+    function applyClientFilters() {
+      const q = (searchInput.value || '').trim().toLowerCase();
+      const stat = statusFilter.value;
+      const fd = fromDate.value ? new Date(fromDate.value + 'T00:00:00') : null;
+      const td = toDate.value ? new Date(toDate.value + 'T23:59:59') : null;
+
+      const filtered = cachedOrders.filter(o => {
+        if (q && !(o.customerName||'').toLowerCase().includes(q)) return false;
+        if (stat !== 'any' && (o.status||'') !== stat) return false;
+        const d = o.createdAt?.toDate ? o.createdAt.toDate() : (o.createdAt? new Date(o.createdAt): null);
+        if (fd && d && d < fd) return false;
+        if (td && d && d > td) return false;
+        return true;
+      });
+
+      renderRows(filtered);
+    }
+
+    applyFilters.addEventListener('click', applyClientFilters);
+    searchInput.addEventListener('input', applyClientFilters);
+
+    // Live subscription (most recent 500; adjust as you like)
+    // If you want true date-filtered server queries, we can add range conditions w/ a composite index.
+    const qLive = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(500));
+    onSnapshot(qLive, (snap) => {
+      cachedOrders = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+      applyClientFilters();
+    });
+
+    async function openModal(id) {
+      const order = cachedOrders.find(x => x._id === id);
+      if (!order) return;
+
+      currentSelection = order;
+      mName.textContent = order.customerName || '—';
+      mId.textContent = order._id;
+      mTotal.textContent = fmt(order.total);
+      mStation.textContent = order.station || '—';
+      mCreated.textContent = tsToText(order.createdAt);
+      mStatus.textContent = order.status || '—';
+
+      const items = Array.isArray(order.items) ? order.items : [];
+      mItems.innerHTML = '';
+      for (const it of items) {
+        const line = Number((it.qty||1) * (it.price||0));
+        const div = document.createElement('div');
+        div.className = 'r';
+        div.innerHTML = `
+          <div>${it.name || '—'}</div>
+          <div>${it.qty ?? 1}</div>
+          <div>${fmt(it.price || 0)}</div>
+          <div>${fmt(line)}</div>
+        `;
+        mItems.appendChild(div);
+      }
+
+      // toggle refund button
+      refundBtn.disabled = (order.status === 'refunded');
+      orderModal.showModal();
+    }
+
+    closeModal.addEventListener('click', () => orderModal.close());
+
+    refundBtn.addEventListener('click', async () => {
+      if (!currentSelection) return;
+      if (currentSelection.status === 'refunded') return;
+
+      const reason = prompt("Refund reason (optional):", "");
+      if (!confirm("Confirm refund this order?\nThis marks the order as refunded and logs it.")) return;
+
+      try {
+        // mark order as refunded
+        const orderRef = doc(db, 'orders', currentSelection._id);
+        await updateDoc(orderRef, {
+          status: 'refunded',
+          refunded: true,
+          refundedAt: serverTimestamp(),
+          refundReason: reason || null
+        });
+
+        // log refund entry
+        await addDoc(collection(db, 'refunds'), {
+          orderId: currentSelection._id,
+          customerName: currentSelection.customerName || null,
+          total: currentSelection.total || 0,
+          station: currentSelection.station || null,
+          items: currentSelection.items || [],
+          createdAt: currentSelection.createdAt || null,
+          refundedAt: serverTimestamp(),
+          refundReason: reason || null
+        });
+
+        alert('Order refunded.');
+        orderModal.close();
+
+      } catch (e) {
+        console.error(e);
+        alert('Refund failed. Check console/logs.');
+      }
+    });
+
+    // Set default date range (last 7 days)
+    const today = new Date();
+    const start = new Date(); start.setDate(today.getDate()-6);
+    fromDate.value = start.toISOString().slice(0,10);
+    toDate.value = today.toISOString().slice(0,10);
+  </script>
+</body>
+</html>
