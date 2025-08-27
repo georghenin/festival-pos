@@ -26,7 +26,7 @@
   .pill.ok{color:#0b0e14;background:var(--ok);border:none}
   .pill.bad{color:#0b0e14;background:var(--danger);border:none}
   .muted{color:var(--muted);font-size:13px}
-  dialog{width:min(880px,92vw);border:1px solid var(--border);border-radius:16px;padding:0;background:var(--card);color:var(--fg)}
+  dialog{width:min(920px,92vw);border:1px solid var(--border);border-radius:16px;padding:0;background:var(--card);color:var(--fg)}
   dialog header{display:flex;gap:8px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border)}
   .modal-body{max-height:70vh;overflow:auto;padding:14px}
   .kv{display:grid;grid-template-columns:160px 1fr;gap:6px 12px;margin-bottom:12px}
@@ -35,6 +35,8 @@
   .items .h{background:#0c111b;border-bottom:1px solid var(--border);font-weight:600;color:#cbd5e1}
   .items .r{border-bottom:1px solid #0e1320}
   .danger{background:var(--danger);border:none;color:#0b0e14}
+  .okbtn{background:var(--ok);border:none;color:#0b0e14}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 </style>
 </head>
 <body>
@@ -47,6 +49,7 @@
       <option value="active">active</option>
       <option value="ready">ready</option>
       <option value="picked_up">picked_up</option>
+      <option value="archived">archived</option>
       <option value="refunded">refunded</option>
     </select>
     <button id="apply" class="primary">Apply</button>
@@ -87,9 +90,12 @@
         <div id="m_items"></div>
       </div>
 
-      <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
-        <button id="refund" class="danger">Refund Order</button>
-        <span class="muted">Refund marks this order as <b>refunded</b> and logs an entry in <code>refunds</code>.</span>
+      <div style="margin-top:12px" class="row">
+        <button id="toPickup"   class="okbtn">Send to Pickup</button>
+        <button id="toKitchen"  class="ghost">Send to Kitchen</button>
+        <button id="forceDone"  class="ghost">Force Complete (Archive)</button>
+        <button id="refund"     class="danger">Refund Order</button>
+        <span class="muted">Archived/refunded orders won’t show on KDS or Pickup. Refunded orders are excluded from Sales.</span>
       </div>
     </div>
   </dialog>
@@ -120,6 +126,9 @@
   const dlg = document.getElementById("dlg");
   const btnClose = document.getElementById("close");
   const btnRefund = document.getElementById("refund");
+  const btnToPickup = document.getElementById("toPickup");
+  const btnToKitchen = document.getElementById("toKitchen");
+  const btnForceDone = document.getElementById("forceDone");
   const m_id = document.getElementById("m_id");
   const m_cust = document.getElementById("m_cust");
   const m_total = document.getElementById("m_total");
@@ -134,31 +143,24 @@
   const tsText = ms => ms ? new Date(ms).toLocaleString() : "—";
   function lineTotal(qty, price){ return Number(qty||1) * Number(price||0); }
 
-  // try to pull variants/mods into visible lines under each item
   function itemLines(it){
     const baseName = it.name || "—";
     const qty = Number(it.qty || 1);
     const price = Number(it.price || 0);
     const lines = [{ label: baseName, qty, price }];
 
-    // mods can be:
-    // 1) array of groups [{groupName, options:[{name, price}]}]
-    // 2) array of simple selected mods [{name, price, qty?}]
-    // 3) single object {name, price, qty?}
     const mods = it.mods;
-
-    // case 1
     if (Array.isArray(mods) && mods.length && mods[0]?.options) {
       mods.forEach(g=>{
         (g.options||[]).forEach(opt=>{
           lines.push({ label: `${baseName} – ${g.groupName}: ${opt.name}`, qty, price: Number(opt.price||0) });
         });
       });
-    } else if (Array.isArray(mods)) { // case 2
+    } else if (Array.isArray(mods)) {
       mods.forEach(m=>{
         lines.push({ label: `${baseName} – ${m.name}`, qty: Number(m.qty||qty), price: Number(m.price||0) });
       });
-    } else if (mods && typeof mods === 'object') { // case 3
+    } else if (mods && typeof mods === 'object') {
       lines.push({ label: `${baseName} – ${mods.name}`, qty: Number(mods.qty||qty), price: Number(mods.price||0) });
     }
     return lines;
@@ -167,7 +169,7 @@
   // ---------- state ----------
   let buffer = [];       // cached docs for client filtering
   let lastDoc = null;    // for pagination
-  let unsub = null;      // live listener (for first page only)
+  let unsub = null;      // live listener (first page)
 
   // default dates (last 7 days)
   const today = new Date();
@@ -229,6 +231,7 @@
         <div>${tsText(o.createdAt)}</div>
         <div>${o.status==="refunded" ? '<span class="pill bad">refunded</span>' :
                  o.status==="picked_up" ? '<span class="pill ok">picked_up</span>' :
+                 o.status==="archived"  ? '<span class="pill">archived</span>' :
                  `<span class="pill">${o.status||"—"}</span>`}</div>
         <div><button class="ghost" data-id="${o.id}">Open</button></div>`;
       row.querySelector("button").addEventListener("click", ()=>openModal(o.id));
@@ -239,6 +242,9 @@
   async function openModal(id){
     const o = buffer.find(x=>x.id===id);
     if (!o) return;
+
+    // stash current selection on buttons
+    [btnRefund, btnToPickup, btnToKitchen, btnForceDone].forEach(b=>{ b.dataset.id = id; });
 
     m_id.textContent = id;
     m_cust.textContent = o.customer || "—";
@@ -258,16 +264,95 @@
       });
     });
 
-    // Enable/disable refund button based on status + auth
-    btnRefund.disabled = (o.status==="refunded");
-    btnRefund.dataset.id = id;
-    btnRefund.dataset.total = Number(o.total||0);
+    // auth-based enablement
+    const u = auth.currentUser;
+    const admin = !!(u && ADMIN_EMAILS.includes(u.email));
+    [btnRefund, btnToPickup, btnToKitchen, btnForceDone].forEach(b=> b.disabled = !admin);
+
     dlg.showModal();
   }
 
   btnClose.addEventListener("click",()=>dlg.close());
 
-  // Refund flow: mark order, log audit
+  // ----- ACTIONS -----
+  async function mutateOrder(id, mutator){
+    const ref = db.collection("orders").doc(id);
+    const snap = await ref.get();
+    const o = snap.data() || {};
+    const updated = mutator(structuredClone(o));
+    await ref.set(updated, { merge:false }); // overwrite to ensure flags like ready are cleared
+    return { before:o, after:updated };
+  }
+
+  // re-map all item ready flags
+  function setItemsReady(items, ready){
+    return (Array.isArray(items)?items:[]).map(it=> ({ ...it, ready: !!ready }));
+  }
+
+  // Send to Pickup (ready)
+  btnToPickup.addEventListener("click", async ()=>{
+    const id = btnToPickup.dataset.id; if (!id) return;
+    try{
+      await mutateOrder(id, (o)=>{
+        const now = Date.now();
+        return {
+          ...o,
+          status: "ready",
+          archived: false,
+          refunded: false,
+          refundReason: null,
+          refundedAt: null,
+          readyAt: now,
+          items: setItemsReady(o.items, true)
+        };
+      });
+      alert("Sent to Pickup.");
+      dlg.close();
+    }catch(e){ console.error(e); alert("Failed. See console."); }
+  });
+
+  // Send to Kitchen (active)
+  btnToKitchen.addEventListener("click", async ()=>{
+    const id = btnToKitchen.dataset.id; if (!id) return;
+    try{
+      await mutateOrder(id, (o)=>{
+        return {
+          ...o,
+          status: "active",
+          archived: false,
+          refunded: false,
+          refundReason: null,
+          refundedAt: null,
+          items: setItemsReady(o.items, false)
+        };
+      });
+      alert("Sent to Kitchen.");
+      dlg.close();
+    }catch(e){ console.error(e); alert("Failed. See console."); }
+  });
+
+  // Force Complete (Archive but still counts in Sales)
+  btnForceDone.addEventListener("click", async ()=>{
+    const id = btnForceDone.dataset.id; if (!id) return;
+    if (!confirm("Force complete this order? It will be archived (hidden on KDS/Pickup) but still included in Sales.")) return;
+    try{
+      await mutateOrder(id, (o)=>{
+        const now = Date.now();
+        return {
+          ...o,
+          status: "archived",
+          archived: true,
+          completedAt: now,
+          // keep items as-is; ensure they won't show as 'ready' anywhere
+          items: setItemsReady(o.items, false)
+        };
+      });
+      alert("Order archived.");
+      dlg.close();
+    }catch(e){ console.error(e); alert("Failed. See console."); }
+  });
+
+  // Refund flow: mark refunded, archive, clear any ready flags, and log to refunds
   btnRefund.addEventListener("click", async ()=>{
     const u = auth.currentUser;
     if (!u || !ADMIN_EMAILS.includes(u.email)){
@@ -276,35 +361,40 @@
     }
     const id = btnRefund.dataset.id;
     const reason = prompt("Refund reason (optional):","") || null;
-    if (!confirm("Confirm refund of this entire order?")) return;
+    if (!confirm("Confirm full refund? Refunded orders are archived and excluded from Sales.")) return;
 
     const now = Date.now();
     try{
-      const ref = db.collection("orders").doc(id);
-      await ref.update({
-        status:"refunded",
-        refunded:true,
-        refundedAt:now,
-        refundReason:reason,
-        refundedBy:u.email
+      // mutate order
+      const { before, after } = await mutateOrder(id, (o)=>{
+        return {
+          ...o,
+          status: "refunded",
+          refunded: true,
+          refundedAt: now,
+          refundReason: reason,
+          refundedBy: u.email,
+          archived: true,
+          // make sure nothing keeps it visible on Pickup/KDS
+          readyAt: null,
+          items: setItemsReady(o.items, false)
+        };
       });
 
-      // read a copy for audit
-      const snap = await ref.get();
-      const o = snap.data() || {};
+      // log audit copy
       await db.collection("refunds").add({
         orderId:id,
-        customer:o.customer||null,
-        total:o.total||0,
-        station:o.station||null,
-        createdAt:o.createdAt||null,
+        customer:after.customer||null,
+        total:Number(after.total||0),
+        station:after.station||null,
+        createdAt:after.createdAt||null,
         refundedAt:now,
         refundedBy:u.email,
         refundReason:reason,
-        items:o.items||[]
+        items:after.items||[]
       });
 
-      alert("Order refunded.");
+      alert("Order refunded & archived.");
       dlg.close();
     }catch(e){
       console.error(e);
@@ -313,9 +403,9 @@
   });
 
   // wire controls
-  elApply.addEventListener("click", applyFilters);
-  elSearch.addEventListener("input", applyFilters);
-  elMore.addEventListener("click", loadMore);
+  document.getElementById("apply").addEventListener("click", applyFilters);
+  document.getElementById("search").addEventListener("input", applyFilters);
+  document.getElementById("more").addEventListener("click", loadMore);
 
   // kick off
   loadFirst();
