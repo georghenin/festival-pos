@@ -1,4 +1,4 @@
-<!-- kds-auth.html (full file, SMS-ready enabled) -->
+<!-- kds-auth.html (updated for archived/refunded + completed view + undo-ready) -->
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -22,6 +22,8 @@
   .line{border-top:1px dashed #293246;padding:6px 0}
   .mods{color:#aeb7c6;font-size:12px;margin-top:2px}
   .muted{color:var(--muted);font-size:12px}
+  .tag{display:inline-block;border:1px solid #23314a;border-radius:999px;padding:2px 8px;font-size:11px;background:#122035;color:#cfe1ff}
+  .btn.ghost{background:#0f1420;color:#e5e8ee;border:1px solid #273043}
 </style>
 </head>
 <body>
@@ -110,6 +112,7 @@ function renderChips(){
 selectAll.onclick=()=>{ selected=new Set(STATIONS); renderChips(); renderTickets(lastSnapshot); };
 savePref.onclick=()=>{ localStorage.setItem('kdsStations', JSON.stringify([...selected])); alert('Saved on this iPad.'); };
 
+// ===== Live feed =====
 db.collection('orders').orderBy('createdAt','desc').limit(150).onSnapshot(snap=>{
   lastSnapshot=snap; renderTickets(snap);
 });
@@ -117,34 +120,70 @@ showDone.onchange=()=> renderTickets(lastSnapshot);
 
 const itemMatchesStations = (it)=> !it.station || selected.has(it.station);
 
+// parse mods → names line
 function modsHTML(mods){
-  if(!mods || !mods.length) return '';
-  const names = mods.flatMap(g => (g.options||[]).map(o=>o.name)).filter(Boolean);
+  if(!mods) return '';
+  // support grouped {groupName, options[]} or array of {name}
+  let names=[];
+  if (Array.isArray(mods) && mods.length && mods[0]?.options){
+    names = mods.flatMap(g => (g.options||[]).map(o=>o.name)).filter(Boolean);
+  } else if (Array.isArray(mods)){
+    names = mods.map(m=>m?.name).filter(Boolean);
+  } else if (typeof mods === 'object'){
+    names = [mods.name].filter(Boolean);
+  }
   if(!names.length) return '';
   return `<div class="mods">${names.join(', ')}</div>`;
+}
+
+// helpers for visibility and station-scope readiness
+function isArchivedOrRefunded(o){ return o?.archived === true || o?.status === 'refunded'; }
+function stationItems(o){ return (o.items||[]).filter(it=> itemMatchesStations(it)); }
+function allStationItemsReady(o){
+  const arr = stationItems(o);
+  return arr.length>0 && arr.every(it=> !!it.ready );
+}
+function anyStationItemPending(o){
+  const arr = stationItems(o);
+  return arr.some(it=> !it.ready );
 }
 
 function renderTickets(snap){
   if(!snap){ grid.innerHTML=''; empty.style.display='block'; return; }
   const includeCompleted = !!showDone.checked;
-  const shown=[];
 
   const html=[];
+  const shownForSound=[];
+
   snap.forEach(d=>{
     const o={id:d.id, ...d.data()};
-    const allReady = (o.items||[]).length && (o.items||[]).every(it=>it.ready);
-    const isCompleted = allReady || o.status==='ready' || o.status==='picked_up';
-    if(!includeCompleted && isCompleted) return;
+    if (isArchivedOrRefunded(o)) return; // NEW: never show archived/refunded
 
-    const pending=(o.items||[]).filter(it => itemMatchesStations(it) && !it.ready);
-    if(!pending.length) return;
+    const pendingForStation = stationItems(o).filter(it=> !it.ready);
+    const completedForStation = stationItems(o).filter(it=> !!it.ready);
 
-    shown.push(o);
-    const lines=pending.map(it=>`
-      <div class="line">
-        <div><strong>${it.qty||1}× ${it.name||''}</strong> <span class="muted">• ${it.station||''}</span></div>
-        ${modsHTML(it.mods)}
-      </div>`).join('');
+    // Decide visibility by toggle:
+    // - Active view (includeCompleted = false): show tickets with ANY pending for selected stations
+    // - Completed view (includeCompleted = true): show tickets with ALL selected-station items ready
+    if (!includeCompleted){
+      if (!pendingForStation.length) return;
+    } else {
+      if (!allStationItemsReady(o)) return;
+    }
+
+    shownForSound.push(o);
+
+    // Build lines for the visible mode
+    const lines = (!includeCompleted ? pendingForStation : completedForStation)
+      .map(it=>`
+        <div class="line">
+          <div><strong>${it.qty||1}× ${it.name||''}</strong> <span class="muted">• ${it.station||''}</span></div>
+          ${modsHTML(it.mods)} ${it.ready?'<span class="tag">ready</span>':''}
+        </div>`).join('');
+
+    const actionBtn = !includeCompleted
+      ? `<button class="btn" data-ready="${o.id}">Ready (this station's items)</button>`
+      : `<button class="btn ghost" data-undo="${o.id}">Undo Ready (this station)</button>`;
 
     html.push(`
       <div class="ticket">
@@ -153,7 +192,7 @@ function renderTickets(snap){
             <div class="customer">${o.customer||'No name'} <span class="muted">#${o.number||''}</span></div>
             <div class="muted">${new Date(o.createdAt||Date.now()).toLocaleTimeString()}</div>
           </div>
-          <div><button class="btn" data-ready="${o.id}">Ready (this station's items)</button></div>
+          <div>${actionBtn}</div>
         </div>
         ${lines}
       </div>`);
@@ -162,11 +201,14 @@ function renderTickets(snap){
   grid.innerHTML = html.join('');
   empty.style.display = html.length? 'none':'block';
 
-  const newest = newestTsForKDS(shown);
+  const newest = newestTsForKDS(shownForSound);
   if(newest && newest > lastSoundTs){ playDing(); lastSoundTs=newest; localStorage.setItem('kdsLastSoundTs', String(lastSoundTs)); }
 
   grid.querySelectorAll('[data-ready]').forEach(b=>{
     b.onclick=()=> setReadyForThisStation(b.dataset.ready);
+  });
+  grid.querySelectorAll('[data-undo]').forEach(b=>{
+    b.onclick=()=> undoReadyForThisStation(b.dataset.undo);
   });
 }
 
@@ -179,7 +221,7 @@ async function callFn(path, body){
   }catch(e){ return {error: String(e)}; }
 }
 
-// mark ONLY visible station's items as ready; if ALL items become ready here, send SMS once
+// mark ONLY visible station's items as ready; if ALL selected-station items become ready here, set order.status=ready (or partial)
 async function setReadyForThisStation(orderId){
   const now=Date.now();
   const ref=db.collection('orders').doc(orderId);
@@ -189,32 +231,61 @@ async function setReadyForThisStation(orderId){
     await db.runTransaction(async tx=>{
       const snap=await tx.get(ref); if(!snap.exists) return;
       const o=snap.data();
+      if (isArchivedOrRefunded(o)) return;
+
       const items=(o.items||[]).map(it=>{
         if(itemMatchesStations(it) && !it.ready){
           return {...it, ready:true, readyAt: now};
         }
         return it;
       });
-      const allReady = items.length && items.every(i=>i.ready);
-      const updates = { items, updatedAt: now };
-      if(allReady && o.status!=='ready'){
+
+      const allReadySelected = stationItems({items, station:o.station}).every(it=>it.ready);
+      const anyPendingOtherStations = (o.items||[]).some(it=> !itemMatchesStations(it) && !it.ready);
+
+      const updates = { items, updatedAt: now, archived:false };
+      if (allReadySelected && !anyPendingOtherStations){
         updates.status = 'ready';
         if(!o.readyAt) updates.readyAt = now;
         becameReady = true;
         orderPhone   = o.phone || null;
         orderNumber  = o.number;
         orderCustomer= o.customer || null;
-      }else{
+      } else {
+        // some other station still pending → partial
         updates.status = 'partial';
       }
       tx.update(ref, updates);
     });
 
-    // After commit, fire SMS once
+    // After commit, fire SMS once if order just became fully ready
     if(becameReady && orderPhone){
       callFn("/sendReadySms", { to: orderPhone, orderNumber, customer: orderCustomer })
         .then(r => { if(r?.error) console.warn("SMS ready error", r.error); });
     }
+  }catch(e){ alert(e.message); }
+}
+
+// undo: clear ready on this station's items; if any station pending, set status active
+async function undoReadyForThisStation(orderId){
+  const ref=db.collection('orders').doc(orderId);
+  try{
+    await db.runTransaction(async tx=>{
+      const snap=await tx.get(ref); if(!snap.exists) return;
+      const o=snap.data();
+      if (isArchivedOrRefunded(o)) return;
+
+      const items=(o.items||[]).map(it=>{
+        if(itemMatchesStations(it) && it.ready){
+          const {ready, readyAt, ...rest} = it;
+          return {...rest, ready:false};
+        }
+        return it;
+      });
+
+      const updates = { items, updatedAt: Date.now(), status:'active' };
+      tx.update(ref, updates);
+    });
   }catch(e){ alert(e.message); }
 }
 
