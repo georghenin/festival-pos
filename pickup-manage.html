@@ -66,7 +66,7 @@
     <!-- History (picked_up) -->
     <div id="hist" class="history">
       <div class="row" style="justify-content:space-between;margin-top:8px">
-        <h3 style="margin:0">Picked Up (today)</h3>
+        <h3 style="margin:0">Picked Up (<span id="histSpan">today</span>)</h3>
         <button id="showAll" class="btn gray">Show all history</button>
       </div>
       <div id="picked"></div>
@@ -94,10 +94,10 @@ const $=s=>document.querySelector(s);
 const me=$('#me'), login=$('#login'), logout=$('#logout');
 const stationBadge=$('#stationBadge'), chips=$('#chips'), selectAll=$('#selectAll'), savePref=$('#savePref');
 const ready=$('#ready'), picked=$('#picked'), emptyReady=$('#emptyReady'), emptyPicked=$('#emptyPicked');
-const toggleHist=$('#toggleHist'), histBox=$('#hist'), showAll=$('#showAll');
+const toggleHist=$('#toggleHist'), histBox=$('#hist'), showAll=$('#showAll'), histSpan=$('#histSpan');
 
-// ====== SOUND (uses your WAV on GitHub Pages) ======
-const SOUND_URL = "https://georghenin.github.io/festival-pos/mixkit-bell-notification-933.wav"; // update if placed elsewhere
+// ====== SOUND ======
+const SOUND_URL = "https://georghenin.github.io/festival-pos/mixkit-bell-notification-933.wav";
 const dingEl=document.getElementById('ding'); dingEl.src = SOUND_URL;
 const soundCb=document.getElementById('sound');
 let lastReadySoundTs = Number(localStorage.getItem('pickupLastSoundTs')||'0');
@@ -107,6 +107,7 @@ function playDing(){ if(!soundCb.checked) return; try{dingEl.currentTime=0; ding
 function newestReadyTs(orders){
   let max=0;
   for(const o of orders){
+    if (isArchivedOrRefunded(o)) continue;
     for(const it of (o.items||[])){
       if(!itemMatchesStations(it)) continue;
       if(it.ready){
@@ -117,14 +118,13 @@ function newestReadyTs(orders){
   }
   return max;
 }
-// ===================================================
 
-// auth: view without sign-in; writes require sign-in
+// ===== Auth (view without sign-in; writes are open as you had them) =====
 auth.onAuthStateChanged(u=>{ me.textContent=u?u.email:'Not signed in'; });
 login.onclick=async()=>{ const e=prompt('Email:'); if(!e) return; const p=prompt('Password'); if(p===null) return; try{await auth.signInWithEmailAndPassword(e.trim(),p);}catch(err){alert(err.message);} };
 logout.onclick=()=>auth.signOut();
 
-// dynamic stations from settings/config
+// ===== Stations from settings/config (with autodiscovery fallback) =====
 let STATIONS=[];
 let selected=new Set(JSON.parse(localStorage.getItem('pickupStations')||'[]'));
 let showAllHistory=false;
@@ -147,38 +147,75 @@ function renderChips(){
 selectAll.onclick=()=>{ STATIONS.forEach(s=>selected.add(s)); renderChips(); renderLists(); };
 savePref.onclick=()=>{ localStorage.setItem('pickupStations', JSON.stringify([...selected])); alert('Saved on this iPad.'); };
 
-// helpers
+// ===== Helpers =====
+const isArchivedOrRefunded = (o)=> (o?.archived === true || o?.status === 'refunded');
 const itemMatchesStations = (it)=>{
   if(!it.station) return true;
   if(!STATIONS.includes(it.station)) return true;
   return selected.has(it.station);
 };
 const orderHasSelectedStations = (o)=> (o.items||[]).some(itemMatchesStations);
-function modsHTML(mods){ const names=(mods||[]).flatMap(g=>(g.options||[]).map(o=>o.name)).filter(Boolean); return names.length? `<div class="mods">${names.join(', ')}</div>`:''; }
 
-// data listeners
+// mods: handle grouped or flat or single object
+function modsHTML(mods){
+  if(!mods) return '';
+  let names=[];
+  if (Array.isArray(mods) && mods.length && mods[0]?.options){
+    names = mods.flatMap(g => (g.options||[]).map(o=>o?.name)).filter(Boolean);
+  } else if (Array.isArray(mods)){
+    names = mods.map(m=>m?.name).filter(Boolean);
+  } else if (typeof mods === 'object'){
+    names = [mods.name].filter(Boolean);
+  }
+  return names.length? `<div class="mods">${names.join(', ')}</div>`:'';
+}
+
+// ===== Data listeners =====
 let unsubReady=null, unsubPicked=null;
 let readyDocs=[], pickedDocs=[];
-function subscribe(){
-  if(unsubReady) unsubReady(); if(unsubPicked) unsubPicked();
 
-  // Orders with at least one ready item and not picked up
+function resubscribePicked(){
+  if (unsubPicked) unsubPicked();
+  if (!showAllHistory){
+    // today only
+    const start=new Date(); start.setHours(0,0,0,0);
+    unsubPicked = db.collection('orders')
+      .where('status','==','picked_up')
+      .where('updatedAt','>=', start.getTime())
+      .orderBy('updatedAt','desc').limit(200)
+      .onSnapshot(s=>{
+        pickedDocs = s.docs.map(d=>({id:d.id, ...d.data()}))
+          .filter(o => !isArchivedOrRefunded(o));
+        autoDiscoverStations(pickedDocs);
+        if(histBox.style.display!=='none') renderLists();
+      });
+  } else {
+    // all history (limited)
+    unsubPicked = db.collection('orders')
+      .where('status','==','picked_up')
+      .orderBy('updatedAt','desc').limit(400)
+      .onSnapshot(s=>{
+        pickedDocs = s.docs.map(d=>({id:d.id, ...d.data()}))
+          .filter(o => !isArchivedOrRefunded(o));
+        autoDiscoverStations(pickedDocs);
+        if(histBox.style.display!=='none') renderLists();
+      });
+  }
+}
+
+function subscribe(){
+  if (unsubReady) unsubReady();
+  resubscribePicked();
+
+  // Ready feed: recent orders; we’ll filter locally
   unsubReady = db.collection('orders').orderBy('updatedAt','desc').limit(400)
     .onSnapshot(s=>{
       readyDocs = s.docs.map(d=>({id:d.id, ...d.data()}))
-        .filter(o => (o.items||[]).some(it=>it.ready) && o.status!=='picked_up');
+        .filter(o => !isArchivedOrRefunded(o))
+        .filter(o => (o.items||[]).some(it=>it.ready))   // has at least one ready item
+        .filter(o => o.status !== 'picked_up');          // not already picked up
       autoDiscoverStations(readyDocs);
       renderLists();
-    });
-
-  const start=new Date(); start.setHours(0,0,0,0);
-  unsubPicked = db.collection('orders')
-    .where('status','==','picked_up').where('updatedAt','>=', start.getTime())
-    .orderBy('updatedAt','desc').limit(200)
-    .onSnapshot(s=>{
-      pickedDocs = s.docs.map(d=>({id:d.id, ...d.data()}));
-      autoDiscoverStations(pickedDocs);
-      if(histBox.style.display!=='none') renderLists();
     });
 }
 subscribe();
@@ -221,14 +258,16 @@ function orderHTML(o){
 }
 
 function renderLists(){
+  // READY
   const r=readyDocs.filter(orderHasSelectedStations);
   ready.innerHTML = r.map(orderHTML).join('');
   emptyReady.style.display = r.length? 'none':'block';
 
-  // 🔔 sound: play when new ready items/orders appear
+  // 🔔 sound: play when new ready items/orders appear (ignores archived/refunded already)
   const newest = newestReadyTs(r);
   if(newest && newest > lastReadySoundTs){ playDing(); lastReadySoundTs=newest; localStorage.setItem('pickupLastSoundTs', String(lastReadySoundTs)); }
 
+  // HISTORY
   if(histBox.style.display!=='none'){
     const p=pickedDocs.filter(orderHasSelectedStations);
     picked.innerHTML = p.map(o=>`
@@ -252,15 +291,22 @@ function renderLists(){
 }
 
 async function setStatus(id, status){
-  try{ await db.collection('orders').doc(id).update({status, updatedAt: Date.now()}); }
-  catch(e){ alert(e.message); }
+  try{
+    await db.collection('orders').doc(id).update({status, updatedAt: Date.now()});
+  }catch(e){ alert(e.message); }
 }
 
 toggleHist.onclick=()=>{
   const open = histBox.style.display!=='none';
   histBox.style.display = open ? 'none' : 'block';
   toggleHist.textContent = open ? 'Show history' : 'Hide history';
-  if(!open) renderLists();
+  if(!open){ renderLists(); }
+};
+showAll.onclick=()=>{
+  showAllHistory = !showAllHistory;
+  showAll.textContent = showAllHistory ? 'Show today only' : 'Show all history';
+  histSpan.textContent = showAllHistory ? 'all' : 'today';
+  resubscribePicked();
 };
 </script>
 </body></html>
