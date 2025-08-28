@@ -1,4 +1,4 @@
-<!-- kds-auth.html (updated for archived/refunded + completed view + undo-ready) -->
+<!-- kds-auth.html (updated: bigger modifier display + archived/refunded filtering + undo-ready) -->
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -20,7 +20,11 @@
   .hdr{display:flex;justify-content:space-between;gap:10px;align-items:center}
   .customer{font-weight:800}
   .line{border-top:1px dashed #293246;padding:6px 0}
-  .mods{color:#aeb7c6;font-size:12px;margin-top:2px}
+  /* ==== Bigger, clearer modifiers ==== */
+  .mods{margin-top:4px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .mods .label{font-size:13px;color:#b9c4d4;font-weight:600;margin-right:4px}
+  .mods .opt{font-size:14px;line-height:1.2;font-weight:600;color:#e9f1ff;
+             padding:4px 8px;border-radius:999px;background:#172136;border:1px solid #25324a}
   .muted{color:var(--muted);font-size:12px}
   .tag{display:inline-block;border:1px solid #23314a;border-radius:999px;padding:2px 8px;font-size:11px;background:#122035;color:#cfe1ff}
   .btn.ghost{background:#0f1420;color:#e5e8ee;border:1px solid #273043}
@@ -120,20 +124,24 @@ showDone.onchange=()=> renderTickets(lastSnapshot);
 
 const itemMatchesStations = (it)=> !it.station || selected.has(it.station);
 
-// parse mods → names line
+// ---- modifiers pretty print (bigger) ----
 function modsHTML(mods){
   if(!mods) return '';
-  // support grouped {groupName, options[]} or array of {name}
-  let names=[];
+  // support grouped {groupName, options[]} or array of {name} or single object
+  let parts=[];
   if (Array.isArray(mods) && mods.length && mods[0]?.options){
-    names = mods.flatMap(g => (g.options||[]).map(o=>o.name)).filter(Boolean);
+    mods.forEach(g=>{
+      (g.options||[]).forEach(o=>{
+        if (o?.name) parts.push(`<span class="opt">${o.name}</span>`);
+      });
+    });
   } else if (Array.isArray(mods)){
-    names = mods.map(m=>m?.name).filter(Boolean);
-  } else if (typeof mods === 'object'){
-    names = [mods.name].filter(Boolean);
+    mods.forEach(m=>{ if(m?.name) parts.push(`<span class="opt">${m.name}</span>`); });
+  } else if (typeof mods === 'object' && mods.name){
+    parts.push(`<span class="opt">${mods.name}</span>`);
   }
-  if(!names.length) return '';
-  return `<div class="mods">${names.join(', ')}</div>`;
+  if(!parts.length) return '';
+  return `<div class="mods"><span class="label">Mods:</span> ${parts.join(' ')}</div>`;
 }
 
 // helpers for visibility and station-scope readiness
@@ -157,23 +165,19 @@ function renderTickets(snap){
 
   snap.forEach(d=>{
     const o={id:d.id, ...d.data()};
-    if (isArchivedOrRefunded(o)) return; // NEW: never show archived/refunded
+    if (isArchivedOrRefunded(o)) return; // never show archived/refunded
 
     const pendingForStation = stationItems(o).filter(it=> !it.ready);
     const completedForStation = stationItems(o).filter(it=> !!it.ready);
 
-    // Decide visibility by toggle:
-    // - Active view (includeCompleted = false): show tickets with ANY pending for selected stations
-    // - Completed view (includeCompleted = true): show tickets with ALL selected-station items ready
     if (!includeCompleted){
-      if (!pendingForStation.length) return;
+      if (!pendingForStation.length) return;          // Active view: needs pending
     } else {
-      if (!allStationItemsReady(o)) return;
+      if (!allStationItemsReady(o)) return;           // Completed view: all selected-station items ready
     }
 
     shownForSound.push(o);
 
-    // Build lines for the visible mode
     const lines = (!includeCompleted ? pendingForStation : completedForStation)
       .map(it=>`
         <div class="line">
@@ -183,7 +187,7 @@ function renderTickets(snap){
 
     const actionBtn = !includeCompleted
       ? `<button class="btn" data-ready="${o.id}">Ready (this station's items)</button>`
-      : `<button class="btn ghost" data-undo="${o.id}">Undo Ready (this station)</button>`;
+      : `<button class="btn gray" style="color:#e5e8ee" data-undo="${o.id}">Undo Ready (this station)</button>`;
 
     html.push(`
       <div class="ticket">
@@ -212,21 +216,11 @@ function renderTickets(snap){
   });
 }
 
-const FN_BASE = ""; // same as in POS; can hardcode full CF URL if you prefer
-async function callFn(path, body){
-  try{
-    const url = (FN_BASE || "https://us-central1-churchfestivalpos.cloudfunctions.net") + path;
-    const r = await fetch(url, { method:"POST", headers:{ "Content-Type":"application/json" }, body:JSON.stringify(body) });
-    return await r.json();
-  }catch(e){ return {error: String(e)}; }
-}
-
-// mark ONLY visible station's items as ready; if ALL selected-station items become ready here, set order.status=ready (or partial)
+// mark ONLY visible station's items as ready; if ALL selected-station items become ready here,
+// set status accordingly (no SMS call).
 async function setReadyForThisStation(orderId){
   const now=Date.now();
   const ref=db.collection('orders').doc(orderId);
-  let becameReady=false, orderPhone=null, orderNumber=null, orderCustomer=null;
-
   try{
     await db.runTransaction(async tx=>{
       const snap=await tx.get(ref); if(!snap.exists) return;
@@ -244,21 +238,13 @@ async function setReadyForThisStation(orderId){
       const anyPendingOtherStations = (o.items||[]).some(it=> !itemMatchesStations(it) && !it.ready);
 
       const updates = { items, updatedAt: now, archived:false };
-      if (allReadySelected && !anyPendingOtherStations){
-        updates.status = 'ready';
-        if(!o.readyAt) updates.readyAt = now;
-        becameReady = true;
-        orderPhone   = o.phone || null;
-        orderNumber  = o.number;
-        orderCustomer= o.customer || null;
-      } else {
-        // some other station still pending → partial
-        updates.status = 'partial';
-      }
+      updates.status = (allReadySelected && !anyPendingOtherStations) ? 'ready' : 'partial';
+      if (updates.status==='ready' && !o.readyAt) updates.readyAt = now;
+
       tx.update(ref, updates);
     });
-
-  
+  }catch(e){ alert(e.message); }
+}
 
 // undo: clear ready on this station's items; if any station pending, set status active
 async function undoReadyForThisStation(orderId){
