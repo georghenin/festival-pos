@@ -4,54 +4,109 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Festival POS</title>
 <style>
+  /* ===== Light, high-contrast theme for outdoor use ===== */
   :root{
-    --bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--card:#0f141e;--border:#1b2230;
-    --accent:#5b9bff;--ok:#2fd28f;--warn:#ffb020;--danger:#ff6b6b
+    --bg:#ffffff;        /* page background */
+    --fg:#111111;        /* primary text */
+    --muted:#555555;     /* secondary text */
+    --card:#f5f7fb;      /* panels/cards */
+    --border:#d0d7e2;    /* borders/dividers */
+    --accent:#2563eb;    /* primary action */
+    --ok:#15a46b;        /* success/ok */
+    --warn:#d97706;      /* warning */
+    --danger:#dc2626;    /* danger */
   }
   *{box-sizing:border-box}
-  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
-  .wrap{max-width:1200px;margin:0 auto;padding:14px}
-  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .left-right{display:grid;grid-template-columns:1fr 380px;gap:12px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px}
+  html,body{
+    margin:0;background:var(--bg);color:var(--fg);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+    font-size:18px;      /* +2 for readability */
+    line-height:1.25;
+  }
+  .wrap{max-width:1200px;margin:0 auto;padding:16px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .left-right{display:grid;grid-template-columns:1fr 420px;gap:14px}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:18px;
+    padding:14px
+  }
+
   input,select,button{font:inherit}
-  input,select{background:#121826;color:#eaf0f6;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
-  button{border:none;border-radius:10px;padding:10px 12px;cursor:pointer}
-  .btn{background:var(--accent);color:#fff}
-  .btn.ok{background:var(--ok);color:#0b0e14}
-  .btn.warn{background:var(--warn);color:#0b0e14}
-  .btn.gray{background:#1e2432;color:#e5e8ee}
-  .btn.danger{background:var(--danger);color:#0b0e14}
-  .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;color:#aab3c0}
-  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
-  .tab{border:1px solid var(--border);border-radius:999px;padding:6px 10px;background:#0f1420;color:#e5e8ee;cursor:pointer}
-  .tab.active{outline:2px solid var(--ok)}
-  .menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
-  .item{background:#121826;border:1px solid var(--border);border-radius:14px;padding:8px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start}
-  .item img{width:100%;height:100px;object-fit:cover;border-radius:10px;margin-bottom:6px;background:#0b101a;border:1px solid var(--border)}
-  .item .nm{font-weight:600}
-  .item .pr{color:#cfe3ff;font-size:13px}
-  table{width:100%;border-collapse:collapse}
-  th,td{border-bottom:1px solid var(--border);padding:8px;text-align:left;vertical-align:top}
-  .right .card{position:sticky;top:10px}
-  .total{display:flex;justify-content:space-between;font-weight:700;margin-top:8px}
-  .qbtn{padding:4px 8px;border-radius:8px;background:#1d2331;color:#dfe6f5}
-  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:50}
-  .modal{background:#0f141e;border:1px solid var(--border);border-radius:14px;padding:14px;max-width:520px;width:92%}
-  .opt{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed #1b2230}
-  .muted{color:var(--muted);font-size:13px}
+  input,select{
+    background:#ffffff;color:#111;
+    border:1px solid var(--border);
+    border-radius:12px;padding:12px 14px
+  }
+  button{
+    border:1px solid var(--border);
+    border-radius:12px;padding:12px 14px;cursor:pointer;
+    background:#ffffff;color:#111;font-weight:700
+  }
+  .btn{background:var(--accent);border-color:transparent;color:#fff}
+  .btn.ok{background:var(--ok);border-color:transparent;color:#fff}
+  .btn.warn{background:var(--warn);border-color:transparent;color:#fff}
+  .btn.gray{background:#f1f5f9}
+  .btn.danger{background:var(--danger);border-color:transparent;color:#fff}
+
+  .pill{
+    border:1px solid var(--border);
+    border-radius:999px;padding:8px 12px;
+    color:#374151;background:#ffffff;font-weight:700
+  }
+
+  .tabs{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0}
+  .tab{
+    border:1px solid var(--border);border-radius:999px;
+    padding:8px 12px;background:#ffffff;color:#111;cursor:pointer;font-weight:700
+  }
+  .tab.active{outline:3px solid var(--ok)}
+
+  .menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+  .item{
+    background:#ffffff;border:1px solid var(--border);border-radius:16px;
+    padding:10px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start
+  }
+  .item img{
+    width:100%;height:110px;object-fit:cover;border-radius:12px;
+    margin-bottom:8px;background:#f8fafc;border:1px solid var(--border)
+  }
+  .item .nm{font-weight:800;font-size:18px}
+  .item .pr{color:#111;font-size:16px}
+
+  table{width:100%;border-collapse:collapse;font-size:18px}
+  th,td{border-bottom:1px solid var(--border);padding:10px;text-align:left;vertical-align:top}
+  th{font-weight:800;color:#111}
+  .right .card{position:sticky;top:12px}
+
+  .total{display:flex;justify-content:space-between;font-weight:800;margin-top:10px;font-size:20px}
+
+  .qbtn{
+    padding:6px 10px;border-radius:10px;background:#eef2f7;color:#111;border:1px solid var(--border);
+    font-weight:800;min-width:36px
+  }
+
+  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50}
+  .modal{
+    background:#ffffff;border:1px solid var(--border);border-radius:16px;padding:16px;max-width:560px;width:92%
+  }
+  .opt{
+    display:flex;justify-content:space-between;align-items:center;padding:8px 0;
+    border-bottom:1px dashed var(--border);font-size:18px
+  }
+  .muted{color:var(--muted);font-size:16px}
 
   /* Header layout tweaks */
-  .hdr{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
-  .hdr-title{font-size:22px;font-weight:800}
-  .hdr-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-  .customer-wrap{margin-top:8px}
+  .hdr{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+  .hdr-title{font-size:24px;font-weight:900}
+  .hdr-right{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .customer-wrap{margin-top:10px}
   #customer{
-    width:100%;
-    font-size:20px;
-    padding:14px 16px;
-    border-radius:12px;
+    width:100%;font-size:22px;padding:16px;border-radius:14px
   }
+
   @media (max-width:900px){
     .left-right{grid-template-columns:1fr}
   }
@@ -78,13 +133,13 @@
     <input id="customer" placeholder="Customer name (required)">
   </div>
 
-  <div class="left-right" style="margin-top:10px">
+  <div class="left-right" style="margin-top:12px">
     <!-- MENU SIDE -->
     <div>
       <div class="card">
         <div class="row" style="justify-content:space-between;align-items:center">
           <div class="tabs" id="stationTabs"><button class="tab active" data-st="__ALL__">All</button></div>
-          <input id="search" placeholder="Search items…" style="min-width:220px">
+          <input id="search" placeholder="Search items…" style="min-width:240px">
         </div>
         <div id="menu" class="menu-grid"></div>
         <div id="menuEmpty" class="muted" style="display:none;margin-top:8px">No items.</div>
@@ -94,17 +149,17 @@
     <!-- CART SIDE -->
     <div class="right">
       <div class="card">
-        <h3 style="margin:0 0 8px 0">Order</h3>
+        <h3 style="margin:0 0 8px 0;font-size:20px">Order</h3>
         <table id="cartTable">
           <thead><tr><th>Item</th><th>Qty</th><th>Each</th><th>Line</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
         <div class="total"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
-        <div class="row" style="justify-content:space-between;margin-top:10px">
+        <div class="row" style="justify-content:space-between;margin-top:12px">
           <button id="clearCart" class="btn gray">Clear</button>
           <button id="submitOrder" class="btn ok">Submit Order</button>
         </div>
-        <div id="msg" class="muted" style="margin-top:8px"></div>
+        <div id="msg" class="muted" style="margin-top:10px"></div>
       </div>
     </div>
   </div>
@@ -113,9 +168,9 @@
 <!-- Modifier Modal -->
 <div id="modMask" class="modal-mask" style="display:none">
   <div class="modal">
-    <h3 id="modTitle" style="margin:0 0 6px 0">Customize</h3>
+    <h3 id="modTitle" style="margin:0 0 6px 0;font-size:20px">Customize</h3>
     <div id="modBody"></div>
-    <div class="row" style="justify-content:flex-end;margin-top:10px">
+    <div class="row" style="justify-content:flex-end;margin-top:12px">
       <button id="modCancel" class="btn gray">Cancel</button>
       <button id="modAdd" class="btn ok">Add to Order</button>
     </div>
@@ -250,7 +305,7 @@ function openModifierModal(menuItem, groupIds){
   groups.forEach((g, idx)=>{
     const gid = `g${idx}`;
     const row = document.createElement('div');
-    row.innerHTML = `<div style="margin:6px 0 4px 0;font-weight:600">${g.name}</div>`;
+    row.innerHTML = `<div style="margin:8px 0 6px 0;font-weight:800">${g.name}</div>`;
     const box = document.createElement('div');
     (g.options||[]).forEach((opt, i)=>{
       const optId = `${gid}_opt_${i}`;
@@ -273,7 +328,7 @@ function openModifierModal(menuItem, groupIds){
     if(g.selectType==='multi' && g.maxPicks){
       const info=document.createElement('div');
       info.className='muted';
-      info.style.marginTop='4px';
+      info.style.marginTop='6px';
       info.textContent = `Pick up to ${g.maxPicks}`;
       box.appendChild(info);
       box.addEventListener('change', ()=>{
@@ -348,18 +403,18 @@ function addLine({menuId, name, station, basePrice, mods}){
 function renderCart(){
   cartTBody.innerHTML = CART.map((l, idx)=>{
     const modsHtml = (l.mods&&l.mods.length)
-      ? `<div class="muted" style="font-size:12px;margin-top:2px">
+      ? `<div class="muted" style="font-size:14px;margin-top:4px">
            ${l.mods.map(g=>`${g.groupName}: ${g.options.map(o=>o.name).join(', ')}`).join(' • ')}
          </div>` : '';
     return `<tr>
       <td>
-        <div style="font-weight:600">${l.name}</div>
+        <div style="font-weight:800">${l.name}</div>
         ${modsHtml}
-        <div class="muted" style="font-size:11px">${l.station||''}</div>
+        <div class="muted" style="font-size:13px">${l.station||''}</div>
       </td>
       <td>
         <button class="qbtn" data-dec="${idx}">−</button>
-        <span style="display:inline-block;width:26px;text-align:center">${l.qty}</span>
+        <span style="display:inline-block;width:30px;text-align:center;font-weight:800">${l.qty}</span>
         <button class="qbtn" data-inc="${idx}">+</button>
       </td>
       <td>$${l.eachPrice.toFixed(2)}</td>
@@ -368,7 +423,6 @@ function renderCart(){
     </tr>`;
   }).join('');
 
-  // wire buttons — call renderCart() so qty text updates immediately
   cartTBody.querySelectorAll('[data-inc]').forEach(b=>{
     b.onclick=()=>{ CART[+b.dataset.inc].qty++; renderCart(); };
   });
@@ -377,8 +431,6 @@ function renderCart(){
       const i=+b.dataset.dec;
       CART[i].qty--;
       if(CART[i].qty<=0){ CART.splice(i,1); }
-      // If you prefer minimum 1 instead of removing, use:
-      // CART[i].qty=Math.max(1,CART[i].qty-1);
       renderCart();
     };
   });
@@ -393,7 +445,6 @@ function recalc(){
   const sub = CART.reduce((a,b)=> a + lRound(b.lineTotal), 0);
   subtotalEl.textContent = `$${sub.toFixed(2)}`;
 }
-// small helper to avoid floating rounding weirdness
 function lRound(n){ return Math.round(n*100)/100; }
 
 // ---------- Submit order ----------
@@ -428,7 +479,7 @@ $('#submitOrder').onclick = async ()=>{
       status: 'new',
       createdAt: ts,
       updatedAt: ts,
-      customer: cust,            // required & non-empty now
+      customer: cust,
       total: CART.reduce((a,b)=> a + b.lineTotal, 0),
       items: CART.map(l=>({
         menuId: l.menuId,
