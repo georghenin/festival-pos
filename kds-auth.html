@@ -258,13 +258,7 @@ async function setReadyForThisStation(orderId){
       tx.update(ref, updates);
     });
 
-    // After commit, fire SMS once if order just became fully ready
-    if(becameReady && orderPhone){
-      callFn("/sendReadySms", { to: orderPhone, orderNumber, customer: orderCustomer })
-        .then(r => { if(r?.error) console.warn("SMS ready error", r.error); });
-    }
-  }catch(e){ alert(e.message); }
-}
+  
 
 // undo: clear ready on this station's items; if any station pending, set status active
 async function undoReadyForThisStation(orderId){
