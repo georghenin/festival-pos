@@ -3,25 +3,39 @@
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Pickup Manager</title>
 <style>
-  :root{--bg:#0d0f13;--fg:#f5f7fa;--muted:#95a0ad;--card:#0f141e;--border:#1b2230;--ok:#2fd28f;--accent:#5b9bff}
-  *{box-sizing:border-box} html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  :root{
+    --bg:#ffffff; --fg:#000000; --muted:#555555;
+    --card:#f5f5f5; --border:#cccccc;
+    --ok:#2fd28f; --accent:#5b9bff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;font-size:18px}
   .wrap{max-width:1200px;margin:0 auto;padding:14px}
-  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;color:#aab3c0;background:#0f1420}
-  .btn{border:none;border-radius:10px;padding:10px 12px;cursor:pointer;color:#fff;background:var(--accent)}
-  .btn.ok{background:var(--ok);color:#0b0e14}.btn.gray{background:#1e2432}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px}
-  .chips{display:flex;gap:8px;flex-wrap:wrap}
-  .chip{border:1px solid var(--border);background:#0f1420;color:#e5e8ee;border-radius:999px;padding:6px 10px;cursor:pointer}
-  .chip.active{outline:2px solid var(--ok)}
-  .ticket{border:1px solid var(--border);background:#121826;border-radius:14px;padding:10px;margin-bottom:10px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .pill{border:1px solid var(--border);border-radius:999px;padding:8px 12px;
+    color:var(--fg);background:#f0f0f0;font-size:16px}
+  .btn{border:none;border-radius:10px;padding:12px 14px;cursor:pointer;
+    font-size:16px;font-weight:600}
+  .btn.ok{background:var(--ok);color:#fff}
+  .btn.gray{background:#e0e0e0;color:#000}
+  .btn.accent{background:var(--accent);color:#fff}
+  .card{background:var(--card);border:1px solid var(--border);
+    border-radius:16px;padding:16px}
+  .chips{display:flex;gap:10px;flex-wrap:wrap}
+  .chip{border:1px solid var(--border);background:#fafafa;color:#000;
+    border-radius:999px;padding:8px 12px;cursor:pointer;font-size:16px}
+  .chip.active{outline:3px solid var(--ok);font-weight:600}
+  .ticket{border:2px solid var(--border);background:#fff;border-radius:14px;
+    padding:14px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.1)}
   .hdr{display:flex;justify-content:space-between;gap:10px;align-items:center}
-  .customer{font-weight:800}
-  .colhdr{margin-top:8px;color:#aab3c6;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
-  .line{border-top:1px dashed #293246;padding:6px 0}
-  .mods{color:#aeb7c6;font-size:12px;margin-top:2px}
-  .muted{color:#95a0ad;font-size:12px}
-  .history{margin-top:10px;display:none}
+  .customer{font-weight:800;font-size:20px}
+  .colhdr{margin-top:8px;color:#333;font-size:15px;text-transform:uppercase;
+    letter-spacing:.04em;font-weight:600}
+  .line{border-top:1px dashed #bbb;padding:8px 0;font-size:16px}
+  .mods{color:#444;font-size:15px;margin-top:4px;font-weight:500}
+  .muted{color:var(--muted);font-size:14px}
+  .history{margin-top:12px;display:none}
 </style>
 </head>
 <body>
@@ -29,7 +43,7 @@
 
   <div class="row" style="justify-content:space-between">
     <div class="row">
-      <strong style="font-size:20px">Pickup Manager</strong>
+      <strong style="font-size:24px">Pickup Manager</strong>
       <span id="stationBadge" class="pill">Stations: loading…</span>
     </div>
     <div class="row">
@@ -41,7 +55,7 @@
   </div>
 
   <!-- Station filters -->
-  <div class="card" style="margin-top:10px">
+  <div class="card" style="margin-top:14px">
     <div class="row" style="justify-content:space-between">
       <div>
         <div class="muted" style="margin-bottom:6px">Only show orders that contain items from these stations:</div>
@@ -55,9 +69,9 @@
   </div>
 
   <!-- Ready list -->
-  <div class="card" style="margin-top:10px">
+  <div class="card" style="margin-top:14px">
     <div class="row" style="justify-content:space-between">
-      <h3 style="margin:0">Ready for Pickup</h3>
+      <h3 style="margin:0;font-size:22px">Ready for Pickup</h3>
       <button id="toggleHist" class="btn gray">Show history</button>
     </div>
     <div id="ready"></div>
@@ -66,7 +80,7 @@
     <!-- History (picked_up) -->
     <div id="hist" class="history">
       <div class="row" style="justify-content:space-between;margin-top:8px">
-        <h3 style="margin:0">Picked Up (<span id="histSpan">today</span>)</h3>
+        <h3 style="margin:0;font-size:22px">Picked Up (today)</h3>
         <button id="showAll" class="btn gray">Show all history</button>
       </div>
       <div id="picked"></div>
@@ -94,7 +108,7 @@ const $=s=>document.querySelector(s);
 const me=$('#me'), login=$('#login'), logout=$('#logout');
 const stationBadge=$('#stationBadge'), chips=$('#chips'), selectAll=$('#selectAll'), savePref=$('#savePref');
 const ready=$('#ready'), picked=$('#picked'), emptyReady=$('#emptyReady'), emptyPicked=$('#emptyPicked');
-const toggleHist=$('#toggleHist'), histBox=$('#hist'), showAll=$('#showAll'), histSpan=$('#histSpan');
+const toggleHist=$('#toggleHist'), histBox=$('#hist'), showAll=$('#showAll');
 
 // ====== SOUND ======
 const SOUND_URL = "https://georghenin.github.io/festival-pos/mixkit-bell-notification-933.wav";
@@ -107,7 +121,6 @@ function playDing(){ if(!soundCb.checked) return; try{dingEl.currentTime=0; ding
 function newestReadyTs(orders){
   let max=0;
   for(const o of orders){
-    if (isArchivedOrRefunded(o)) continue;
     for(const it of (o.items||[])){
       if(!itemMatchesStations(it)) continue;
       if(it.ready){
@@ -118,13 +131,14 @@ function newestReadyTs(orders){
   }
   return max;
 }
+// ===================================================
 
-// ===== Auth (view without sign-in; writes are open as you had them) =====
+// auth: view without sign-in; writes require sign-in
 auth.onAuthStateChanged(u=>{ me.textContent=u?u.email:'Not signed in'; });
 login.onclick=async()=>{ const e=prompt('Email:'); if(!e) return; const p=prompt('Password'); if(p===null) return; try{await auth.signInWithEmailAndPassword(e.trim(),p);}catch(err){alert(err.message);} };
 logout.onclick=()=>auth.signOut();
 
-// ===== Stations from settings/config (with autodiscovery fallback) =====
+// dynamic stations
 let STATIONS=[];
 let selected=new Set(JSON.parse(localStorage.getItem('pickupStations')||'[]'));
 let showAllHistory=false;
@@ -147,75 +161,29 @@ function renderChips(){
 selectAll.onclick=()=>{ STATIONS.forEach(s=>selected.add(s)); renderChips(); renderLists(); };
 savePref.onclick=()=>{ localStorage.setItem('pickupStations', JSON.stringify([...selected])); alert('Saved on this iPad.'); };
 
-// ===== Helpers =====
-const isArchivedOrRefunded = (o)=> (o?.archived === true || o?.status === 'refunded');
-const itemMatchesStations = (it)=>{
-  if(!it.station) return true;
-  if(!STATIONS.includes(it.station)) return true;
-  return selected.has(it.station);
-};
+const itemMatchesStations = (it)=> !it.station || selected.has(it.station);
 const orderHasSelectedStations = (o)=> (o.items||[]).some(itemMatchesStations);
+function modsHTML(mods){ const names=(mods||[]).flatMap(g=>(g.options||[]).map(o=>o.name)).filter(Boolean); return names.length? `<div class="mods">${names.join(', ')}</div>`:''; }
 
-// mods: handle grouped or flat or single object
-function modsHTML(mods){
-  if(!mods) return '';
-  let names=[];
-  if (Array.isArray(mods) && mods.length && mods[0]?.options){
-    names = mods.flatMap(g => (g.options||[]).map(o=>o?.name)).filter(Boolean);
-  } else if (Array.isArray(mods)){
-    names = mods.map(m=>m?.name).filter(Boolean);
-  } else if (typeof mods === 'object'){
-    names = [mods.name].filter(Boolean);
-  }
-  return names.length? `<div class="mods">${names.join(', ')}</div>`:'';
-}
-
-// ===== Data listeners =====
 let unsubReady=null, unsubPicked=null;
 let readyDocs=[], pickedDocs=[];
-
-function resubscribePicked(){
-  if (unsubPicked) unsubPicked();
-  if (!showAllHistory){
-    // today only
-    const start=new Date(); start.setHours(0,0,0,0);
-    unsubPicked = db.collection('orders')
-      .where('status','==','picked_up')
-      .where('updatedAt','>=', start.getTime())
-      .orderBy('updatedAt','desc').limit(200)
-      .onSnapshot(s=>{
-        pickedDocs = s.docs.map(d=>({id:d.id, ...d.data()}))
-          .filter(o => !isArchivedOrRefunded(o));
-        autoDiscoverStations(pickedDocs);
-        if(histBox.style.display!=='none') renderLists();
-      });
-  } else {
-    // all history (limited)
-    unsubPicked = db.collection('orders')
-      .where('status','==','picked_up')
-      .orderBy('updatedAt','desc').limit(400)
-      .onSnapshot(s=>{
-        pickedDocs = s.docs.map(d=>({id:d.id, ...d.data()}))
-          .filter(o => !isArchivedOrRefunded(o));
-        autoDiscoverStations(pickedDocs);
-        if(histBox.style.display!=='none') renderLists();
-      });
-  }
-}
-
 function subscribe(){
-  if (unsubReady) unsubReady();
-  resubscribePicked();
-
-  // Ready feed: recent orders; we’ll filter locally
+  if(unsubReady) unsubReady(); if(unsubPicked) unsubPicked();
   unsubReady = db.collection('orders').orderBy('updatedAt','desc').limit(400)
     .onSnapshot(s=>{
       readyDocs = s.docs.map(d=>({id:d.id, ...d.data()}))
-        .filter(o => !isArchivedOrRefunded(o))
-        .filter(o => (o.items||[]).some(it=>it.ready))   // has at least one ready item
-        .filter(o => o.status !== 'picked_up');          // not already picked up
+        .filter(o => (o.items||[]).some(it=>it.ready) && o.status!=='picked_up');
       autoDiscoverStations(readyDocs);
       renderLists();
+    });
+  const start=new Date(); start.setHours(0,0,0,0);
+  unsubPicked = db.collection('orders')
+    .where('status','==','picked_up').where('updatedAt','>=', start.getTime())
+    .orderBy('updatedAt','desc').limit(200)
+    .onSnapshot(s=>{
+      pickedDocs = s.docs.map(d=>({id:d.id, ...d.data()}));
+      autoDiscoverStations(pickedDocs);
+      if(histBox.style.display!=='none') renderLists();
     });
 }
 subscribe();
@@ -240,7 +208,7 @@ function orderHTML(o){
   const allReady = (o.items||[]).length && (o.items||[]).every(it=>it.ready);
   const btn = allReady
     ? `<button class="btn ok" data-act="picked" data-id="${o.id}">Mark Picked Up</button>`
-    : `<button class="btn gray" disabled title="Some items still preparing">Mark Picked Up</button>`;
+    : `<button class="btn gray" disabled>Mark Picked Up</button>`;
 
   return `
   <div class="ticket">
@@ -251,23 +219,17 @@ function orderHTML(o){
       </div>
       <div>${btn}</div>
     </div>
-
     ${rItems.length? `<div class="colhdr">Ready Items</div>${rHTML}` : ''}
     ${pItems.length? `<div class="colhdr">Still Preparing</div>${pHTML}` : ''}
   </div>`;
 }
 
 function renderLists(){
-  // READY
   const r=readyDocs.filter(orderHasSelectedStations);
   ready.innerHTML = r.map(orderHTML).join('');
   emptyReady.style.display = r.length? 'none':'block';
-
-  // 🔔 sound: play when new ready items/orders appear (ignores archived/refunded already)
   const newest = newestReadyTs(r);
   if(newest && newest > lastReadySoundTs){ playDing(); lastReadySoundTs=newest; localStorage.setItem('pickupLastSoundTs', String(lastReadySoundTs)); }
-
-  // HISTORY
   if(histBox.style.display!=='none'){
     const p=pickedDocs.filter(orderHasSelectedStations);
     picked.innerHTML = p.map(o=>`
@@ -291,22 +253,15 @@ function renderLists(){
 }
 
 async function setStatus(id, status){
-  try{
-    await db.collection('orders').doc(id).update({status, updatedAt: Date.now()});
-  }catch(e){ alert(e.message); }
+  try{ await db.collection('orders').doc(id).update({status, updatedAt: Date.now()}); }
+  catch(e){ alert(e.message); }
 }
 
 toggleHist.onclick=()=>{
   const open = histBox.style.display!=='none';
   histBox.style.display = open ? 'none' : 'block';
   toggleHist.textContent = open ? 'Show history' : 'Hide history';
-  if(!open){ renderLists(); }
-};
-showAll.onclick=()=>{
-  showAllHistory = !showAllHistory;
-  showAll.textContent = showAllHistory ? 'Show today only' : 'Show all history';
-  histSpan.textContent = showAllHistory ? 'all' : 'today';
-  resubscribePicked();
+  if(!open) renderLists();
 };
 </script>
 </body></html>
