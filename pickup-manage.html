@@ -6,36 +6,33 @@
   :root{
     --bg:#ffffff; --fg:#000000; --muted:#555555;
     --card:#f5f5f5; --border:#cccccc;
-    --ok:#2fd28f; --accent:#5b9bff;
+    --ok:#15a46b; --accent:#2563eb;
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--fg);
-    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;font-size:18px}
-  .wrap{max-width:1200px;margin:0 auto;padding:14px}
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;font-size:18px;line-height:1.25}
+  .wrap{max-width:1200px;margin:0 auto;padding:16px}
   .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   .pill{border:1px solid var(--border);border-radius:999px;padding:8px 12px;
-    color:var(--fg);background:#f0f0f0;font-size:16px}
-  .btn{border:none;border-radius:10px;padding:12px 14px;cursor:pointer;
-    font-size:16px;font-weight:600}
-  .btn.ok{background:var(--ok);color:#fff}
-  .btn.gray{background:#e0e0e0;color:#000}
-  .btn.accent{background:var(--accent);color:#fff}
-  .card{background:var(--card);border:1px solid var(--border);
-    border-radius:16px;padding:16px}
+    color:#111;background:#fff;font-size:16px;font-weight:700}
+  .btn{border:1px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;
+    font-size:16px;font-weight:700;background:#fff;color:#111}
+  .btn.ok{background:var(--ok);border-color:transparent;color:#fff}
+  .btn.gray{background:#f1f5f9}
+  .btn.accent{background:var(--accent);border-color:transparent;color:#fff}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:16px}
   .chips{display:flex;gap:10px;flex-wrap:wrap}
-  .chip{border:1px solid var(--border);background:#fafafa;color:#000;
-    border-radius:999px;padding:8px 12px;cursor:pointer;font-size:16px}
-  .chip.active{outline:3px solid var(--ok);font-weight:600}
-  .ticket{border:2px solid var(--border);background:#fff;border-radius:14px;
-    padding:14px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.1)}
+  .chip{border:1px solid var(--border);background:#ffffff;color:#000;border-radius:999px;padding:8px 12px;cursor:pointer;font-size:16px;font-weight:700}
+  .chip.active{outline:3px solid var(--ok)}
+  .ticket{border:2px solid var(--border);background:#fff;border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.08)}
   .hdr{display:flex;justify-content:space-between;gap:10px;align-items:center}
-  .customer{font-weight:800;font-size:20px}
-  .colhdr{margin-top:8px;color:#333;font-size:15px;text-transform:uppercase;
-    letter-spacing:.04em;font-weight:600}
+  .customer{font-weight:900;font-size:20px}
+  .colhdr{margin-top:8px;color:#333;font-size:15px;text-transform:uppercase;letter-spacing:.04em;font-weight:700}
   .line{border-top:1px dashed #bbb;padding:8px 0;font-size:16px}
-  .mods{color:#444;font-size:15px;margin-top:4px;font-weight:500}
+  .mods{color:#444;font-size:15px;margin-top:4px;font-weight:600}
   .muted{color:var(--muted);font-size:14px}
   .history{margin-top:12px;display:none}
+  input[type="checkbox"]{transform:scale(1.15);margin-right:6px}
 </style>
 </head>
 <body>
@@ -47,18 +44,18 @@
       <span id="stationBadge" class="pill">Stations: loading…</span>
     </div>
     <div class="row">
-      <label class="pill"><input id="sound" type="checkbox" style="margin-right:6px"> Sound on new ready</label>
+      <label class="pill"><input id="sound" type="checkbox"> Sound on new ready</label>
       <span id="me" class="pill">Not signed in</span>
       <button id="login" class="btn gray">Sign in</button>
       <button id="logout" class="btn gray">Sign out</button>
     </div>
   </div>
 
-  <!-- Station filters -->
+  <!-- Station filters (now only affect which items are shown inside each order; orders always appear) -->
   <div class="card" style="margin-top:14px">
     <div class="row" style="justify-content:space-between">
       <div>
-        <div class="muted" style="margin-bottom:6px">Only show orders that contain items from these stations:</div>
+        <div class="muted" style="margin-bottom:6px">Show items for these stations (orders always appear):</div>
         <div class="chips" id="chips"></div>
       </div>
       <div class="row">
@@ -68,14 +65,14 @@
     </div>
   </div>
 
-  <!-- Ready list -->
+  <!-- Active orders -->
   <div class="card" style="margin-top:14px">
     <div class="row" style="justify-content:space-between">
-      <h3 style="margin:0;font-size:22px">Ready for Pickup</h3>
+      <h3 style="margin:0;font-size:22px">Active Orders (new • partial • ready)</h3>
       <button id="toggleHist" class="btn gray">Show history</button>
     </div>
-    <div id="ready"></div>
-    <div id="emptyReady" class="muted" style="display:none">No ready orders.</div>
+    <div id="active"></div>
+    <div id="emptyActive" class="muted" style="display:none">No active orders.</div>
 
     <!-- History (picked_up) -->
     <div id="hist" class="history">
@@ -107,10 +104,10 @@ const db=firebase.firestore(), auth=firebase.auth();
 const $=s=>document.querySelector(s);
 const me=$('#me'), login=$('#login'), logout=$('#logout');
 const stationBadge=$('#stationBadge'), chips=$('#chips'), selectAll=$('#selectAll'), savePref=$('#savePref');
-const ready=$('#ready'), picked=$('#picked'), emptyReady=$('#emptyReady'), emptyPicked=$('#emptyPicked');
+const active=$('#active'), picked=$('#picked'), emptyActive=$('#emptyActive'), emptyPicked=$('#emptyPicked');
 const toggleHist=$('#toggleHist'), histBox=$('#hist'), showAll=$('#showAll');
 
-// ====== SOUND ======
+// ====== SOUND (still only on "new ready" to avoid too much dinging) ======
 const SOUND_URL = "https://georghenin.github.io/festival-pos/mixkit-bell-notification-933.wav";
 const dingEl=document.getElementById('ding'); dingEl.src = SOUND_URL;
 const soundCb=document.getElementById('sound');
@@ -122,7 +119,6 @@ function newestReadyTs(orders){
   let max=0;
   for(const o of orders){
     for(const it of (o.items||[])){
-      if(!itemMatchesStations(it)) continue;
       if(it.ready){
         const ts=Number(it.readyAt || o.updatedAt || o.createdAt || 0);
         if(ts>max) max=ts;
@@ -131,14 +127,13 @@ function newestReadyTs(orders){
   }
   return max;
 }
-// ===================================================
 
-// auth: view without sign-in; writes require sign-in
+// ===== Auth (view without sign-in; writes require sign-in) =====
 auth.onAuthStateChanged(u=>{ me.textContent=u?u.email:'Not signed in'; });
 login.onclick=async()=>{ const e=prompt('Email:'); if(!e) return; const p=prompt('Password'); if(p===null) return; try{await auth.signInWithEmailAndPassword(e.trim(),p);}catch(err){alert(err.message);} };
 logout.onclick=()=>auth.signOut();
 
-// dynamic stations
+// ===== Stations from settings/config + selection persists =====
 let STATIONS=[];
 let selected=new Set(JSON.parse(localStorage.getItem('pickupStations')||'[]'));
 let showAllHistory=false;
@@ -161,40 +156,50 @@ function renderChips(){
 selectAll.onclick=()=>{ STATIONS.forEach(s=>selected.add(s)); renderChips(); renderLists(); };
 savePref.onclick=()=>{ localStorage.setItem('pickupStations', JSON.stringify([...selected])); alert('Saved on this iPad.'); };
 
-const itemMatchesStations = (it)=> !it.station || selected.has(it.station);
-const orderHasSelectedStations = (o)=> (o.items||[]).some(itemMatchesStations);
+// ===== Helpers =====
+const isHiddenOrder = (o)=> (o?.archived === true || o?.status === 'refunded' || o?.status === 'picked_up');
+const itemMatchesStations = (it)=>{
+  if(!it.station) return true;
+  if(!STATIONS.includes(it.station)) return true;
+  return selected.has(it.station);
+};
 function modsHTML(mods){ const names=(mods||[]).flatMap(g=>(g.options||[]).map(o=>o.name)).filter(Boolean); return names.length? `<div class="mods">${names.join(', ')}</div>`:''; }
+const orderAllReady = (o)=> (o.items||[]).length && (o.items||[]).every(it=>it.ready);
 
-let unsubReady=null, unsubPicked=null;
-let readyDocs=[], pickedDocs=[];
-function subscribe(){
-  if(unsubReady) unsubReady(); if(unsubPicked) unsubPicked();
-  unsubReady = db.collection('orders').orderBy('updatedAt','desc').limit(400)
-    .onSnapshot(s=>{
-      readyDocs = s.docs.map(d=>({id:d.id, ...d.data()}))
-        .filter(o => (o.items||[]).some(it=>it.ready) && o.status!=='picked_up');
-      autoDiscoverStations(readyDocs);
-      renderLists();
-    });
+// ===== Data listeners =====
+let unsubActive=null, unsubPicked=null;
+let activeDocs=[], pickedDocs=[];
+
+function resubscribePicked(){
+  if (unsubPicked) unsubPicked();
   const start=new Date(); start.setHours(0,0,0,0);
   unsubPicked = db.collection('orders')
-    .where('status','==','picked_up').where('updatedAt','>=', start.getTime())
+    .where('status','==','picked_up')
+    .where('updatedAt','>=', start.getTime())
     .orderBy('updatedAt','desc').limit(200)
     .onSnapshot(s=>{
       pickedDocs = s.docs.map(d=>({id:d.id, ...d.data()}));
-      autoDiscoverStations(pickedDocs);
       if(histBox.style.display!=='none') renderLists();
+    });
+}
+
+function subscribe(){
+  if (unsubActive) unsubActive();
+  resubscribePicked();
+
+  // NEW: include new + partial + ready (but not picked_up/refunded/archived)
+  unsubActive = db.collection('orders')
+    .orderBy('updatedAt','desc').limit(500)
+    .onSnapshot(s=>{
+      activeDocs = s.docs.map(d=>({id:d.id, ...d.data()}))
+        .filter(o => !isHiddenOrder(o));
+      renderLists();
     });
 }
 subscribe();
 
-function autoDiscoverStations(arr){
-  const seen=new Set(STATIONS);
-  arr.forEach(o => (o.items||[]).forEach(it=>{ if(it.station) seen.add(it.station); }));
-  if(seen.size!==STATIONS.length){ STATIONS=[...seen]; STATIONS.forEach(s=>selected.add(s)); renderChips(); stationBadge.textContent='Stations: '+STATIONS.join(', '); }
-}
-
 function orderHTML(o){
+  // Items shown per selected stations (order always visible)
   const rItems=(o.items||[]).filter(it=>it.ready && itemMatchesStations(it));
   const pItems=(o.items||[]).filter(it=>!it.ready && itemMatchesStations(it));
 
@@ -205,10 +210,10 @@ function orderHTML(o){
     <div class="line"><div><strong>${it.qty||1}× ${it.name}</strong> <span class="muted">• ${it.station||''}</span></div>${modsHTML(it.mods)}</div>
   `).join('');
 
-  const allReady = (o.items||[]).length && (o.items||[]).every(it=>it.ready);
+  const allReady = orderAllReady(o);
   const btn = allReady
     ? `<button class="btn ok" data-act="picked" data-id="${o.id}">Mark Picked Up</button>`
-    : `<button class="btn gray" disabled>Mark Picked Up</button>`;
+    : `<button class="btn gray" disabled title="Whole order must be ready">Mark Picked Up</button>`;
 
   return `
   <div class="ticket">
@@ -225,14 +230,17 @@ function orderHTML(o){
 }
 
 function renderLists(){
-  const r=readyDocs.filter(orderHasSelectedStations);
-  ready.innerHTML = r.map(orderHTML).join('');
-  emptyReady.style.display = r.length? 'none':'block';
-  const newest = newestReadyTs(r);
+  // ACTIVE
+  active.innerHTML = activeDocs.map(orderHTML).join('');
+  emptyActive.style.display = activeDocs.length? 'none':'block';
+
+  // 🔔 sound on new ready items (not on every update)
+  const newest = newestReadyTs(activeDocs);
   if(newest && newest > lastReadySoundTs){ playDing(); lastReadySoundTs=newest; localStorage.setItem('pickupLastSoundTs', String(lastReadySoundTs)); }
+
+  // HISTORY
   if(histBox.style.display!=='none'){
-    const p=pickedDocs.filter(orderHasSelectedStations);
-    picked.innerHTML = p.map(o=>`
+    picked.innerHTML = pickedDocs.map(o=>`
       <div class="ticket">
         <div class="hdr">
           <div>
@@ -246,10 +254,10 @@ function renderLists(){
         `).join('')}
       </div>
     `).join('');
-    emptyPicked.style.display = p.length? 'none':'block';
+    emptyPicked.style.display = pickedDocs.length? 'none':'block';
     picked.querySelectorAll('[data-act="undo"]').forEach(b=> b.onclick=()=> setStatus(b.dataset.id,'ready'));
   }
-  ready.querySelectorAll('[data-act="picked"]').forEach(b=> b.onclick=()=> setStatus(b.dataset.id,'picked_up'));
+  active.querySelectorAll('[data-act="picked"]').forEach(b=> b.onclick=()=> setStatus(b.dataset.id,'picked_up'));
 }
 
 async function setStatus(id, status){
