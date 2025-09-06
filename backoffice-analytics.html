@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
@@ -6,315 +6,528 @@
 <title>Back Office — Sales & Analytics</title>
 <style>
   :root{
-    --bg:#0d0f13; --card:#0f141e; --fg:#f5f7fa; --muted:#95a0ad;
-    --border:#1b2230; --accent:#5b9bff;
+    --bg:#ffffff; --fg:#111; --muted:#666;
+    --card:#f5f5f7; --border:#d7dbe2;
+    --accent:#2563eb; --ok:#15a46b; --warn:#d97706;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
-  header{position:sticky;top:0;background:#0d0f13d0;backdrop-filter:saturate(1.2) blur(6px);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;gap:10px;align-items:center;z-index:5}
-  h1{margin:0;font-size:18px}
-  input,select,button{background:#0c111b;color:var(--fg);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
-  button{cursor:pointer}
-  .primary{background:var(--accent);color:#fff;border:none}
+  html,body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;font-size:18px;line-height:1.25}
   .wrap{max-width:1200px;margin:0 auto;padding:16px}
-  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
-  .metric{font-size:28px;font-weight:700}
-  .muted{color:var(--muted);font-size:13px}
-  .table{margin-top:12px;border:1px solid var(--border);border-radius:16px;overflow:hidden}
-  .thead,.trow{display:grid;grid-template-columns:1.6fr 0.6fr 0.8fr 0.8fr;gap:8px;padding:10px 12px}
-  .thead{background:#0c111b;border-bottom:1px solid var(--border);font-weight:600;color:#cbd5e1}
-  .trow{border-bottom:1px solid #0e1320}
-  .pill{display:inline-block;border:1px solid var(--border);background:#0f1420;color:#a7b0bd;border-radius:999px;padding:4px 8px;font-size:12px}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  .row{display:flex;gap:8px;flex-wrap:wrap}
-  .little{font-size:12px}
-  .msel{min-width:220px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .pill{border:1px solid var(--border);border-radius:999px;padding:8px 12px;background:#fff;color:#111;font-weight:700}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:14px}
+  .btn{border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:#fff;color:#111;font-weight:700;cursor:pointer}
+  .btn.primary{background:var(--accent);border-color:transparent;color:#fff}
+  .btn.ok{background:var(--ok);border-color:transparent;color:#fff}
+  .btn.gray{background:#eef2f7}
+  input,select{font:inherit;border:1px solid var(--border);border-radius:12px;background:#fff;color:#111;padding:10px 12px}
+  h2{margin:0 0 8px 0;font-size:22px}
+  h3{margin:0 0 8px 0;font-size:20px}
+
+  .chips{display:flex;gap:10px;flex-wrap:wrap}
+  .chip{border:1px solid var(--border);background:#fff;color:#111;border-radius:999px;padding:8px 12px;cursor:pointer;font-weight:700}
+  .chip.active{outline:3px solid var(--ok)}
+
+  .toolbar{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end}
+  .filters{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .filters .wide{grid-column:span 2}
+  @media (max-width:900px){ .filters{grid-template-columns:1fr 1fr} }
+
+  .tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .tab{border:1px solid var(--border);border-radius:999px;padding:8px 12px;background:#fff;cursor:pointer;font-weight:800}
+  .tab.active{outline:3px solid var(--accent);color:#0b1f52}
+
+  .totals{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .total-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px;text-align:center}
+  .total-val{font-size:22px;font-weight:900}
+  .total-lbl{color:var(--muted);font-size:14px}
+
+  .selbar{background:#fff;border:2px solid var(--accent);border-radius:14px;padding:10px;margin-top:10px;display:none}
+  .selbar strong{font-size:18px}
+
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid var(--border);padding:10px;text-align:left;vertical-align:top}
+  th{background:#fff;position:sticky;top:0;z-index:2}
+  .num{text-align:right}
+  .muted{color:var(--muted)}
+  .expander{cursor:pointer;color:#0b1f52;font-weight:700}
+
+  .charts{display:grid;grid-template-columns:1fr;gap:12px}
+  canvas{background:#fff;border:1px solid var(--border);border-radius:14px;padding:10px}
 </style>
 </head>
 <body>
-  <header>
-    <h1>Back Office — Sales & Analytics</h1>
-    <input id="from" type="date"/><input id="to" type="date"/>
-    <select id="stations" class="msel" multiple title="Stations (multi-select)"></select>
-    <input id="itemSearch" placeholder="Search item…"/>
-    <label class="row little" title="If ON, only count orders with status = picked_up">
-      <input type="checkbox" id="pickedOnly"/> picked_up only
-    </label>
-    <button id="run" class="primary">Run</button>
-    <div style="flex:1"></div>
-    <a href="backoffice-orders.html"><button>Orders</button></a>
-  </header>
-
-  <div class="wrap">
-    <div class="cards">
-      <div class="card">
-        <div class="muted">Total Sales</div>
-        <div id="mTotal" class="metric">$0.00</div>
-        <div class="little muted">Default counts all non-refunded orders</div>
-      </div>
-      <div class="card">
-        <div class="muted">Orders Count</div>
-        <div id="mOrders" class="metric">0</div>
-      </div>
-      <div class="card">
-        <div class="muted">Refunds (excluded)</div>
-        <div id="mRefunds" class="metric">$0.00</div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:16px">
-      <div class="row" style="justify-content:space-between;align-items:center">
-        <div class="muted">Daily Sales</div>
-        <div class="row little">
-          <button id="exportDaily">Export CSV</button>
-        </div>
-      </div>
-      <canvas id="chart" height="120"></canvas>
-    </div>
-
-    <div class="grid2" style="margin-top:16px">
-      <div class="card">
-        <div class="row" style="justify-content:space-between;align-items:center">
-          <div class="muted">Item Breakdown (qty & revenue) — excludes refunded</div>
-          <div class="row little">
-            <button id="exportItems">Export CSV</button>
-          </div>
-        </div>
-        <div class="table">
-          <div class="thead"><div>Item</div><div>Qty</div><div>Revenue</div><div>Station</div></div>
-          <div id="itemsBody"></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="row" style="justify-content:space-between;align-items:center">
-          <div class="muted">Mod / Variant Impact (qty & revenue from mod prices)</div>
-          <div class="row little">
-            <button id="exportMods">Export CSV</button>
-          </div>
-        </div>
-        <div class="table">
-          <div class="thead"><div>Variant</div><div>Qty</div><div>Revenue</div><div>Station</div></div>
-          <div id="modsBody"></div>
-        </div>
-      </div>
+<div class="wrap">
+  <div class="row" style="justify-content:space-between">
+    <h2>Back Office — Sales & Analytics</h2>
+    <div class="row">
+      <span id="stationsBadge" class="pill">Stations: loading…</span>
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
-  <script>
-  // ---------- Firebase ----------
-  const config = { apiKey:"AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM", authDomain:"churchfestivalpos.firebaseapp.com", projectId:"churchfestivalpos" };
-  firebase.initializeApp(config);
-  const db = firebase.firestore();
+  <!-- Filters -->
+  <div class="card" style="margin-top:12px">
+    <div class="filters">
+      <div>
+        <div class="muted" style="margin-bottom:4px">Start date</div>
+        <input type="date" id="startDate">
+      </div>
+      <div>
+        <div class="muted" style="margin-bottom:4px">End date</div>
+        <input type="date" id="endDate">
+      </div>
+      <div>
+        <div class="muted" style="margin-bottom:4px">Group by</div>
+        <div class="tabs">
+          <button class="tab active" data-mode="items" id="tabItems">Items</button>
+          <button class="tab" data-mode="stations" id="tabStations">Stations</button>
+        </div>
+      </div>
+      <div class="wide" id="itemSearchWrap">
+        <div class="muted" style="margin-bottom:4px">Search items</div>
+        <input id="itemSearch" placeholder="Type to filter items by name…">
+      </div>
+    </div>
 
-  // ---------- UI refs ----------
-  const elFrom = document.getElementById("from");
-  const elTo = document.getElementById("to");
-  const elStations = document.getElementById("stations");
-  const elItemSearch = document.getElementById("itemSearch");
-  const elPickedOnly = document.getElementById("pickedOnly");
-  const btnRun = document.getElementById("run");
-  const mTotal = document.getElementById("mTotal");
-  const mOrders = document.getElementById("mOrders");
-  const mRefunds = document.getElementById("mRefunds");
-  const itemsBody = document.getElementById("itemsBody");
-  const modsBody = document.getElementById("modsBody");
+    <div class="muted" style="margin:10px 0 6px 0">Filter by stations</div>
+    <div id="stationChips" class="chips"></div>
 
-  const btnDailyCSV = document.getElementById("exportDaily");
-  const btnItemsCSV = document.getElementById("exportItems");
-  const btnModsCSV  = document.getElementById("exportMods");
+    <div class="row" style="justify-content:flex-end;margin-top:12px">
+      <button id="refresh" class="btn primary">Run Report</button>
+      <button id="exportCsv" class="btn">Export CSV (All)</button>
+      <button id="exportCsvSel" class="btn" style="display:none">Export CSV (Selected)</button>
+    </div>
+  </div>
 
-  // defaults: last 14 days
-  const today = new Date();
-  const start = new Date(); start.setDate(today.getDate()-13);
-  elFrom.value = start.toISOString().slice(0,10);
-  elTo.value = today.toISOString().slice(0,10);
+  <!-- Totals -->
+  <div class="totals" style="margin-top:12px">
+    <div class="total-card">
+      <div class="total-val" id="tRevenue">$0.00</div>
+      <div class="total-lbl">Revenue (filtered)</div>
+    </div>
+    <div class="total-card">
+      <div class="total-val" id="tItems">0</div>
+      <div class="total-lbl">Items sold (filtered)</div>
+    </div>
+    <div class="total-card">
+      <div class="total-val" id="tOrders">0</div>
+      <div class="total-lbl">Orders counted (filtered)</div>
+    </div>
+  </div>
 
-  // Chart
-  const ctx = document.getElementById("chart").getContext("2d");
-  let chart = new Chart(ctx,{
-    type:"line",
-    data:{ labels:[], datasets:[{label:"Daily Sales", data:[]}] },
-    options:{ responsive:true, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{ticks:{callback:v=>'$'+Number(v).toFixed(0)}}}}
+  <!-- Selected totals bar (appears when rows are checked) -->
+  <div id="selBar" class="selbar">
+    <div class="row" style="justify-content:space-between">
+      <div><strong>Selected Totals:</strong>
+        <span id="selRevenue" style="margin-left:12px">$0.00</span> •
+        <span id="selItems">0 items</span>
+      </div>
+      <button id="clearSelection" class="btn gray">Clear selection</button>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card" style="margin-top:12px">
+    <h3 id="tableTitle" style="margin-bottom:8px">Sales by Items</h3>
+    <div style="max-height:420px;overflow:auto;border-radius:12px">
+      <table id="dataTable">
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts" style="margin-top:12px">
+    <div>
+      <h3 style="margin-bottom:6px">Daily Revenue</h3>
+      <canvas id="chartDaily" width="900" height="260"></canvas>
+    </div>
+    <div id="stationChartWrap" style="display:none">
+      <h3 style="margin-bottom:6px">Revenue by Station</h3>
+      <canvas id="chartStations" width="900" height="260"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
+  authDomain:"churchfestivalpos.firebaseapp.com",
+  projectId:"churchfestivalpos"
+});
+const db=firebase.firestore();
+
+/* ---------- DOM ---------- */
+const $=s=>document.querySelector(s);
+const stationsBadge=$('#stationsBadge');
+const startDate=$('#startDate'), endDate=$('#endDate');
+const tabItems=$('#tabItems'), tabStations=$('#tabStations');
+const itemSearchWrap=$('#itemSearchWrap'), itemSearch=$('#itemSearch');
+const stationChips=$('#stationChips');
+const refreshBtn=$('#refresh'), exportCsv=$('#exportCsv'), exportCsvSel=$('#exportCsvSel');
+const tRevenue=$('#tRevenue'), tItems=$('#tItems'), tOrders=$('#tOrders');
+const selBar=$('#selBar'), selRevenue=$('#selRevenue'), selItems=$('#selItems'), clearSelection=$('#clearSelection');
+const tableTitle=$('#tableTitle'), thead=$('#thead'), tbody=$('#tbody');
+const chartDaily=$('#chartDaily'), chartStations=$('#chartStations'), stationChartWrap=$('#stationChartWrap');
+
+/* ---------- State ---------- */
+let MODE='items'; // 'items' | 'stations'
+let STATIONS_ALL=['Grill','Fryer','Drinks','Pizza'];
+let selectedStations=new Set();
+let orders=[];  // filtered source orders
+let aggItems=[], aggStations=[], dailySeries=[];
+let rowSelection=new Set(); // ids of selected rows
+
+/* ---------- Init dates (today) ---------- */
+(function initDates(){
+  const d=new Date(); const endISO=d.toISOString().slice(0,10);
+  const d2=new Date(); d2.setDate(d2.getDate()-0);
+  const startISO=d2.toISOString().slice(0,10);
+  startDate.value=startISO; endDate.value=endISO;
+})();
+
+/* ---------- Stations from settings ---------- */
+async function loadStations(){
+  try{
+    const s=await db.collection('settings').doc('config').get();
+    const conf=s.data(); if(conf && Array.isArray(conf.stations) && conf.stations.length) STATIONS_ALL=conf.stations;
+  }catch(e){}
+  stationsBadge.textContent='Stations: '+STATIONS_ALL.join(', ');
+  if(!selectedStations.size) STATIONS_ALL.forEach(s=>selectedStations.add(s));
+  renderStationChips();
+}
+
+function renderStationChips(){
+  stationChips.innerHTML=STATIONS_ALL.map(s=>`<span class="chip ${selectedStations.has(s)?'active':''}" data-st="${s}">${s}</span>`).join('');
+  stationChips.querySelectorAll('.chip').forEach(c=>{
+    c.onclick=()=>{ const s=c.dataset.st; selectedStations.has(s)?selectedStations.delete(s):selectedStations.add(s); renderStationChips(); };
+  });
+}
+
+/* ---------- Tabs ---------- */
+function setMode(m){
+  MODE=m;
+  tabItems.classList.toggle('active', m==='items');
+  tabStations.classList.toggle('active', m==='stations');
+  itemSearchWrap.style.display = (m==='items') ? 'block' : 'none';
+  tableTitle.textContent = m==='items' ? 'Sales by Items' : 'Sales by Stations';
+  stationChartWrap.style.display = (m==='stations') ? 'block' : 'none';
+  renderTable(); renderSelectedBar();
+}
+tabItems.onclick=()=> setMode('items');
+tabStations.onclick=()=> setMode('stations');
+
+/* ---------- Fetch + Aggregate ---------- */
+refreshBtn.onclick=runReport;
+async function runReport(){
+  rowSelection.clear();
+  renderSelectedBar();
+
+  const startMS = new Date(startDate.value+'T00:00:00').getTime();
+  const endMS   = new Date(endDate.value+'T23:59:59').getTime();
+
+  // Query by createdAt within range (one-off read)
+  const snap=await db.collection('orders')
+    .where('createdAt','>=', startMS)
+    .where('createdAt','<=', endMS)
+    .orderBy('createdAt','asc')
+    .get();
+
+  // Keep only completed sales
+  const base = snap.docs.map(d=>({id:d.id, ...d.data()}))
+    .filter(o=> (o.status==='picked_up' || o.status==='force_completed') && !o.refunded && !o.archived);
+
+  // Apply station filter at item level
+  const stAllowed=new Set(selectedStations);
+  orders = base.map(o=>{
+    const items=(o.items||[]).filter(it=> !it.station || stAllowed.has(it.station));
+    return {...o, items};
+  }).filter(o=> (o.items||[]).length>0);
+
+  aggregate();
+  renderTotals();
+  renderTable();
+  drawDailyChart();
+  if(MODE==='stations') drawStationChart();
+}
+
+function aggregate(){
+  // Items
+  const byItem=new Map();
+  // Stations
+  const byStation=new Map();
+  // Daily revenue
+  const byDay=new Map();
+
+  orders.forEach(o=>{
+    const day = new Date(o.createdAt||o.updatedAt||0);
+    day.setHours(0,0,0,0);
+    const dayKey=day.getTime();
+
+    let orderRevenue=0, orderItems=0;
+
+    (o.items||[]).forEach(it=>{
+      const qty = Number(it.qty||1);
+      const unit = Number(it.price||0);
+      const lineRev = round2(qty*unit);
+      orderRevenue += lineRev;
+      orderItems += qty;
+
+      const ikey = (it.name||'Unknown') + '|' + (it.station||'');
+      const curI = byItem.get(ikey) || { key:ikey, name:it.name||'Unknown', station:it.station||'', qty:0, revenue:0, lines:[], mods:{} };
+      curI.qty += qty; curI.revenue = round2(curI.revenue + lineRev);
+      // capture modifiers
+      (it.mods||[]).forEach(g=>{
+        (g.options||[]).forEach(opt=>{
+          const mk = g.groupName+'|'+opt.name;
+          curI.mods[mk] = (curI.mods[mk]||{group:g.groupName, option:opt.name, qty:0, revenue:0});
+          curI.mods[mk].qty += qty;
+          curI.mods[mk].revenue = round2(curI.mods[mk].revenue + (qty*Number(opt.price||0)));
+        });
+      });
+      byItem.set(ikey, curI);
+
+      const sKey = it.station||'';
+      const curS = byStation.get(sKey) || { station:sKey, orders:0, items:0, revenue:0, _orderSet:new Set() };
+      curS.items += qty;
+      curS.revenue = round2(curS.revenue + lineRev);
+      curS._orderSet.add(o.id);
+      byStation.set(sKey, curS);
+    });
+
+    byDay.set(dayKey, round2((byDay.get(dayKey)||0) + orderRevenue));
   });
 
-  const fmt = n => `$${(Number(n||0)).toFixed(2)}`;
-  const ymd = d => d.toISOString().slice(0,10);
-  const toMs = s => new Date(s).getTime();
+  // finalize station order counts
+  byStation.forEach(v => v.orders = v._orderSet.size);
 
-  // stations list (once)
-  async function loadStations(){
-    const snap = await db.collection("orders").orderBy("createdAt","desc").limit(800).get();
-    const set = new Set();
-    snap.forEach(d=>{ const st = d.data().station; if (st) set.add(st); });
-    Array.from(set).sort().forEach(st=>{
-      const o = document.createElement("option"); o.value = st; o.textContent = st; elStations.appendChild(o);
+  aggItems = Array.from(byItem.values()).map(v=>({ 
+    id:v.key, name:v.name, station:v.station, qty:v.qty, revenue:v.revenue, avg: v.qty? round2(v.revenue/v.qty):0, mods:v.mods 
+  }));
+
+  aggStations = Array.from(byStation.values()).map(v=>({
+    id:v.station||'(no station)', station:v.station||'(no station)', orders:v.orders, items:v.items, revenue:v.revenue
+  }));
+
+  // daily series to array sorted by day
+  dailySeries = Array.from(byDay.entries()).sort((a,b)=>a[0]-b[0]).map(([k,v])=>({day:new Date(Number(k)), revenue:v}));
+}
+
+function renderTotals(){
+  const revenue = orders.reduce((a,o)=> a + (o.items||[]).reduce((s,it)=> s + Number(it.qty||1)*Number(it.price||0), 0), 0);
+  const items   = orders.reduce((a,o)=> a + (o.items||[]).reduce((s,it)=> s + Number(it.qty||1), 0), 0);
+  const orderCt = orders.length;
+
+  tRevenue.textContent = fmt$ (revenue);
+  tItems.textContent   = items.toString();
+  tOrders.textContent  = orderCt.toString();
+}
+
+/* ---------- Table rendering ---------- */
+function renderTable(){
+  rowSelection.clear();
+  renderSelectedBar();
+
+  if(MODE==='items'){
+    // apply item search
+    const q=(itemSearch.value||'').trim().toLowerCase();
+    const rows = q ? aggItems.filter(r => (r.name||'').toLowerCase().includes(q)) : aggItems.slice();
+
+    thead.innerHTML = `
+      <tr>
+        <th style="width:44px"><input type="checkbox" id="selAll"></th>
+        <th>Item</th>
+        <th>Station</th>
+        <th class="num">Qty</th>
+        <th class="num">Revenue</th>
+        <th class="num">Avg Price</th>
+        <th>Modifiers</th>
+      </tr>`;
+    tbody.innerHTML = rows.map(r=>`
+      <tr data-id="${esc(r.id)}">
+        <td><input type="checkbox" class="sel"></td>
+        <td><strong>${esc(r.name)}</strong></td>
+        <td>${esc(r.station||'')}</td>
+        <td class="num">${r.qty}</td>
+        <td class="num">${fmt$(r.revenue)}</td>
+        <td class="num">${fmt$(r.avg)}</td>
+        <td>${modsSummaryHTML(r.mods)}</td>
+      </tr>
+    `).join('');
+
+    wireSelection();
+  }else{
+    // stations mode
+    const rows=aggStations.slice();
+
+    thead.innerHTML = `
+      <tr>
+        <th style="width:44px"><input type="checkbox" id="selAll"></th>
+        <th>Station</th>
+        <th class="num">Orders</th>
+        <th class="num">Items Sold</th>
+        <th class="num">Revenue</th>
+      </tr>`;
+    tbody.innerHTML = rows.map(r=>`
+      <tr data-id="${esc(r.id)}">
+        <td><input type="checkbox" class="sel"></td>
+        <td><strong>${esc(r.station)}</strong></td>
+        <td class="num">${r.orders}</td>
+        <td class="num">${r.items}</td>
+        <td class="num">${fmt$(r.revenue)}</td>
+      </tr>
+    `).join('');
+
+    wireSelection();
+  }
+}
+
+itemSearch.oninput = ()=> renderTable();
+
+function wireSelection(){
+  const selAll=$('#selAll');
+  const boxes=[...tbody.querySelectorAll('input.sel')];
+  selAll.onclick=()=>{ boxes.forEach(b=>{ b.checked=selAll.checked; toggleRow(b.closest('tr').dataset.id, b.checked); }); renderSelectedBar(); };
+  boxes.forEach(b=>{
+    b.onchange=()=>{ toggleRow(b.closest('tr').dataset.id, b.checked); renderSelectedBar(); };
+  });
+}
+
+function toggleRow(id, checked){
+  if(checked) rowSelection.add(id); else rowSelection.delete(id);
+}
+
+function renderSelectedBar(){
+  if(rowSelection.size===0){
+    selBar.style.display='none';
+    exportCsvSel.style.display='none';
+    return;
+  }
+  exportCsvSel.style.display='inline-block';
+
+  let items=0, revenue=0;
+  if(MODE==='items'){
+    aggItems.forEach(r=>{
+      if(rowSelection.has(r.id)){ items += r.qty; revenue += r.revenue; }
+    });
+  }else{
+    aggStations.forEach(r=>{
+      if(rowSelection.has(r.id)){ items += r.items; revenue += r.revenue; }
     });
   }
+  selRevenue.textContent = fmt$(revenue);
+  selItems.textContent   = MODE==='items' ? `${items} items` : `${items} items`;
+  selBar.style.display='block';
+}
+clearSelection.onclick=()=>{ rowSelection.clear(); [...tbody.querySelectorAll('input.sel')].forEach(b=> b.checked=false); renderSelectedBar(); };
 
-  // helpers to extract variant/mod lines
-  function variantLines(item){
-    const base = item.name || "—";
-    const qtyBase = Number(item.qty||1);
-    const res = [];
+/* ---------- Charts (vanilla canvas) ---------- */
+function drawDailyChart(){
+  const ctx=chartDaily.getContext('2d');
+  ctx.clearRect(0,0,chartDaily.width,chartDaily.height);
 
-    const mods = item.mods;
-    if (Array.isArray(mods) && mods.length && mods[0]?.options){ // group->options
-      mods.forEach(g=>{
-        (g.options||[]).forEach(opt=>{
-          res.push({ name:`${base} – ${g.groupName}: ${opt.name}`, qty: qtyBase, price: Number(opt.price||0), station: (item.station||null) });
-        });
-      });
-    } else if (Array.isArray(mods)) { // simple array [{name, price, qty?}]
-      mods.forEach(m=>{
-        res.push({ name:`${base} – ${m.name}`, qty: Number(m.qty||qtyBase), price: Number(m.price||0), station:(item.station||null) });
-      });
-    } else if (mods && typeof mods === 'object') { // single object
-      res.push({ name:`${base} – ${mods.name}`, qty: Number(mods.qty||qtyBase), price: Number(mods.price||0), station:(item.station||null) });
-    }
-    return res;
+  const W=chartDaily.width, H=chartDaily.height, P=28;
+  // axes
+  ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(P,H-P); ctx.lineTo(W-P,H-P); ctx.lineTo(W-P,P); ctx.stroke();
+
+  if(!dailySeries.length) return;
+
+  const xs=dailySeries.map(d=>d.day.getTime());
+  const ys=dailySeries.map(d=>d.revenue);
+  const xmin = Math.min(...xs), xmax=Math.max(...xs);
+  const ymin = 0, ymax=Math.max(...ys)*1.1 || 1;
+
+  const xscale=t=> P + ( (t-xmin)/(xmax-xmin||1) )*(W-2*P);
+  const yscale=v=> (H-P) - ( (v-ymin)/(ymax-ymin||1) )*(H-2*P);
+
+  // grid + labels
+  ctx.fillStyle='#0f172a'; ctx.font='14px system-ui';
+  const steps=Math.min(10, dailySeries.length);
+  for(let i=0;i<=steps;i++){
+    const t=xmin + (i/steps)*(xmax-xmin);
+    const x=xscale(t);
+    ctx.strokeStyle='#e2e8f0'; ctx.beginPath(); ctx.moveTo(x,H-P); ctx.lineTo(x,P); ctx.stroke();
+    const d=new Date(t);
+    ctx.fillText((d.getMonth()+1)+'/'+d.getDate(), x-16, H-6);
   }
 
-  function getSelectedStations(){
-    return Array.from(elStations.selectedOptions).map(o=>o.value);
+  // line
+  ctx.strokeStyle='#1f6feb'; ctx.lineWidth=2;
+  ctx.beginPath();
+  dailySeries.forEach((pt,i)=>{ const x=xscale(pt.day.getTime()); const y=yscale(pt.revenue); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+  ctx.stroke();
+
+  // dots
+  ctx.fillStyle='#1f6feb';
+  dailySeries.forEach(pt=>{ const x=xscale(pt.day.getTime()); const y=yscale(pt.revenue); ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill(); });
+}
+
+function drawStationChart(){
+  const ctx=chartStations.getContext('2d');
+  ctx.clearRect(0,0,chartStations.width,chartStations.height);
+  const W=chartStations.width, H=chartStations.height, P=28;
+
+  const data=aggStations.slice().sort((a,b)=>b.revenue-a.revenue);
+  if(!data.length) return;
+
+  const ymax = Math.max(...data.map(x=>x.revenue))*1.1 || 1;
+  const barW = Math.max(24, (W-2*P)/Math.max(1,data.length) - 10);
+
+  // axes
+  ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(P,H-P); ctx.lineTo(W-P,H-P); ctx.lineTo(W-P,P); ctx.stroke();
+
+  // bars
+  ctx.fillStyle='#2563eb';
+  data.forEach((r,i)=>{
+    const x = P + i*(barW+10);
+    const bh = Math.round(((r.revenue)/(ymax))* (H-2*P));
+    const y = (H-P) - bh;
+    ctx.fillRect(x,y,barW,bh);
+    ctx.fillStyle='#0f172a'; ctx.font='13px system-ui';
+    ctx.fillText(r.station||'(no station)', x, H-6);
+    ctx.fillStyle='#2563eb';
+  });
+}
+
+/* ---------- CSV Export ---------- */
+exportCsv.onclick=()=> exportCurrent(false);
+exportCsvSel.onclick=()=> exportCurrent(true);
+
+function exportCurrent(onlySelected){
+  let rows=[], headers=[];
+  if(MODE==='items'){
+    const data = onlySelected ? aggItems.filter(r=>rowSelection.has(r.id)) : aggItems;
+    headers=['Item','Station','Qty','Revenue','Avg Price'];
+    rows = data.map(r=> [r.name, r.station||'', r.qty, r.revenue.toFixed(2), r.avg.toFixed(2)]);
+  }else{
+    const data = onlySelected ? aggStations.filter(r=>rowSelection.has(r.id)) : aggStations;
+    headers=['Station','Orders','Items Sold','Revenue'];
+    rows = data.map(r=> [r.station, r.orders, r.items, r.revenue.toFixed(2)]);
   }
+  const csv = [headers.join(','), ...rows.map(r=>r.map(csvEsc).join(','))].join('\n');
+  const blob=new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download = MODE==='items' ? 'sales_by_items.csv' : 'sales_by_stations.csv';
+  document.body.appendChild(a); a.click(); URL.revokeObjectURL(url); a.remove();
+}
 
-  function stationAllowed(orderStation, itemStation, selected){
-    if (!selected.length) return true; // none selected == all
-    const st = itemStation || orderStation || null;
-    return st && selected.includes(st);
-  }
+/* ---------- Helpers ---------- */
+function round2(n){ return Math.round((+n||0)*100)/100; }
+function fmt$(n){ return '$'+(round2(n)).toFixed(2); }
+function esc(s){ return (s??'').toString().replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+function csvEsc(x){ const s=String(x??''); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; }
 
-  async function run(){
-    const fd = toMs(elFrom.value+"T00:00:00");
-    const td = toMs(elTo.value+"T23:59:59");
-    const stationSel = getSelectedStations();
-    const pickedOnly = elPickedOnly.checked;
-    const searchQ = (elItemSearch.value||"").trim().toLowerCase();
-
-    // server read (client filtering for status/date to avoid composite-index surprises)
-    const snap = await db.collection("orders").orderBy("createdAt","desc").get();
-
-    const perDay = new Map();        // yyyy-mm-dd -> total
-    const itemsAgg = new Map();      // key name|station -> {name, station, qty, revenue}
-    const modsAgg = new Map();       // key variant|station -> {name, station, qty, revenue}
-    let total = 0, ordersCount = 0, refundsTotal = 0;
-
-    snap.forEach(doc=>{
-      const o = doc.data() || {};
-      const ms = o.createdAt || 0;
-      if (ms < fd || ms > td) return;
-
-      // exclude refunded from totals + breakdowns
-      if (o.status === "refunded"){ refundsTotal += Number(o.total||0); return; }
-
-      // optional picked_up-only view
-      if (pickedOnly && o.status !== "picked_up") return;
-
-      // per-day totals
-      const day = ymd(new Date(ms));
-      perDay.set(day, (perDay.get(day)||0) + Number(o.total||0));
-      ordersCount += 1;
-      total += Number(o.total||0);
-
-      const items = Array.isArray(o.items) ? o.items : [];
-      items.forEach(it=>{
-        const itStation = it.station || o.station || null;
-        if (!stationAllowed(o.station, it.station, stationSel)) return;
-
-        // base item aggregation
-        const key = `${it.name||"—"}|${itStation||"—"}`;
-        const prev = itemsAgg.get(key) || { name:it.name||"—", station:itStation||"—", qty:0, revenue:0 };
-        const qty = Number(it.qty||1), price = Number(it.price||0);
-        prev.qty += qty;
-        prev.revenue += qty * price;
-        itemsAgg.set(key, prev);
-
-        // variant/mod impact aggregation (based on mod prices)
-        variantLines(it).forEach(v=>{
-          const k = `${v.name}|${(v.station||"—")}`;
-          const pv = modsAgg.get(k) || { name:v.name, station:(v.station||"—"), qty:0, revenue:0 };
-          pv.qty += Number(v.qty||0);
-          pv.revenue += Number(v.qty||0) * Number(v.price||0);
-          modsAgg.set(k, pv);
-        });
-      });
-    });
-
-    // Update metrics
-    mTotal.textContent = fmt(total);
-    mOrders.textContent = String(ordersCount);
-    mRefunds.textContent = fmt(refundsTotal);
-
-    // Daily chart
-    const days = [];
-    for (let d=new Date(fd); d<=td; d.setDate(d.getDate()+1)) days.push(ymd(d));
-    const dayData = days.map(k=> perDay.get(k)||0 );
-    chart.data.labels = days;
-    chart.data.datasets[0].data = dayData;
-    chart.update();
-
-    // Render item table
-    const itemsArr = Array.from(itemsAgg.values())
-      .filter(x=> !searchQ || (x.name||"").toLowerCase().includes(searchQ))
-      .sort((a,b)=> b.revenue - a.revenue);
-    itemsBody.innerHTML = "";
-    itemsArr.forEach(r=>{
-      const div = document.createElement("div");
-      div.className = "trow";
-      div.innerHTML = `<div>${r.name}</div><div>${r.qty}</div><div>${fmt(r.revenue)}</div><div><span class="pill">${r.station}</span></div>`;
-      itemsBody.appendChild(div);
-    });
-
-    // Render mods/variants table
-    const modsArr = Array.from(modsAgg.values())
-      .filter(x=> !searchQ || (x.name||"").toLowerCase().includes(searchQ))
-      .sort((a,b)=> b.revenue - a.revenue);
-    modsBody.innerHTML = "";
-    modsArr.forEach(r=>{
-      const div = document.createElement("div");
-      div.className = "trow";
-      div.innerHTML = `<div>${r.name}</div><div>${r.qty}</div><div>${fmt(r.revenue)}</div><div><span class="pill">${r.station}</span></div>`;
-      modsBody.appendChild(div);
-    });
-
-    // CSV exports
-    btnDailyCSV.onclick = ()=>{
-      const rows = [["Date","Sales"]];
-      chart.data.labels.forEach((lab,i)=> rows.push([lab, String(chart.data.datasets[0].data[i]||0)]));
-      downloadCSV(rows,"daily_sales.csv");
-    };
-    btnItemsCSV.onclick = ()=>{
-      const rows = [["Item","Qty","Revenue","Station"]];
-      itemsArr.forEach(r=> rows.push([r.name, String(r.qty), String(r.revenue), r.station]));
-      downloadCSV(rows,"item_breakdown.csv");
-    };
-    btnModsCSV.onclick = ()=>{
-      const rows = [["Variant","Qty","Revenue","Station"]];
-      modsArr.forEach(r=> rows.push([r.name, String(r.qty), String(r.revenue), r.station]));
-      downloadCSV(rows,"mod_variant_impact.csv");
-    };
-  }
-
-  function downloadCSV(rows, filename){
-    const csv = rows.map(r=> r.map(x=>{
-      const s = String(x??"");
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
-    }).join("," )).join("\n");
-    const blob = new Blob([csv],{type:"text/csv;charset=utf-8;"});
-    const url = URL.createObjectURL(blob);
-    const a = Object.assign(document.createElement("a"),{href:url,download:filename});
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-  }
-
-  btnRun.addEventListener("click", run);
-  elItemSearch.addEventListener("input", run);
-
-  loadStations().then(run);
-  </script>
+/* ---------- Boot ---------- */
+loadStations();
+setMode('items');
+</script>
 </body>
 </html>
