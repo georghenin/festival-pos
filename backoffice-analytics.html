@@ -29,7 +29,6 @@
   .chip{border:1px solid var(--border);background:#fff;color:#111;border-radius:999px;padding:8px 12px;cursor:pointer;font-weight:700}
   .chip.active{outline:3px solid var(--ok)}
 
-  .toolbar{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end}
   .filters{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
   .filters .wide{grid-column:span 2}
   @media (max-width:900px){ .filters{grid-template-columns:1fr 1fr} }
@@ -51,10 +50,8 @@
   th{background:#fff;position:sticky;top:0;z-index:2}
   .num{text-align:right}
   .muted{color:var(--muted)}
-  .expander{cursor:pointer;color:#0b1f52;font-weight:700}
-
-  .charts{display:grid;grid-template-columns:1fr;gap:12px}
-  canvas{background:#fff;border:1px solid var(--border);border-radius:14px;padding:10px}
+  details > summary{cursor:pointer; color:#0b1f52; font-weight:800}
+  .optrow{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--border);padding:4px 0}
 </style>
 </head>
 <body>
@@ -116,7 +113,7 @@
     </div>
   </div>
 
-  <!-- Selected totals bar (appears when rows are checked) -->
+  <!-- Selected totals -->
   <div id="selBar" class="selbar">
     <div class="row" style="justify-content:space-between">
       <div><strong>Selected Totals:</strong>
@@ -139,15 +136,13 @@
   </div>
 
   <!-- Charts -->
-  <div class="charts" style="margin-top:12px">
-    <div>
-      <h3 style="margin-bottom:6px">Daily Revenue</h3>
-      <canvas id="chartDaily" width="900" height="260"></canvas>
-    </div>
-    <div id="stationChartWrap" style="display:none">
-      <h3 style="margin-bottom:6px">Revenue by Station</h3>
-      <canvas id="chartStations" width="900" height="260"></canvas>
-    </div>
+  <div class="card" style="margin-top:12px">
+    <h3 style="margin-bottom:6px">Daily Revenue</h3>
+    <canvas id="chartDaily" width="900" height="260"></canvas>
+  </div>
+  <div id="stationChartWrap" class="card" style="margin-top:12px;display:none">
+    <h3 style="margin-bottom:6px">Revenue by Station</h3>
+    <canvas id="chartStations" width="900" height="260"></canvas>
   </div>
 </div>
 
@@ -181,7 +176,7 @@ let STATIONS_ALL=['Grill','Fryer','Drinks','Pizza'];
 let selectedStations=new Set();
 let orders=[];  // filtered source orders
 let aggItems=[], aggStations=[], dailySeries=[];
-let rowSelection=new Set(); // ids of selected rows
+let rowSelection=new Set();
 
 /* ---------- Init dates (today) ---------- */
 (function initDates(){
@@ -201,7 +196,6 @@ async function loadStations(){
   if(!selectedStations.size) STATIONS_ALL.forEach(s=>selectedStations.add(s));
   renderStationChips();
 }
-
 function renderStationChips(){
   stationChips.innerHTML=STATIONS_ALL.map(s=>`<span class="chip ${selectedStations.has(s)?'active':''}" data-st="${s}">${s}</span>`).join('');
   stationChips.querySelectorAll('.chip').forEach(c=>{
@@ -231,18 +225,17 @@ async function runReport(){
   const startMS = new Date(startDate.value+'T00:00:00').getTime();
   const endMS   = new Date(endDate.value+'T23:59:59').getTime();
 
-  // Query by createdAt within range (one-off read)
   const snap=await db.collection('orders')
     .where('createdAt','>=', startMS)
     .where('createdAt','<=', endMS)
     .orderBy('createdAt','asc')
     .get();
 
-  // Keep only completed sales
+  // completed sales only
   const base = snap.docs.map(d=>({id:d.id, ...d.data()}))
     .filter(o=> (o.status==='picked_up' || o.status==='force_completed') && !o.refunded && !o.archived);
 
-  // Apply station filter at item level
+  // station filter at item level
   const stAllowed=new Set(selectedStations);
   orders = base.map(o=>{
     const items=(o.items||[]).filter(it=> !it.station || stAllowed.has(it.station));
@@ -257,11 +250,8 @@ async function runReport(){
 }
 
 function aggregate(){
-  // Items
   const byItem=new Map();
-  // Stations
   const byStation=new Map();
-  // Daily revenue
   const byDay=new Map();
 
   orders.forEach(o=>{
@@ -269,30 +259,26 @@ function aggregate(){
     day.setHours(0,0,0,0);
     const dayKey=day.getTime();
 
-    let orderRevenue=0, orderItems=0;
-
     (o.items||[]).forEach(it=>{
       const qty = Number(it.qty||1);
       const unit = Number(it.price||0);
       const lineRev = round2(qty*unit);
-      orderRevenue += lineRev;
-      orderItems += qty;
 
       const ikey = (it.name||'Unknown') + '|' + (it.station||'');
-      const curI = byItem.get(ikey) || { key:ikey, name:it.name||'Unknown', station:it.station||'', qty:0, revenue:0, lines:[], mods:{} };
+      const curI = byItem.get(ikey) || { key:ikey, name:it.name||'Unknown', station:it.station||'', qty:0, revenue:0, avg:0, mods:{} };
       curI.qty += qty; curI.revenue = round2(curI.revenue + lineRev);
-      // capture modifiers
+
       (it.mods||[]).forEach(g=>{
         (g.options||[]).forEach(opt=>{
           const mk = g.groupName+'|'+opt.name;
           curI.mods[mk] = (curI.mods[mk]||{group:g.groupName, option:opt.name, qty:0, revenue:0});
           curI.mods[mk].qty += qty;
-          curI.mods[mk].revenue = round2(curI.mods[mk].revenue + (qty*Number(opt.price||0)));
+          curI.mods[mk].revenue = round2(curI.mods[mk].revenue + qty*Number(opt.price||0));
         });
       });
       byItem.set(ikey, curI);
 
-      const sKey = it.station||'';
+      const sKey = it.station||'(no station)';
       const curS = byStation.get(sKey) || { station:sKey, orders:0, items:0, revenue:0, _orderSet:new Set() };
       curS.items += qty;
       curS.revenue = round2(curS.revenue + lineRev);
@@ -300,21 +286,18 @@ function aggregate(){
       byStation.set(sKey, curS);
     });
 
-    byDay.set(dayKey, round2((byDay.get(dayKey)||0) + orderRevenue));
+    byDay.set(dayKey, round2((byDay.get(dayKey)||0) + (o.items||[]).reduce((a,it)=>a+Number(it.qty||1)*Number(it.price||0),0)));
   });
 
-  // finalize station order counts
   byStation.forEach(v => v.orders = v._orderSet.size);
 
-  aggItems = Array.from(byItem.values()).map(v=>({ 
-    id:v.key, name:v.name, station:v.station, qty:v.qty, revenue:v.revenue, avg: v.qty? round2(v.revenue/v.qty):0, mods:v.mods 
+  aggItems = Array.from(byItem.values()).map(v=>({
+    id:v.key, name:v.name, station:v.station, qty:v.qty, revenue:v.revenue,
+    avg: v.qty? round2(v.revenue/v.qty):0, mods:v.mods
   }));
-
   aggStations = Array.from(byStation.values()).map(v=>({
-    id:v.station||'(no station)', station:v.station||'(no station)', orders:v.orders, items:v.items, revenue:v.revenue
+    id:v.station, station:v.station, orders:v.orders, items:v.items, revenue:v.revenue
   }));
-
-  // daily series to array sorted by day
   dailySeries = Array.from(byDay.entries()).sort((a,b)=>a[0]-b[0]).map(([k,v])=>({day:new Date(Number(k)), revenue:v}));
 }
 
@@ -322,8 +305,7 @@ function renderTotals(){
   const revenue = orders.reduce((a,o)=> a + (o.items||[]).reduce((s,it)=> s + Number(it.qty||1)*Number(it.price||0), 0), 0);
   const items   = orders.reduce((a,o)=> a + (o.items||[]).reduce((s,it)=> s + Number(it.qty||1), 0), 0);
   const orderCt = orders.length;
-
-  tRevenue.textContent = fmt$ (revenue);
+  tRevenue.textContent = fmt$(revenue);
   tItems.textContent   = items.toString();
   tOrders.textContent  = orderCt.toString();
 }
@@ -334,7 +316,6 @@ function renderTable(){
   renderSelectedBar();
 
   if(MODE==='items'){
-    // apply item search
     const q=(itemSearch.value||'').trim().toLowerCase();
     const rows = q ? aggItems.filter(r => (r.name||'').toLowerCase().includes(q)) : aggItems.slice();
 
@@ -346,7 +327,7 @@ function renderTable(){
         <th class="num">Qty</th>
         <th class="num">Revenue</th>
         <th class="num">Avg Price</th>
-        <th>Modifiers</th>
+        <th>Options (modifiers)</th>
       </tr>`;
     tbody.innerHTML = rows.map(r=>`
       <tr data-id="${esc(r.id)}">
@@ -362,9 +343,7 @@ function renderTable(){
 
     wireSelection();
   }else{
-    // stations mode
     const rows=aggStations.slice();
-
     thead.innerHTML = `
       <tr>
         <th style="width:44px"><input type="checkbox" id="selAll"></th>
@@ -382,11 +361,9 @@ function renderTable(){
         <td class="num">${fmt$(r.revenue)}</td>
       </tr>
     `).join('');
-
     wireSelection();
   }
 }
-
 itemSearch.oninput = ()=> renderTable();
 
 function wireSelection(){
@@ -398,41 +375,55 @@ function wireSelection(){
   });
 }
 
-function toggleRow(id, checked){
-  if(checked) rowSelection.add(id); else rowSelection.delete(id);
+/* ---------- Modifiers summary (FIX ADDED) ---------- */
+function modsSummaryHTML(modsObj){
+  const arr = Object.values(modsObj||{});
+  if(!arr.length) return '<span class="muted">—</span>';
+
+  arr.sort((a,b)=> b.qty - a.qty);
+  const top = arr.slice(0,3).map(m=> `${esc(m.group)}: ${esc(m.option)} <span class="muted">(${m.qty})</span>`).join(' • ');
+
+  const detailRows = arr.map(m=>`
+    <div class="optrow">
+      <div>${esc(m.group)} → <strong>${esc(m.option)}</strong></div>
+      <div class="num" style="min-width:80px">${m.qty}</div>
+      <div class="num" style="min-width:100px">${fmt$(m.revenue)}</div>
+    </div>
+  `).join('');
+
+  const details = `
+    <details style="margin-top:6px">
+      <summary>details (${arr.length})</summary>
+      <div style="margin-top:6px">${detailRows}</div>
+    </details>`;
+
+  return top + (arr.length>3 ? ' • …' : '') + details;
 }
 
+/* ---------- Selected totals ---------- */
+function toggleRow(id, checked){ if(checked) rowSelection.add(id); else rowSelection.delete(id); }
 function renderSelectedBar(){
-  if(rowSelection.size===0){
-    selBar.style.display='none';
-    exportCsvSel.style.display='none';
-    return;
-  }
+  if(rowSelection.size===0){ selBar.style.display='none'; exportCsvSel.style.display='none'; return; }
   exportCsvSel.style.display='inline-block';
 
   let items=0, revenue=0;
   if(MODE==='items'){
-    aggItems.forEach(r=>{
-      if(rowSelection.has(r.id)){ items += r.qty; revenue += r.revenue; }
-    });
+    aggItems.forEach(r=>{ if(rowSelection.has(r.id)){ items += r.qty; revenue += r.revenue; }});
   }else{
-    aggStations.forEach(r=>{
-      if(rowSelection.has(r.id)){ items += r.items; revenue += r.revenue; }
-    });
+    aggStations.forEach(r=>{ if(rowSelection.has(r.id)){ items += r.items; revenue += r.revenue; }});
   }
   selRevenue.textContent = fmt$(revenue);
-  selItems.textContent   = MODE==='items' ? `${items} items` : `${items} items`;
+  selItems.textContent   = `${items} items`;
   selBar.style.display='block';
 }
 clearSelection.onclick=()=>{ rowSelection.clear(); [...tbody.querySelectorAll('input.sel')].forEach(b=> b.checked=false); renderSelectedBar(); };
 
-/* ---------- Charts (vanilla canvas) ---------- */
+/* ---------- Charts (simple canvas) ---------- */
 function drawDailyChart(){
   const ctx=chartDaily.getContext('2d');
   ctx.clearRect(0,0,chartDaily.width,chartDaily.height);
 
   const W=chartDaily.width, H=chartDaily.height, P=28;
-  // axes
   ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(P,H-P); ctx.lineTo(W-P,H-P); ctx.lineTo(W-P,P); ctx.stroke();
 
@@ -442,48 +433,35 @@ function drawDailyChart(){
   const ys=dailySeries.map(d=>d.revenue);
   const xmin = Math.min(...xs), xmax=Math.max(...xs);
   const ymin = 0, ymax=Math.max(...ys)*1.1 || 1;
-
   const xscale=t=> P + ( (t-xmin)/(xmax-xmin||1) )*(W-2*P);
   const yscale=v=> (H-P) - ( (v-ymin)/(ymax-ymin||1) )*(H-2*P);
 
-  // grid + labels
   ctx.fillStyle='#0f172a'; ctx.font='14px system-ui';
   const steps=Math.min(10, dailySeries.length);
   for(let i=0;i<=steps;i++){
     const t=xmin + (i/steps)*(xmax-xmin);
     const x=xscale(t);
     ctx.strokeStyle='#e2e8f0'; ctx.beginPath(); ctx.moveTo(x,H-P); ctx.lineTo(x,P); ctx.stroke();
-    const d=new Date(t);
-    ctx.fillText((d.getMonth()+1)+'/'+d.getDate(), x-16, H-6);
+    const d=new Date(t); ctx.fillText((d.getMonth()+1)+'/'+d.getDate(), x-16, H-6);
   }
 
-  // line
   ctx.strokeStyle='#1f6feb'; ctx.lineWidth=2;
   ctx.beginPath();
   dailySeries.forEach((pt,i)=>{ const x=xscale(pt.day.getTime()); const y=yscale(pt.revenue); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
   ctx.stroke();
-
-  // dots
   ctx.fillStyle='#1f6feb';
   dailySeries.forEach(pt=>{ const x=xscale(pt.day.getTime()); const y=yscale(pt.revenue); ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill(); });
 }
-
 function drawStationChart(){
   const ctx=chartStations.getContext('2d');
   ctx.clearRect(0,0,chartStations.width,chartStations.height);
   const W=chartStations.width, H=chartStations.height, P=28;
-
   const data=aggStations.slice().sort((a,b)=>b.revenue-a.revenue);
   if(!data.length) return;
-
   const ymax = Math.max(...data.map(x=>x.revenue))*1.1 || 1;
   const barW = Math.max(24, (W-2*P)/Math.max(1,data.length) - 10);
-
-  // axes
   ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(P,H-P); ctx.lineTo(W-P,H-P); ctx.lineTo(W-P,P); ctx.stroke();
-
-  // bars
   ctx.fillStyle='#2563eb';
   data.forEach((r,i)=>{
     const x = P + i*(barW+10);
@@ -499,7 +477,6 @@ function drawStationChart(){
 /* ---------- CSV Export ---------- */
 exportCsv.onclick=()=> exportCurrent(false);
 exportCsvSel.onclick=()=> exportCurrent(true);
-
 function exportCurrent(onlySelected){
   let rows=[], headers=[];
   if(MODE==='items'){
