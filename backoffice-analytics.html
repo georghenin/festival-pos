@@ -8,7 +8,7 @@
   :root{
     --bg:#ffffff; --fg:#111; --muted:#666;
     --card:#f5f5f7; --border:#d7dbe2;
-    --accent:#2563eb; --ok:#15a46b; --warn:#d97706;
+    --accent:#2563eb; --ok:#15a46b;
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--fg);
@@ -19,9 +19,8 @@
   .card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:14px}
   .btn{border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:#fff;color:#111;font-weight:700;cursor:pointer}
   .btn.primary{background:var(--accent);border-color:transparent;color:#fff}
-  .btn.ok{background:var(--ok);border-color:transparent;color:#fff}
   .btn.gray{background:#eef2f7}
-  input,select{font:inherit;border:1px solid var(--border);border-radius:12px;background:#fff;color:#111;padding:10px 12px}
+  input{font:inherit;border:1px solid var(--border);border-radius:12px;background:#fff;color:#111;padding:10px 12px}
   h2{margin:0 0 8px 0;font-size:22px}
   h3{margin:0 0 8px 0;font-size:20px}
 
@@ -32,10 +31,6 @@
   .filters{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
   .filters .wide{grid-column:span 2}
   @media (max-width:900px){ .filters{grid-template-columns:1fr 1fr} }
-
-  .tabs{display:flex;gap:8px;flex-wrap:wrap}
-  .tab{border:1px solid var(--border);border-radius:999px;padding:8px 12px;background:#fff;cursor:pointer;font-weight:800}
-  .tab.active{outline:3px solid var(--accent);color:#0b1f52}
 
   .totals{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
   .total-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px;text-align:center}
@@ -65,7 +60,7 @@
     </div>
   </div>
 
-  <!-- Filters -->
+  <!-- Filters (Items only) -->
   <div class="card" style="margin-top:12px">
     <div class="filters">
       <div>
@@ -75,13 +70,6 @@
       <div>
         <div class="muted" style="margin-bottom:4px">End date</div>
         <input type="date" id="endDate">
-      </div>
-      <div>
-        <div class="muted" style="margin-bottom:4px">Group by</div>
-        <div class="tabs">
-          <button class="tab active" data-mode="items" id="tabItems">Items</button>
-          <button class="tab" data-mode="stations" id="tabStations">Stations</button>
-        </div>
       </div>
       <div class="wide" id="itemSearchWrap">
         <div class="muted" style="margin-bottom:4px">Search items</div>
@@ -137,14 +125,10 @@
     </div>
   </div>
 
-  <!-- Charts -->
+  <!-- Chart -->
   <div class="card" style="margin-top:12px">
     <h3 style="margin-bottom:6px">Daily Revenue</h3>
     <canvas id="chartDaily" width="900" height="260"></canvas>
-  </div>
-  <div id="stationChartWrap" class="card" style="margin-top:12px;display:none">
-    <h3 style="margin-bottom:6px">Revenue by Station</h3>
-    <canvas id="chartStations" width="900" height="260"></canvas>
   </div>
 </div>
 
@@ -163,19 +147,30 @@ const db=firebase.firestore();
 const $=s=>document.querySelector(s);
 const stationsBadge=$('#stationsBadge');
 const startDate=$('#startDate'), endDate=$('#endDate');
-const tabItems=$('#tabItems'), tabStations=$('#tabStations');
-const itemSearchWrap=$('#itemSearchWrap'), itemSearch=$('#itemSearch');
+const itemSearch=$('#itemSearch');
 const stationChips=$('#stationChips');
 const refreshBtn=$('#refresh'), exportCsv=$('#exportCsv'), exportCsvSel=$('#exportCsvSel');
 const tRevenue=$('#tRevenue'), tItems=$('#tItems'), tOrders=$('#tOrders');
 const selBar=$('#selBar'), selRevenue=$('#selRevenue'), selItems=$('#selItems'), clearSelection=$('#clearSelection');
-const tableTitle=$('#tableTitle'), thead=$('#thead'), tbody=$('#tbody');
-const chartDaily=$('#chartDaily'), chartStations=$('#chartStations'), stationChartWrap=$('#stationChartWrap');
+const thead=$('#thead'), tbody=$('#tbody');
+const chartDaily=$('#chartDaily');
 
-/* ---------- Station canonicalization ---------- */
-let STATIONS=[];                // admin labels, exact spelling
+/* ---------- Station canonicalization (Admin-driven + aliases) ---------- */
+let STATIONS=[];                // exact labels from Admin
 let ST_CANON=new Map();         // normKey -> admin label
 let ST_NORM_SET=new Set();      // set of normKeys
+
+// common variants/typos → admin labels
+const STATION_ALIASES = new Map([
+  ['coffee & dessert','coffee and dessert'],
+  ['coffee & desserts','coffee and dessert'],
+  ['coffee and desserts','coffee and dessert'],
+  ['dessert','coffee and dessert'],
+  ['desserts','coffee and dessert'],
+  ['ice-cream','ice cream'],
+  ['icecream','ice cream'],
+  ['ice cream station','ice cream']
+]);
 
 function normKey(s){
   return String(s||'')
@@ -195,7 +190,8 @@ function setStationsFromConfig(labels){
   });
 }
 function canonicalStationLabel(s){
-  const k=normKey(s);
+  let k=normKey(s);
+  if(STATION_ALIASES.has(k)) k = normKey(STATION_ALIASES.get(k));
   return ST_CANON.get(k)||'';
 }
 function selectedHasStation(selectedSet, s){
@@ -205,17 +201,15 @@ function selectedHasStation(selectedSet, s){
 }
 
 /* ---------- State ---------- */
-let MODE='items'; // 'items' | 'stations'
 let selectedStations=new Set(); // holds admin labels
 let orders=[];                  // filtered source orders
-let aggItems=[], aggStations=[], dailySeries=[];
+let aggItems=[], dailySeries=[];
 let rowSelection=new Set();
 
 /* ---------- Init dates (today) ---------- */
 (function initDates(){
   const d=new Date(); const endISO=d.toISOString().slice(0,10);
-  const d2=new Date(); d2.setDate(d2.getDate()-0);
-  const startISO=d2.toISOString().slice(0,10);
+  const startISO=endISO; // same-day default
   startDate.value=startISO; endDate.value=endISO;
 })();
 
@@ -239,20 +233,7 @@ function renderStationChips(){
   });
 }
 
-/* ---------- Tabs ---------- */
-function setMode(m){
-  MODE=m;
-  tabItems.classList.toggle('active', m==='items');
-  tabStations.classList.toggle('active', m==='stations');
-  itemSearchWrap.style.display = (m==='items') ? 'block' : 'none';
-  tableTitle.textContent = m==='items' ? 'Sales by Items' : 'Sales by Stations';
-  stationChartWrap.style.display = (m==='stations') ? 'block' : 'none';
-  renderTable(); renderSelectedBar();
-}
-tabItems.onclick=()=> setMode('items');
-tabStations.onclick=()=> setMode('stations');
-
-/* ---------- Fetch + Aggregate ---------- */
+/* ---------- Fetch + Aggregate (Items only) ---------- */
 refreshBtn.onclick=runReport;
 async function runReport(){
   rowSelection.clear();
@@ -276,7 +257,10 @@ async function runReport(){
   orders = base.map(o=>{
     const items=(o.items||[]).filter(it=>{
       const label = canonicalStationLabel(it.station);
-      if(!label){ if(it && it.station) console.warn('[Analytics] Unknown station:', it.station); return false; }
+      if(!label){
+        if(it && it.station) console.warn('[Analytics] Unknown station (fix in menu/stations):', it.station);
+        return false;
+      }
       return allowedNorm.has(normKey(label));
     });
     return {...o, items};
@@ -286,12 +270,10 @@ async function runReport(){
   renderTotals();
   renderTable();
   drawDailyChart();
-  if(MODE==='stations') drawStationChart();
 }
 
 function aggregate(){
   const byItem=new Map();
-  const byStation=new Map();
   const byDay=new Map();
 
   orders.forEach(o=>{
@@ -304,41 +286,29 @@ function aggregate(){
       const unit = Number(it.price||0);
       const lineRev = round2(qty*unit);
 
-      const itemKey = (it.name||'Unknown') + '|' + (canonicalStationLabel(it.station)||'');
-      const curI = byItem.get(itemKey) || { key:itemKey, name:it.name||'Unknown', station:canonicalStationLabel(it.station)||'', qty:0, revenue:0, avg:0, mods:{} };
-      curI.qty += qty; curI.revenue = round2(curI.revenue + lineRev);
+      const label = canonicalStationLabel(it.station) || '';
+      const itemKey = (it.name||'Unknown') + '|' + label;
+      const cur = byItem.get(itemKey) || { key:itemKey, name:it.name||'Unknown', station:label, qty:0, revenue:0, avg:0, mods:{} };
+      cur.qty += qty; cur.revenue = round2(cur.revenue + lineRev);
 
       (it.mods||[]).forEach(g=>{
         (g.options||[]).forEach(opt=>{
           const mk = g.groupName+'|'+opt.name;
-          curI.mods[mk] = (curI.mods[mk]||{group:g.groupName, option:opt.name, qty:0, revenue:0});
-          curI.mods[mk].qty += qty;
-          curI.mods[mk].revenue = round2(curI.mods[mk].revenue + qty*Number(opt.price||0));
+          cur.mods[mk] = (cur.mods[mk]||{group:g.groupName, option:opt.name, qty:0, revenue:0});
+          cur.mods[mk].qty += qty;
+          cur.mods[mk].revenue = round2(cur.mods[mk].revenue + qty*Number(opt.price||0));
         });
       });
-      byItem.set(itemKey, curI);
-
-      const sLabel = canonicalStationLabel(it.station) || '(no station)';
-      const sKey = normKey(sLabel);
-      const curS = byStation.get(sKey) || { id:sKey, station:sLabel, orders:0, items:0, revenue:0, _orderSet:new Set() };
-      curS.items += qty;
-      curS.revenue = round2(curS.revenue + lineRev);
-      curS._orderSet.add(o.id);
-      byStation.set(sKey, curS);
+      byItem.set(itemKey, cur);
     });
 
     const orderRev = (o.items||[]).reduce((a,it)=> a + Number(it.qty||1)*Number(it.price||0), 0);
     byDay.set(dayKey, round2((byDay.get(dayKey)||0) + orderRev));
   });
 
-  byStation.forEach(v => v.orders = v._orderSet.size);
-
   aggItems = Array.from(byItem.values()).map(v=>({
     id:v.key, name:v.name, station:v.station, qty:v.qty, revenue:v.revenue,
     avg: v.qty? round2(v.revenue/v.qty):0, mods:v.mods
-  }));
-  aggStations = Array.from(byStation.values()).map(v=>({
-    id:v.id, station:v.station, orders:v.orders, items:v.items, revenue:v.revenue
   }));
   dailySeries = Array.from(byDay.entries()).sort((a,b)=>a[0]-b[0]).map(([k,v])=>({day:new Date(Number(k)), revenue:v}));
 }
@@ -352,59 +322,37 @@ function renderTotals(){
   tOrders.textContent  = String(orderCt);
 }
 
-/* ---------- Table rendering ---------- */
+/* ---------- Items table ---------- */
 function renderTable(){
   rowSelection.clear();
   renderSelectedBar();
 
-  if(MODE==='items'){
-    const q=(itemSearch.value||'').trim().toLowerCase();
-    const rows = q ? aggItems.filter(r => (r.name||'').toLowerCase().includes(q)) : aggItems.slice();
+  const q=(itemSearch.value||'').trim().toLowerCase();
+  const rows = q ? aggItems.filter(r => (r.name||'').toLowerCase().includes(q)) : aggItems.slice();
 
-    thead.innerHTML = `
-      <tr>
-        <th style="width:44px"><input type="checkbox" id="selAll"></th>
-        <th>Item</th>
-        <th>Station</th>
-        <th class="num">Qty</th>
-        <th class="num">Revenue</th>
-        <th class="num">Avg Price</th>
-        <th>Options (modifiers)</th>
-      </tr>`;
-    tbody.innerHTML = rows.map(r=>`
-      <tr data-id="${esc(r.id)}">
-        <td><input type="checkbox" class="sel"></td>
-        <td><strong>${esc(r.name)}</strong></td>
-        <td>${esc(r.station||'')}</td>
-        <td class="num">${r.qty}</td>
-        <td class="num">${fmt$(r.revenue)}</td>
-        <td class="num">${fmt$(r.avg)}</td>
-        <td>${modsSummaryHTML(r.mods)}</td>
-      </tr>
-    `).join('');
+  thead.innerHTML = `
+    <tr>
+      <th style="width:44px"><input type="checkbox" id="selAll"></th>
+      <th>Item</th>
+      <th>Station</th>
+      <th class="num">Qty</th>
+      <th class="num">Revenue</th>
+      <th class="num">Avg Price</th>
+      <th>Options (modifiers)</th>
+    </tr>`;
+  tbody.innerHTML = rows.map(r=>`
+    <tr data-id="${esc(r.id)}">
+      <td><input type="checkbox" class="sel"></td>
+      <td><strong>${esc(r.name)}</strong></td>
+      <td>${esc(r.station||'')}</td>
+      <td class="num">${r.qty}</td>
+      <td class="num">${fmt$(r.revenue)}</td>
+      <td class="num">${fmt$(r.avg)}</td>
+      <td>${modsSummaryHTML(r.mods)}</td>
+    </tr>
+  `).join('');
 
-    wireSelection();
-  }else{
-    const rows=aggStations.slice();
-    thead.innerHTML = `
-      <tr>
-        <th style="width:44px"><input type="checkbox" id="selAll"></th>
-        <th>Station</th>
-        <th class="num">Orders</th>
-        <th class="num">Items Sold</th>
-        <th class="num">Revenue</th>
-      </tr>`;
-    tbody.innerHTML = rows.map(r=>`
-      <tr data-id="${esc(r.id)}">
-        <td><input type="checkbox" class="sel"></td>
-        <td><strong>${esc(r.station)}</strong></td>
-        <td class="num">${r.orders}</td>
-        <td class="num">${r.items}</td>
-        <td class="num">${fmt$(r.revenue)}</td>
-      </tr>
-    `).join('');
-    wireSelection();
-  }
+  wireSelection();
 }
 itemSearch.oninput = ()=> renderTable();
 
@@ -449,18 +397,14 @@ function renderSelectedBar(){
   exportCsvSel.style.display='inline-block';
 
   let items=0, revenue=0;
-  if(MODE==='items'){
-    aggItems.forEach(r=>{ if(rowSelection.has(r.id)){ items += r.qty; revenue += r.revenue; }});
-  }else{
-    aggStations.forEach(r=>{ if(rowSelection.has(r.id)){ items += r.items; revenue += r.revenue; }});
-  }
+  aggItems.forEach(r=>{ if(rowSelection.has(r.id)){ items += r.qty; revenue += r.revenue; }});
   selRevenue.textContent = fmt$(revenue);
   selItems.textContent   = `${items} items`;
   selBar.style.display='block';
 }
 clearSelection.onclick=()=>{ rowSelection.clear(); [...tbody.querySelectorAll('input.sel')].forEach(b=> b.checked=false); renderSelectedBar(); };
 
-/* ---------- Charts (simple canvas) ---------- */
+/* ---------- Chart (simple canvas) ---------- */
 function drawDailyChart(){
   const ctx=chartDaily.getContext('2d');
   ctx.clearRect(0,0,chartDaily.width,chartDaily.height);
@@ -494,47 +438,19 @@ function drawDailyChart(){
   ctx.fillStyle='#1f6feb';
   dailySeries.forEach(pt=>{ const x=xscale(pt.day.getTime()); const y=yscale(pt.revenue); ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill(); });
 }
-function drawStationChart(){
-  const ctx=chartStations.getContext('2d');
-  ctx.clearRect(0,0,chartStations.width,chartStations.height);
-  const W=chartStations.width, H=chartStations.height, P=28;
-  const data=aggStations.slice().sort((a,b)=>b.revenue-a.revenue);
-  if(!data.length) return;
-  const ymax = Math.max(...data.map(x=>x.revenue))*1.1 || 1;
-  const barW = Math.max(24, (W-2*P)/Math.max(1,data.length) - 10);
-  ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(P,H-P); ctx.lineTo(W-P,H-P); ctx.lineTo(W-P,P); ctx.stroke();
-  ctx.fillStyle='#2563eb';
-  data.forEach((r,i)=>{
-    const x = P + i*(barW+10);
-    const bh = Math.round(((r.revenue)/(ymax))* (H-2*P));
-    const y = (H-P) - bh;
-    ctx.fillRect(x,y,barW,bh);
-    ctx.fillStyle='#0f172a'; ctx.font='13px system-ui';
-    ctx.fillText(r.station||'(no station)', x, H-6);
-    ctx.fillStyle='#2563eb';
-  });
-}
 
 /* ---------- CSV Export ---------- */
 exportCsv.onclick=()=> exportCurrent(false);
 exportCsvSel.onclick=()=> exportCurrent(true);
 function exportCurrent(onlySelected){
-  let rows=[], headers=[];
-  if(MODE==='items'){
-    const data = onlySelected ? aggItems.filter(r=>rowSelection.has(r.id)) : aggItems;
-    headers=['Item','Station','Qty','Revenue','Avg Price'];
-    rows = data.map(r=> [r.name, r.station||'', r.qty, r.revenue.toFixed(2), r.avg.toFixed(2)]);
-  }else{
-    const data = onlySelected ? aggStations.filter(r=>rowSelection.has(r.id)) : aggStations;
-    headers=['Station','Orders','Items Sold','Revenue'];
-    rows = data.map(r=> [r.station, r.orders, r.items, r.revenue.toFixed(2)]);
-  }
+  const data = onlySelected ? aggItems.filter(r=>rowSelection.has(r.id)) : aggItems;
+  const headers=['Item','Station','Qty','Revenue','Avg Price'];
+  const rows = data.map(r=> [r.name, r.station||'', r.qty, r.revenue.toFixed(2), r.avg.toFixed(2)]);
   const csv = [headers.join(','), ...rows.map(r=>r.map(csvEsc).join(','))].join('\n');
   const blob=new Blob([csv], {type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=url; a.download = MODE==='items' ? 'sales_by_items.csv' : 'sales_by_stations.csv';
+  a.href=url; a.download = 'sales_by_items.csv';
   document.body.appendChild(a); a.click(); URL.revokeObjectURL(url); a.remove();
 }
 
@@ -546,7 +462,6 @@ function csvEsc(x){ const s=String(x??''); return /[",\n]/.test(s) ? `"${s.repla
 
 /* ---------- Boot ---------- */
 loadStations();
-setMode('items');
 </script>
 </body>
 </html>
