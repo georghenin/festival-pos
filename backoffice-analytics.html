@@ -160,11 +160,12 @@ let STATIONS=[];                // exact labels from Admin
 let ST_CANON=new Map();         // normKey -> admin label
 let ST_NORM_SET=new Set();      // set of normKeys
 
-// common variants/typos → admin labels
+// ✅ Expanded aliases to catch common mistakes/variants
 const STATION_ALIASES = new Map([
   ['coffee & dessert','coffee and dessert'],
   ['coffee & desserts','coffee and dessert'],
   ['coffee and desserts','coffee and dessert'],
+  ['coffee and desert','coffee and dessert'],  // <— misspelling without the second "s"
   ['dessert','coffee and dessert'],
   ['desserts','coffee and dessert'],
   ['ice-cream','ice cream'],
@@ -251,6 +252,23 @@ async function runReport(){
   // Completed sales only (exclude refunds/archived)
   const base = snap.docs.map(d=>({id:d.id, ...d.data()}))
     .filter(o=> (o.status==='picked_up' || o.status==='force_completed') && !o.refunded && !o.archived);
+
+  // 🔎 DEBUG: print all raw stations we see in this range
+  const rawSeen = new Map();
+  base.forEach(o => (o.items||[]).forEach(it=>{
+    const raw = (it.station ?? '').toString();
+    rawSeen.set(raw, (rawSeen.get(raw)||0)+1);
+  }));
+  if(rawSeen.size){
+    console.group('[Analytics] Stations seen (raw → canonical)');
+    [...rawSeen.entries()].forEach(([raw])=>{
+      const label = canonicalStationLabel(raw) || '(unmapped)';
+      console.log(`  "${raw}" → "${label}"`);
+    });
+    console.groupEnd();
+  }else{
+    console.log('[Analytics] No items in selected orders/date range.');
+  }
 
   // Apply station filter at item level using canonical labels
   const allowedNorm = new Set([...selectedStations].map(normKey));
