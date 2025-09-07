@@ -52,6 +52,8 @@
   .muted{color:var(--muted)}
   details > summary{cursor:pointer; color:#0b1f52; font-weight:800}
   .optrow{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--border);padding:4px 0}
+
+  canvas{background:#fff;border:1px solid var(--border);border-radius:14px;padding:10px}
 </style>
 </head>
 <body>
@@ -170,11 +172,42 @@ const selBar=$('#selBar'), selRevenue=$('#selRevenue'), selItems=$('#selItems'),
 const tableTitle=$('#tableTitle'), thead=$('#thead'), tbody=$('#tbody');
 const chartDaily=$('#chartDaily'), chartStations=$('#chartStations'), stationChartWrap=$('#stationChartWrap');
 
+/* ---------- Station canonicalization ---------- */
+let STATIONS=[];                // admin labels, exact spelling
+let ST_CANON=new Map();         // normKey -> admin label
+let ST_NORM_SET=new Set();      // set of normKeys
+
+function normKey(s){
+  return String(s||'')
+    .toLowerCase()
+    .replace(/&/g,'and')
+    .replace(/-/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+function setStationsFromConfig(labels){
+  STATIONS=(labels||[]).filter(Boolean);
+  ST_CANON.clear(); ST_NORM_SET.clear();
+  STATIONS.forEach(label=>{
+    const k=normKey(label);
+    ST_CANON.set(k,label);
+    ST_NORM_SET.add(k);
+  });
+}
+function canonicalStationLabel(s){
+  const k=normKey(s);
+  return ST_CANON.get(k)||'';
+}
+function selectedHasStation(selectedSet, s){
+  const k=normKey(s);
+  const selectedNorm=new Set([...selectedSet].map(normKey));
+  return selectedNorm.has(k);
+}
+
 /* ---------- State ---------- */
 let MODE='items'; // 'items' | 'stations'
-let STATIONS_ALL=['Grill','Fryer','Drinks','Pizza'];
-let selectedStations=new Set();
-let orders=[];  // filtered source orders
+let selectedStations=new Set(); // holds admin labels
+let orders=[];                  // filtered source orders
 let aggItems=[], aggStations=[], dailySeries=[];
 let rowSelection=new Set();
 
@@ -186,18 +219,21 @@ let rowSelection=new Set();
   startDate.value=startISO; endDate.value=endISO;
 })();
 
-/* ---------- Stations from settings ---------- */
+/* ---------- Load Stations from settings ---------- */
 async function loadStations(){
   try{
     const s=await db.collection('settings').doc('config').get();
-    const conf=s.data(); if(conf && Array.isArray(conf.stations) && conf.stations.length) STATIONS_ALL=conf.stations;
+    const conf=s.data();
+    if(conf && Array.isArray(conf.stations) && conf.stations.length){
+      setStationsFromConfig(conf.stations);
+    }
   }catch(e){}
-  stationsBadge.textContent='Stations: '+STATIONS_ALL.join(', ');
-  if(!selectedStations.size) STATIONS_ALL.forEach(s=>selectedStations.add(s));
+  stationsBadge.textContent='Stations: '+(STATIONS.length?STATIONS.join(', '):'—');
+  if(!selectedStations.size) STATIONS.forEach(s=>selectedStations.add(s));
   renderStationChips();
 }
 function renderStationChips(){
-  stationChips.innerHTML=STATIONS_ALL.map(s=>`<span class="chip ${selectedStations.has(s)?'active':''}" data-st="${s}">${s}</span>`).join('');
+  stationChips.innerHTML=STATIONS.map(s=>`<span class="chip ${selectedStations.has(s)?'active':''}" data-st="${s}">${s}</span>`).join('');
   stationChips.querySelectorAll('.chip').forEach(c=>{
     c.onclick=()=>{ const s=c.dataset.st; selectedStations.has(s)?selectedStations.delete(s):selectedStations.add(s); renderStationChips(); };
   });
@@ -231,14 +267,18 @@ async function runReport(){
     .orderBy('createdAt','asc')
     .get();
 
-  // completed sales only
+  // Completed sales only (exclude refunds/archived)
   const base = snap.docs.map(d=>({id:d.id, ...d.data()}))
     .filter(o=> (o.status==='picked_up' || o.status==='force_completed') && !o.refunded && !o.archived);
 
-  // station filter at item level
-  const stAllowed=new Set(selectedStations);
+  // Apply station filter at item level using canonical labels
+  const allowedNorm = new Set([...selectedStations].map(normKey));
   orders = base.map(o=>{
-    const items=(o.items||[]).filter(it=> !it.station || stAllowed.has(it.station));
+    const items=(o.items||[]).filter(it=>{
+      const label = canonicalStationLabel(it.station);
+      if(!label){ if(it && it.station) console.warn('[Analytics] Unknown station:', it.station); return false; }
+      return allowedNorm.has(normKey(label));
+    });
     return {...o, items};
   }).filter(o=> (o.items||[]).length>0);
 
@@ -264,8 +304,8 @@ function aggregate(){
       const unit = Number(it.price||0);
       const lineRev = round2(qty*unit);
 
-      const ikey = (it.name||'Unknown') + '|' + (it.station||'');
-      const curI = byItem.get(ikey) || { key:ikey, name:it.name||'Unknown', station:it.station||'', qty:0, revenue:0, avg:0, mods:{} };
+      const itemKey = (it.name||'Unknown') + '|' + (canonicalStationLabel(it.station)||'');
+      const curI = byItem.get(itemKey) || { key:itemKey, name:it.name||'Unknown', station:canonicalStationLabel(it.station)||'', qty:0, revenue:0, avg:0, mods:{} };
       curI.qty += qty; curI.revenue = round2(curI.revenue + lineRev);
 
       (it.mods||[]).forEach(g=>{
@@ -276,17 +316,19 @@ function aggregate(){
           curI.mods[mk].revenue = round2(curI.mods[mk].revenue + qty*Number(opt.price||0));
         });
       });
-      byItem.set(ikey, curI);
+      byItem.set(itemKey, curI);
 
-      const sKey = it.station||'(no station)';
-      const curS = byStation.get(sKey) || { station:sKey, orders:0, items:0, revenue:0, _orderSet:new Set() };
+      const sLabel = canonicalStationLabel(it.station) || '(no station)';
+      const sKey = normKey(sLabel);
+      const curS = byStation.get(sKey) || { id:sKey, station:sLabel, orders:0, items:0, revenue:0, _orderSet:new Set() };
       curS.items += qty;
       curS.revenue = round2(curS.revenue + lineRev);
       curS._orderSet.add(o.id);
       byStation.set(sKey, curS);
     });
 
-    byDay.set(dayKey, round2((byDay.get(dayKey)||0) + (o.items||[]).reduce((a,it)=>a+Number(it.qty||1)*Number(it.price||0),0)));
+    const orderRev = (o.items||[]).reduce((a,it)=> a + Number(it.qty||1)*Number(it.price||0), 0);
+    byDay.set(dayKey, round2((byDay.get(dayKey)||0) + orderRev));
   });
 
   byStation.forEach(v => v.orders = v._orderSet.size);
@@ -296,7 +338,7 @@ function aggregate(){
     avg: v.qty? round2(v.revenue/v.qty):0, mods:v.mods
   }));
   aggStations = Array.from(byStation.values()).map(v=>({
-    id:v.station, station:v.station, orders:v.orders, items:v.items, revenue:v.revenue
+    id:v.id, station:v.station, orders:v.orders, items:v.items, revenue:v.revenue
   }));
   dailySeries = Array.from(byDay.entries()).sort((a,b)=>a[0]-b[0]).map(([k,v])=>({day:new Date(Number(k)), revenue:v}));
 }
@@ -306,8 +348,8 @@ function renderTotals(){
   const items   = orders.reduce((a,o)=> a + (o.items||[]).reduce((s,it)=> s + Number(it.qty||1), 0), 0);
   const orderCt = orders.length;
   tRevenue.textContent = fmt$(revenue);
-  tItems.textContent   = items.toString();
-  tOrders.textContent  = orderCt.toString();
+  tItems.textContent   = String(items);
+  tOrders.textContent  = String(orderCt);
 }
 
 /* ---------- Table rendering ---------- */
@@ -375,7 +417,7 @@ function wireSelection(){
   });
 }
 
-/* ---------- Modifiers summary (FIX ADDED) ---------- */
+/* ---------- Modifiers summary ---------- */
 function modsSummaryHTML(modsObj){
   const arr = Object.values(modsObj||{});
   if(!arr.length) return '<span class="muted">—</span>';
