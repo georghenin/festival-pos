@@ -71,7 +71,7 @@
         <div class="muted" style="margin-bottom:4px">End date</div>
         <input type="date" id="endDate">
       </div>
-      <div class="wide" id="itemSearchWrap">
+      <div class="wide">
         <div class="muted" style="margin-bottom:4px">Search items</div>
         <input id="itemSearch" placeholder="Type to filter items by name…">
       </div>
@@ -158,14 +158,13 @@ const chartDaily=$('#chartDaily');
 /* ---------- Station canonicalization (Admin-driven + aliases) ---------- */
 let STATIONS=[];                // exact labels from Admin
 let ST_CANON=new Map();         // normKey -> admin label
-let ST_NORM_SET=new Set();      // set of normKeys
 
-// ✅ Expanded aliases to catch common mistakes/variants
+// Aliases/variants → admin labels
 const STATION_ALIASES = new Map([
   ['coffee & dessert','coffee and dessert'],
   ['coffee & desserts','coffee and dessert'],
   ['coffee and desserts','coffee and dessert'],
-  ['coffee and desert','coffee and dessert'],  // <— misspelling without the second "s"
+  ['coffee and desert','coffee and dessert'],
   ['dessert','coffee and dessert'],
   ['desserts','coffee and dessert'],
   ['ice-cream','ice cream'],
@@ -183,26 +182,17 @@ function normKey(s){
 }
 function setStationsFromConfig(labels){
   STATIONS=(labels||[]).filter(Boolean);
-  ST_CANON.clear(); ST_NORM_SET.clear();
-  STATIONS.forEach(label=>{
-    const k=normKey(label);
-    ST_CANON.set(k,label);
-    ST_NORM_SET.add(k);
-  });
+  ST_CANON.clear();
+  STATIONS.forEach(label=> ST_CANON.set(normKey(label), label));
 }
 function canonicalStationLabel(s){
   let k=normKey(s);
   if(STATION_ALIASES.has(k)) k = normKey(STATION_ALIASES.get(k));
   return ST_CANON.get(k)||'';
 }
-function selectedHasStation(selectedSet, s){
-  const k=normKey(s);
-  const selectedNorm=new Set([...selectedSet].map(normKey));
-  return selectedNorm.has(k);
-}
 
 /* ---------- State ---------- */
-let selectedStations=new Set(); // holds admin labels
+let selectedStations=new Set(); // holds admin labels (and optional "Unassigned")
 let orders=[];                  // filtered source orders
 let aggItems=[], dailySeries=[];
 let rowSelection=new Set();
@@ -228,7 +218,9 @@ async function loadStations(){
   renderStationChips();
 }
 function renderStationChips(){
-  stationChips.innerHTML=STATIONS.map(s=>`<span class="chip ${selectedStations.has(s)?'active':''}" data-st="${s}">${s}</span>`).join('');
+  stationChips.innerHTML=STATIONS.map(s=>`<span class="chip ${selectedStations.has(s)?'active':''}" data-st="${s}">${s}</span>`).join('') +
+    (selectedStations.has('Unassigned') || STATIONS.includes('Unassigned')
+      ? ` <span class="chip ${selectedStations.has('Unassigned')?'active':''}" data-st="Unassigned">Unassigned</span>` : '');
   stationChips.querySelectorAll('.chip').forEach(c=>{
     c.onclick=()=>{ const s=c.dataset.st; selectedStations.has(s)?selectedStations.delete(s):selectedStations.add(s); renderStationChips(); };
   });
@@ -249,20 +241,20 @@ async function runReport(){
     .orderBy('createdAt','asc')
     .get();
 
-  // Completed sales only (exclude refunds/archived)
+  // Count ALL non-refunded, non-archived (includes "ready")
   const base = snap.docs.map(d=>({id:d.id, ...d.data()}))
-    .filter(o=> (o.status==='picked_up' || o.status==='force_completed') && !o.refunded && !o.archived);
+    .filter(o => !o.refunded && !o.archived);
 
-  // 🔎 DEBUG: print all raw stations we see in this range
+  // Diagnostics: raw → canonical, plus counts
   const rawSeen = new Map();
   base.forEach(o => (o.items||[]).forEach(it=>{
-    const raw = (it.station ?? '').toString();
-    rawSeen.set(raw, (rawSeen.get(raw)||0)+1);
+    const raw=(it.station??'').toString();
+    rawSeen.set(raw,(rawSeen.get(raw)||0)+1);
   }));
   if(rawSeen.size){
     console.group('[Analytics] Stations seen (raw → canonical)');
-    [...rawSeen.entries()].forEach(([raw])=>{
-      const label = canonicalStationLabel(raw) || '(unmapped)';
+    [...rawSeen.keys()].forEach(raw=>{
+      const label = canonicalStationLabel(raw) || '(unassigned)';
       console.log(`  "${raw}" → "${label}"`);
     });
     console.groupEnd();
@@ -270,17 +262,28 @@ async function runReport(){
     console.log('[Analytics] No items in selected orders/date range.');
   }
 
-  // Apply station filter at item level using canonical labels
+  const stationCounts = new Map();
+  base.forEach(o => (o.items||[]).forEach(it=>{
+    const label = canonicalStationLabel(it.station) || 'Unassigned';
+    stationCounts.set(label,(stationCounts.get(label)||0)+1);
+  }));
+  console.group('[Analytics] Item counts per station');
+  [...stationCounts.entries()].forEach(([label,ct])=> console.log(`  ${label}: ${ct}`));
+  console.groupEnd();
+
+  // If Unassigned exists, show its chip (default OFF)
+  if(stationCounts.has('Unassigned') && !STATIONS.includes('Unassigned')){
+    STATIONS=[...STATIONS,'Unassigned'];
+    renderStationChips();
+  }
+
+  // Apply station filter at item level using canonical labels (+Unassigned)
   const allowedNorm = new Set([...selectedStations].map(normKey));
   orders = base.map(o=>{
-    const items=(o.items||[]).filter(it=>{
-      const label = canonicalStationLabel(it.station);
-      if(!label){
-        if(it && it.station) console.warn('[Analytics] Unknown station (fix in menu/stations):', it.station);
-        return false;
-      }
-      return allowedNorm.has(normKey(label));
-    });
+    const items=(o.items||[]).map(it=>{
+      const label = canonicalStationLabel(it.station) || 'Unassigned';
+      return {...it, station: label};
+    }).filter(it => allowedNorm.has(normKey(it.station)));
     return {...o, items};
   }).filter(o=> (o.items||[]).length>0);
 
@@ -304,9 +307,8 @@ function aggregate(){
       const unit = Number(it.price||0);
       const lineRev = round2(qty*unit);
 
-      const label = canonicalStationLabel(it.station) || '';
-      const itemKey = (it.name||'Unknown') + '|' + label;
-      const cur = byItem.get(itemKey) || { key:itemKey, name:it.name||'Unknown', station:label, qty:0, revenue:0, avg:0, mods:{} };
+      const itemKey = (it.name||'Unknown') + '|' + (it.station||'');
+      const cur = byItem.get(itemKey) || { key:itemKey, name:it.name||'Unknown', station:it.station||'', qty:0, revenue:0, avg:0, mods:{} };
       cur.qty += qty; cur.revenue = round2(cur.revenue + lineRev);
 
       (it.mods||[]).forEach(g=>{
