@@ -1,171 +1,154 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Festival POS – Launchpad</title>
+<title>Festival POS — Home</title>
 <style>
   :root{
-    --bg:#0d0f13; --card:#0f141e; --fg:#f5f7fa; --muted:#95a0ad;
-    --border:#1b2230; --accent:#5b9bff; --ok:#2fd28f; --warn:#ffb020; --danger:#ff6b6b;
+    --bg:#ffffff; --fg:#111; --muted:#667085;
+    --card:#f5f5f7; --border:#d7dbe2;
+    --accent:#2563eb; --ok:#16a34a; --danger:#dc2626;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
-  .wrap{max-width:1100px;margin:0 auto;padding:24px}
-  h1{margin:0 0 8px 0;font-size:28px}
-  h2{margin:18px 0 10px 0;font-size:20px;color:var(--muted)}
-  .sub{color:var(--muted);margin:0 0 18px 0}
-  .section{margin-top:8px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+  html,body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;font-size:18px;line-height:1.25}
+  .wrap{max-width:1100px;margin:0 auto;padding:16px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .pill{border:1px solid var(--border);border-radius:999px;padding:8px 12px;background:#fff;font-weight:700}
+  .btn{border:1px solid var(--border);border-radius:12px;padding:10px 14px;background:#fff;font-weight:700;cursor:pointer}
+  .btn.primary{background:var(--accent);border-color:transparent;color:#fff}
+  .btn.gray{background:#eef2f7}
+  .btn.danger{background:#fee2e2;border-color:#fecaca;color:#7f1d1d}
+  input{font:inherit;border:1px solid var(--border);border-radius:12px;background:#fff;color:#111;padding:12px}
+  h1{margin:0 0 8px 0;font-size:24px}
+  h2{margin:0 0 8px 0;font-size:20px}
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
-  .card h3{margin:0 0 8px 0}
-  .muted{color:var(--muted);font-size:13px}
-  a.btn{display:inline-block;margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--accent);color:#fff;text-decoration:none}
-  code{font-family:ui-monospace,monospace;font-size:12px;background:#0c111b;border:1px solid #1b2230;border-radius:8px;padding:2px 6px;color:#dbe5f6}
-  footer{margin-top:20px;color:var(--muted);font-size:12px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
-  .pill{display:inline-block;border:1px solid var(--border);background:#0f1420;color:#a7b0bd;border-radius:999px;padding:6px 10px}
-  .status{margin:0 0 20px 0;display:flex;gap:12px;flex-wrap:wrap}
-  .status span{padding:6px 12px;border-radius:999px;font-size:13px}
-  .ok{background:var(--ok);color:#0b0e14}
-  .warn{background:var(--warn);color:#0b0e14}
-  .danger{background:var(--danger);color:#0b0e14}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+  .link{display:block;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;text-decoration:none;color:inherit}
+  .muted{color:var(--muted)}
+  /* hide app until auth ready */
+  .hidden{display:none}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Festival POS – Launchpad <span class="muted" style="font-size:12px">v2025-08-20</span></h1>
-  <p class="sub">Tap a tile below on each iPad to open the correct screen. For best results, in Safari use <b>Share → Add to Home Screen</b>.</p>
-
-  <!-- Quick checks -->
-  <div class="status">
-    <span id="conn" class="warn">Checking Firestore…</span>
-    <span id="auth" class="warn">Checking Auth…</span>
-    <span id="net" class="warn">Checking Network…</span>
-  </div>
-
-  <!-- POS & Displays -->
-  <div class="section">
-    <h2>POS & Displays</h2>
-    <div class="grid">
-
-      <!-- POS -->
-      <div class="card">
-        <h3>POS — Order Station</h3>
-        <p class="muted">Take orders and print receipts (Epson). Auto-print enabled.</p>
-        <a class="btn" href="pos-cloudmenu.html">Open POS</a>
-      </div>
-
-      <!-- KDS Auth (Stations) -->
-      <div class="card">
-        <h3>Kitchen Display (KDS)</h3>
-        <p class="muted">Prep queues by station. Use the buttons inside to open each KDS (“Active / Completed”).</p>
-        <a class="btn" href="kds-auth.html">Open KDS</a>
-        <ul class="muted">
-          <li>Use station buttons for Grill, Shawarma and Gyro, Veggie and More, etc.</li>
-        </ul>
-      </div>
-
-      <!-- Pickup Manager -->
-      <div class="card">
-        <h3>Pickup Manager</h3>
-        <p class="muted">Move orders Ready → Picked Up (or Undo). “All History” view + sound option.</p>
-        <a class="btn" href="pickup-manage.html">Open Pickup Manager</a>
-      </div>
-
-      <!-- Optional: Public Pickup -->
-      <div class="card">
-        <h3>Pickup Display (Public)</h3>
-        <p class="muted">Read-only board for customers. Shows Ready orders and names.</p>
-        <a class="btn" href="pickup-v3.html">Open Public Pickup</a>
-      </div>
+  <!-- Header -->
+  <div class="row" style="justify-content:space-between;margin-bottom:10px">
+    <h1>Festival POS — Home</h1>
+    <div class="row">
+      <span id="who" class="pill">Checking sign-in…</span>
+      <button id="signOut" class="btn gray hidden">Sign out</button>
     </div>
   </div>
 
-  <!-- ADMIN -->
-  <div class="section">
-    <h2>Admin</h2>
-    <div class="grid">
-      <!-- Menu Admin -->
-      <div class="card">
-        <h3>Menu Admin</h3>
-        <p class="muted">Manage items: Name, Price, Station, Active, Image URL. Inline editing. Admin sign-in required.</p>
-        <a class="btn" href="menu-admin.html">Open Menu Admin</a>
-        <ul class="muted">
-          <li>Admins: <code>smsmofri@gmail.com</code>, <code>george.henin98@gmail.com</code></li>
-        </ul>
-      </div>
+  <!-- LOGIN PANEL (shown when signed out) -->
+  <div id="authBox" class="card">
+    <h2 style="margin-bottom:10px">Sign in</h2>
+    <div class="row" style="gap:12px">
+      <input id="email" type="email" placeholder="Email" style="min-width:260px">
+      <input id="pass" type="password" placeholder="Password" style="min-width:220px">
+      <button id="signIn" class="btn primary">Sign in</button>
+    </div>
+    <div id="authMsg" class="muted" style="margin-top:8px"></div>
+  </div>
 
-      <!-- Mod Groups Admin -->
-      <div class="card">
-        <h3>Modifier Groups</h3>
-        <p class="muted">Create and edit modifier groups/options used by menu items.</p>
-        <a class="btn" href="mod-groups-admin.html">Open Modifier Groups</a>
+  <!-- APP LINKS (only visible when signed in) -->
+  <div id="appBox" class="hidden">
+    <div class="card" style="margin-top:12px">
+      <h2 style="margin-bottom:10px">Point of Sale</h2>
+      <div class="grid">
+        <a class="link" href="pos-cloudmenu.html"><strong>POS — Cloud Menu</strong><div class="muted">Take orders</div></a>
       </div>
+    </div>
 
-      <!-- Stations Admin -->
-      <div class="card">
-        <h3>Stations Admin</h3>
-        <p class="muted">Create / rename kitchen stations for routing and reporting.</p>
-        <a class="btn" href="stations-admin.html">Open Stations Admin</a>
+    <div class="card" style="margin-top:12px">
+      <h2 style="margin-bottom:10px">Kitchen & Pickup</h2>
+      <div class="grid">
+        <a class="link" href="kds-auth.html"><strong>Kitchen Display (KDS)</strong><div class="muted">Prep by station</div></a>
+        <a class="link" href="pickup-manage.html"><strong>Pickup Manager</strong><div class="muted">Ready & picked-up workflow</div></a>
+        <a class="link" href="pickup-v3.html"><strong>Public Pickup Screen</strong><div class="muted">Customer-facing</div></a>
       </div>
+    </div>
 
-      <!-- NEW: Back Office — Orders -->
-      <div class="card">
-        <h3>Back Office — Orders</h3>
-        <p class="muted">Search by name, view full order (with variants), refund & log audit.</p>
-        <a class="btn" href="backoffice-orders.html">Open Orders Manager</a>
+    <div class="card" style="margin-top:12px">
+      <h2 style="margin-bottom:10px">Back Office</h2>
+      <div class="grid">
+        <a class="link" href="backoffice-orders.html"><strong>Back Office — Orders</strong><div class="muted">Search, view, refund, route</div></a>
+        <a class="link" href="backoffice-analytics.html"><strong>Back Office — Sales & Analytics</strong><div class="muted">Totals, items, stations, CSV</div></a>
       </div>
+    </div>
 
-      <!-- NEW: Back Office — Sales & Analytics -->
-      <div class="card">
-        <h3>Back Office — Sales & Analytics</h3>
-        <p class="muted">Daily totals (default: non-refunded), item breakdown, and mod/variant impact. Filters + CSV export.</p>
-        <a class="btn" href="backoffice-analytics.html">Open Sales & Analytics</a>
+    <div class="card" style="margin-top:12px">
+      <h2 style="margin-bottom:10px">Admin</h2>
+      <div class="grid">
+        <a class="link" href="menu-admin.html"><strong>Menu Admin</strong><div class="muted">Manage items</div></a>
+        <a class="link" href="mod-groups-admin.html"><strong>Modifier Groups Admin</strong><div class="muted">Options/upsells</div></a>
+        <a class="link" href="menu-importer-min.html"><strong>Menu Importer</strong><div class="muted">CSV to menu</div></a>
+        <a class="link" href="stations-admin.html"><strong>Stations Admin</strong><div class="muted">Manage stations list</div></a>
       </div>
     </div>
   </div>
-
-  <footer>
-    <span class="pill">Firebase: <b>churchfestivalpos</b></span>
-    <span class="muted">Tip: If an iPad looks stale, pull down to refresh (or add <code>?nocache=…</code> to the URL).</span>
-  </footer>
 </div>
 
-<!-- Firebase SDK -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 <script>
-const config = {
-  apiKey: "AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
-  authDomain: "churchfestivalpos.firebaseapp.com",
-  projectId: "churchfestivalpos"
-};
-firebase.initializeApp(config);
-const db = firebase.firestore();
+/* --- Firebase init (your project) --- */
+firebase.initializeApp({
+  apiKey:"AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
+  authDomain:"churchfestivalpos.firebaseapp.com",
+  projectId:"churchfestivalpos"
+});
 const auth = firebase.auth();
 
-// Firestore quick check
-db.collection("menu").limit(1).get()
-  .then(()=> { const el=document.getElementById("conn"); el.textContent="Firestore OK"; el.className="ok"; })
-  .catch(()=> { const el=document.getElementById("conn"); el.textContent="Firestore Error"; el.className="danger"; });
+/* --- DOM --- */
+const $=s=>document.querySelector(s);
+const who=$('#who'), signOut=$('#signOut');
+const authBox=$('#authBox'), appBox=$('#appBox');
+const email=$('#email'), pass=$('#pass'), signIn=$('#signIn'), authMsg=$('#authMsg');
 
-// Auth quick check
-auth.onAuthStateChanged(u=>{
-  const el = document.getElementById("auth");
-  if(u){ el.textContent = "Signed in: "+u.email; el.className="ok"; }
-  else { el.textContent = "Not signed in"; el.className="warn"; }
+/* --- Auth state gate --- */
+let authReady=false;
+auth.onAuthStateChanged(user=>{
+  authReady=true;
+  if(user){
+    who.textContent = user.email;
+    authBox.classList.add('hidden');
+    appBox.classList.remove('hidden');
+    signOut.classList.remove('hidden');
+  }else{
+    who.textContent = 'Signed out';
+    appBox.classList.add('hidden');
+    authBox.classList.remove('hidden');
+    signOut.classList.add('hidden');
+  }
 });
 
-// Network quick check
-function updateNet(){
-  const el=document.getElementById("net");
-  if(navigator.onLine){ el.textContent="Online"; el.className="ok"; }
-  else { el.textContent="Offline"; el.className="danger"; }
-}
-window.addEventListener("online", updateNet);
-window.addEventListener("offline", updateNet);
-updateNet();
+/* --- Actions --- */
+signIn.onclick = async ()=>{
+  authMsg.textContent='';
+  const e=(email.value||'').trim();
+  const p=pass.value||'';
+  if(!e || !p){ authMsg.textContent='Enter email and password.'; return; }
+  signIn.disabled=true; signIn.textContent='Signing in…';
+  try{
+    await auth.signInWithEmailAndPassword(e,p);
+    authMsg.textContent='';
+  }catch(err){
+    authMsg.textContent = err.message || 'Sign-in failed.';
+  }finally{
+    signIn.disabled=false; signIn.textContent='Sign in';
+  }
+};
+
+signOut.onclick = ()=> auth.signOut();
+
+/* --- Optional: block keyboard Enter on inputs to submit --- */
+[email,pass].forEach(inp=>{
+  inp.addEventListener('keydown', (ev)=>{ if(ev.key==='Enter'){ signIn.click(); }});
+});
 </script>
 </body>
 </html>
