@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Back Office — Sales & Analytics</title>
+<title>Back Office — Sales & Analytics (Locked)</title>
 <style>
   :root{
     --bg:#ffffff; --fg:#111; --muted:#666;
@@ -23,6 +23,8 @@
   input{font:inherit;border:1px solid var(--border);border-radius:12px;background:#fff;color:#111;padding:10px 12px}
   h2{margin:0 0 8px 0;font-size:22px}
   h3{margin:0 0 8px 0;font-size:20px}
+  .muted{color:var(--muted)}
+  .hidden{display:none}
 
   .chips{display:flex;gap:10px;flex-wrap:wrap}
   .chip{border:1px solid var(--border);background:#fff;color:#111;border-radius:999px;padding:8px 12px;cursor:pointer;font-weight:700}
@@ -44,7 +46,6 @@
   th,td{border-bottom:1px solid var(--border);padding:10px;text-align:left;vertical-align:top}
   th{background:#fff;position:sticky;top:0;z-index:2}
   .num{text-align:right}
-  .muted{color:var(--muted)}
   details > summary{cursor:pointer; color:#0b1f52; font-weight:800}
   .optrow{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--border);padding:4px 0}
 
@@ -53,435 +54,469 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="row" style="justify-content:space-between">
+  <!-- Header -->
+  <div class="row" style="justify-content:space-between;margin-bottom:10px">
     <h2>Back Office — Sales & Analytics</h2>
     <div class="row">
+      <span id="who" class="pill">Checking sign-in…</span>
+      <button id="signOut" class="btn gray hidden">Sign out</button>
+    </div>
+  </div>
+
+  <!-- LOGIN PANEL (shown when signed out or not admin) -->
+  <div id="authBox" class="card">
+    <h3 style="margin-bottom:10px">Sign in</h3>
+    <div class="row" style="gap:12px">
+      <input id="email" type="email" placeholder="Email" style="min-width:260px">
+      <input id="pass" type="password" placeholder="Password" style="min-width:220px">
+      <button id="signIn" class="btn primary">Sign in</button>
+    </div>
+    <div id="authMsg" class="muted" style="margin-top:8px"></div>
+  </div>
+
+  <!-- NOT ADMIN MESSAGE -->
+  <div id="notAdmin" class="card hidden">
+    <strong>Signed in but not an admin.</strong>
+    <div class="muted" style="margin-top:6px">Ask an admin to add your email to the allow-list.</div>
+  </div>
+
+  <!-- ANALYTICS APP (only visible for admins) -->
+  <div id="appBox" class="hidden">
+
+    <div class="row" style="justify-content:flex-start;margin-top:6px">
       <span id="stationsBadge" class="pill">Stations: loading…</span>
     </div>
-  </div>
 
-  <!-- Filters (Items only) -->
-  <div class="card" style="margin-top:12px">
-    <div class="filters">
-      <div>
-        <div class="muted" style="margin-bottom:4px">Start date</div>
-        <input type="date" id="startDate">
+    <!-- Filters -->
+    <div class="card" style="margin-top:12px">
+      <div class="filters">
+        <div>
+          <div class="muted" style="margin-bottom:4px">Start date</div>
+          <input type="date" id="startDate">
+        </div>
+        <div>
+          <div class="muted" style="margin-bottom:4px">End date</div>
+          <input type="date" id="endDate">
+        </div>
+        <div class="wide">
+          <div class="muted" style="margin-bottom:4px">Search items</div>
+          <input id="itemSearch" placeholder="Type to filter items by name…">
+        </div>
       </div>
-      <div>
-        <div class="muted" style="margin-bottom:4px">End date</div>
-        <input type="date" id="endDate">
+
+      <div class="muted" style="margin:10px 0 6px 0">Filter by stations</div>
+      <div id="stationChips" class="chips"></div>
+
+      <div class="row" style="justify-content:flex-end;margin-top:12px">
+        <button id="refresh" class="btn primary">Run Report</button>
+        <button id="exportCsv" class="btn">Export CSV (All)</button>
+        <button id="exportCsvSel" class="btn" style="display:none">Export CSV (Selected)</button>
       </div>
-      <div class="wide">
-        <div class="muted" style="margin-bottom:4px">Search items</div>
-        <input id="itemSearch" placeholder="Type to filter items by name…">
+    </div>
+
+    <!-- Totals -->
+    <div class="totals" style="margin-top:12px">
+      <div class="total-card">
+        <div class="total-val" id="tRevenue">$0.00</div>
+        <div class="total-lbl">Revenue (filtered)</div>
+      </div>
+      <div class="total-card">
+        <div class="total-val" id="tItems">0</div>
+        <div class="total-lbl">Items sold (filtered)</div>
+      </div>
+      <div class="total-card">
+        <div class="total-val" id="tOrders">0</div>
+        <div class="total-lbl">Orders counted (filtered)</div>
       </div>
     </div>
 
-    <div class="muted" style="margin:10px 0 6px 0">Filter by stations</div>
-    <div id="stationChips" class="chips"></div>
-
-    <div class="row" style="justify-content:flex-end;margin-top:12px">
-      <button id="refresh" class="btn primary">Run Report</button>
-      <button id="exportCsv" class="btn">Export CSV (All)</button>
-      <button id="exportCsvSel" class="btn" style="display:none">Export CSV (Selected)</button>
-    </div>
-  </div>
-
-  <!-- Totals -->
-  <div class="totals" style="margin-top:12px">
-    <div class="total-card">
-      <div class="total-val" id="tRevenue">$0.00</div>
-      <div class="total-lbl">Revenue (filtered)</div>
-    </div>
-    <div class="total-card">
-      <div class="total-val" id="tItems">0</div>
-      <div class="total-lbl">Items sold (filtered)</div>
-    </div>
-    <div class="total-card">
-      <div class="total-val" id="tOrders">0</div>
-      <div class="total-lbl">Orders counted (filtered)</div>
-    </div>
-  </div>
-
-  <!-- Selected totals -->
-  <div id="selBar" class="selbar">
-    <div class="row" style="justify-content:space-between">
-      <div><strong>Selected Totals:</strong>
-        <span id="selRevenue" style="margin-left:12px">$0.00</span> •
-        <span id="selItems">0 items</span>
+    <!-- Selected totals -->
+    <div id="selBar" class="selbar">
+      <div class="row" style="justify-content:space-between">
+        <div><strong>Selected Totals:</strong>
+          <span id="selRevenue" style="margin-left:12px">$0.00</span> •
+          <span id="selItems">0 items</span>
+        </div>
+        <button id="clearSelection" class="btn gray">Clear selection</button>
       </div>
-      <button id="clearSelection" class="btn gray">Clear selection</button>
     </div>
-  </div>
 
-  <!-- Table -->
-  <div class="card" style="margin-top:12px">
-    <h3 id="tableTitle" style="margin-bottom:8px">Sales by Items</h3>
-    <div style="max-height:420px;overflow:auto;border-radius:12px">
-      <table id="dataTable">
-        <thead id="thead"></thead>
-        <tbody id="tbody"></tbody>
-      </table>
+    <!-- Table -->
+    <div class="card" style="margin-top:12px">
+      <h3 id="tableTitle" style="margin-bottom:8px">Sales by Items</h3>
+      <div style="max-height:420px;overflow:auto;border-radius:12px">
+        <table id="dataTable">
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
     </div>
-  </div>
 
-  <!-- Chart -->
-  <div class="card" style="margin-top:12px">
-    <h3 style="margin-bottom:6px">Daily Revenue</h3>
-    <canvas id="chartDaily" width="900" height="260"></canvas>
+    <!-- Chart -->
+    <div class="card" style="margin-top:12px">
+      <h3 style="margin-bottom:6px">Daily Revenue</h3>
+      <canvas id="chartDaily" width="900" height="260"></canvas>
+    </div>
   </div>
 </div>
 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
 <script>
+/* ===== Firebase init (your project) ===== */
 firebase.initializeApp({
   apiKey:"AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
   authDomain:"churchfestivalpos.firebaseapp.com",
   projectId:"churchfestivalpos"
 });
+const auth=firebase.auth();
 const db=firebase.firestore();
 
-/* ---------- DOM ---------- */
+/* ===== Admin allow-list ===== */
+const ADMINS = new Set(["smsmofri@gmail.com","george.henin98@gmail.com"].map(x=>x.toLowerCase()));
+
+/* ===== DOM (Auth shell) ===== */
 const $=s=>document.querySelector(s);
-const stationsBadge=$('#stationsBadge');
-const startDate=$('#startDate'), endDate=$('#endDate');
-const itemSearch=$('#itemSearch');
-const stationChips=$('#stationChips');
-const refreshBtn=$('#refresh'), exportCsv=$('#exportCsv'), exportCsvSel=$('#exportCsvSel');
-const tRevenue=$('#tRevenue'), tItems=$('#tItems'), tOrders=$('#tOrders');
-const selBar=$('#selBar'), selRevenue=$('#selRevenue'), selItems=$('#selItems'), clearSelection=$('#clearSelection');
-const thead=$('#thead'), tbody=$('#tbody');
-const chartDaily=$('#chartDaily');
+const who=$('#who'), signOut=$('#signOut');
+const authBox=$('#authBox'), notAdmin=$('#notAdmin'), appBox=$('#appBox');
+const email=$('#email'), pass=$('#pass'), signIn=$('#signIn'), authMsg=$('#authMsg');
 
-/* ---------- Station canonicalization (Admin-driven + aliases) ---------- */
-let STATIONS=[];                // exact labels from Admin
-let ST_CANON=new Map();         // normKey -> admin label
+/* ===== Gate: auth + admin ===== */
+auth.onAuthStateChanged(user=>{
+  if(!user){
+    who.textContent='Signed out';
+    authBox.classList.remove('hidden');
+    notAdmin.classList.add('hidden');
+    appBox.classList.add('hidden');
+    signOut.classList.add('hidden');
+    return;
+  }
+  who.textContent=user.email||'Signed in';
+  signOut.classList.remove('hidden');
 
-// Aliases/variants → admin labels
-const STATION_ALIASES = new Map([
-  ['coffee & dessert','coffee and dessert'],
-  ['coffee & desserts','coffee and dessert'],
-  ['coffee and desserts','coffee and dessert'],
-  ['coffee and desert','coffee and dessert'],
-  ['dessert','coffee and dessert'],
-  ['desserts','coffee and dessert'],
-  ['ice-cream','ice cream'],
-  ['icecream','ice cream'],
-  ['ice cream station','ice cream']
-]);
+  const ok = ADMINS.has((user.email||'').toLowerCase());
+  if(!ok){
+    authBox.classList.add('hidden');
+    notAdmin.classList.remove('hidden');
+    appBox.classList.add('hidden');
+    return;
+  }
+  // Admin: show app, hide auth
+  authBox.classList.add('hidden');
+  notAdmin.classList.add('hidden');
+  appBox.classList.remove('hidden');
+  // Boot analytics UI after gate passes
+  bootAnalyticsUI();
+});
 
-function normKey(s){
-  return String(s||'')
-    .toLowerCase()
-    .replace(/&/g,'and')
-    .replace(/-/g,' ')
-    .replace(/\s+/g,' ')
-    .trim();
-}
-function setStationsFromConfig(labels){
-  STATIONS=(labels||[]).filter(Boolean);
-  ST_CANON.clear();
-  STATIONS.forEach(label=> ST_CANON.set(normKey(label), label));
-}
-function canonicalStationLabel(s){
-  let k=normKey(s);
-  if(STATION_ALIASES.has(k)) k = normKey(STATION_ALIASES.get(k));
-  return ST_CANON.get(k)||'';
-}
+/* Actions */
+signIn.onclick=async ()=>{
+  authMsg.textContent='';
+  const e=(email.value||'').trim();
+  const p=pass.value||'';
+  if(!e||!p){ authMsg.textContent='Enter email and password.'; return; }
+  signIn.disabled=true; signIn.textContent='Signing in…';
+  try{ await auth.signInWithEmailAndPassword(e,p); authMsg.textContent=''; }
+  catch(err){ authMsg.textContent=err?.message||'Sign-in failed.'; }
+  finally{ signIn.disabled=false; signIn.textContent='Sign in'; }
+};
+signOut.onclick=()=> auth.signOut();
 
-/* ---------- State ---------- */
-let selectedStations=new Set(); // holds admin labels (and optional "Unassigned")
-let orders=[];                  // filtered source orders
-let aggItems=[], dailySeries=[];
-let rowSelection=new Set();
+/* ===== Analytics code (loaded only after gate) ===== */
+function bootAnalyticsUI(){
+  /* ---------- DOM (analytics) ---------- */
+  const stationsBadge=$('#stationsBadge');
+  const startDate=$('#startDate'), endDate=$('#endDate');
+  const itemSearch=$('#itemSearch');
+  const stationChips=$('#stationChips');
+  const refreshBtn=$('#refresh'), exportCsv=$('#exportCsv'), exportCsvSel=$('#exportCsvSel');
+  const tRevenue=$('#tRevenue'), tItems=$('#tItems'), tOrders=$('#tOrders');
+  const selBar=$('#selBar'), selRevenue=$('#selRevenue'), selItems=$('#selItems'), clearSelection=$('#clearSelection');
+  const thead=$('#thead'), tbody=$('#tbody');
+  const chartDaily=$('#chartDaily');
 
-/* ---------- Init dates (today) ---------- */
-(function initDates(){
-  const d=new Date(); const endISO=d.toISOString().slice(0,10);
-  const startISO=endISO; // same-day default
-  startDate.value=startISO; endDate.value=endISO;
-})();
-
-/* ---------- Load Stations from settings ---------- */
-async function loadStations(){
-  try{
-    const s=await db.collection('settings').doc('config').get();
-    const conf=s.data();
-    if(conf && Array.isArray(conf.stations) && conf.stations.length){
-      setStationsFromConfig(conf.stations);
-    }
-  }catch(e){}
-  stationsBadge.textContent='Stations: '+(STATIONS.length?STATIONS.join(', '):'—');
-  if(!selectedStations.size) STATIONS.forEach(s=>selectedStations.add(s));
-  renderStationChips();
-}
-function renderStationChips(){
-  stationChips.innerHTML=STATIONS.map(s=>`<span class="chip ${selectedStations.has(s)?'active':''}" data-st="${s}">${s}</span>`).join('') +
-    (selectedStations.has('Unassigned') || STATIONS.includes('Unassigned')
-      ? ` <span class="chip ${selectedStations.has('Unassigned')?'active':''}" data-st="Unassigned">Unassigned</span>` : '');
-  stationChips.querySelectorAll('.chip').forEach(c=>{
-    c.onclick=()=>{ const s=c.dataset.st; selectedStations.has(s)?selectedStations.delete(s):selectedStations.add(s); renderStationChips(); };
-  });
-}
-
-/* ---------- Fetch + Aggregate (Items only) ---------- */
-refreshBtn.onclick=runReport;
-async function runReport(){
-  rowSelection.clear();
-  renderSelectedBar();
-
-  const startMS = new Date(startDate.value+'T00:00:00').getTime();
-  const endMS   = new Date(endDate.value+'T23:59:59').getTime();
-
-  const snap=await db.collection('orders')
-    .where('createdAt','>=', startMS)
-    .where('createdAt','<=', endMS)
-    .orderBy('createdAt','asc')
-    .get();
-
-  // Count ALL non-refunded, non-archived (includes "ready")
-  const base = snap.docs.map(d=>({id:d.id, ...d.data()}))
-    .filter(o => !o.refunded && !o.archived);
-
-  // Diagnostics: raw → canonical, plus counts
-  const rawSeen = new Map();
-  base.forEach(o => (o.items||[]).forEach(it=>{
-    const raw=(it.station??'').toString();
-    rawSeen.set(raw,(rawSeen.get(raw)||0)+1);
-  }));
-  if(rawSeen.size){
-    console.group('[Analytics] Stations seen (raw → canonical)');
-    [...rawSeen.keys()].forEach(raw=>{
-      const label = canonicalStationLabel(raw) || '(unassigned)';
-      console.log(`  "${raw}" → "${label}"`);
-    });
-    console.groupEnd();
-  }else{
-    console.log('[Analytics] No items in selected orders/date range.');
+  /* ---------- Station canonicalization ---------- */
+  let STATIONS=[];                // exact labels from Admin
+  let ST_CANON=new Map();         // normKey -> admin label
+  const STATION_ALIASES = new Map([
+    ['coffee & dessert','coffee and dessert'],
+    ['coffee & desserts','coffee and dessert'],
+    ['coffee and desserts','coffee and dessert'],
+    ['coffee and desert','coffee and dessert'],
+    ['dessert','coffee and dessert'],
+    ['desserts','coffee and dessert'],
+    ['ice-cream','ice cream'],
+    ['icecream','ice cream'],
+    ['ice cream station','ice cream']
+  ]);
+  function normKey(s){ return String(s||'').toLowerCase().replace(/&/g,'and').replace(/-/g,' ').replace(/\s+/g,' ').trim(); }
+  function setStationsFromConfig(labels){
+    STATIONS=(labels||[]).filter(Boolean);
+    ST_CANON.clear(); STATIONS.forEach(label=> ST_CANON.set(normKey(label), label));
+  }
+  function canonicalStationLabel(s){
+    let k=normKey(s);
+    if(STATION_ALIASES.has(k)) k=normKey(STATION_ALIASES.get(k));
+    return ST_CANON.get(k)||'';
   }
 
-  const stationCounts = new Map();
-  base.forEach(o => (o.items||[]).forEach(it=>{
-    const label = canonicalStationLabel(it.station) || 'Unassigned';
-    stationCounts.set(label,(stationCounts.get(label)||0)+1);
-  }));
-  console.group('[Analytics] Item counts per station');
-  [...stationCounts.entries()].forEach(([label,ct])=> console.log(`  ${label}: ${ct}`));
-  console.groupEnd();
+  /* ---------- State ---------- */
+  let selectedStations=new Set();
+  let orders=[], aggItems=[], dailySeries=[];
+  let rowSelection=new Set();
 
-  // If Unassigned exists, show its chip (default OFF)
-  if(stationCounts.has('Unassigned') && !STATIONS.includes('Unassigned')){
-    STATIONS=[...STATIONS,'Unassigned'];
+  /* ---------- Init dates ---------- */
+  (function initDates(){
+    const d=new Date(); const iso=d.toISOString().slice(0,10);
+    startDate.value=iso; endDate.value=iso;
+  })();
+
+  /* ---------- Load stations ---------- */
+  async function loadStations(){
+    try{
+      const s=await db.collection('settings').doc('config').get();
+      const conf=s.data();
+      if(conf && Array.isArray(conf.stations) && conf.stations.length){
+        setStationsFromConfig(conf.stations);
+      }
+    }catch(e){}
+    stationsBadge.textContent='Stations: '+(STATIONS.length?STATIONS.join(', '):'—');
+    if(!selectedStations.size) STATIONS.forEach(s=>selectedStations.add(s));
     renderStationChips();
   }
-
-  // Apply station filter at item level using canonical labels (+Unassigned)
-  const allowedNorm = new Set([...selectedStations].map(normKey));
-  orders = base.map(o=>{
-    const items=(o.items||[]).map(it=>{
-      const label = canonicalStationLabel(it.station) || 'Unassigned';
-      return {...it, station: label};
-    }).filter(it => allowedNorm.has(normKey(it.station)));
-    return {...o, items};
-  }).filter(o=> (o.items||[]).length>0);
-
-  aggregate();
-  renderTotals();
-  renderTable();
-  drawDailyChart();
-}
-
-function aggregate(){
-  const byItem=new Map();
-  const byDay=new Map();
-
-  orders.forEach(o=>{
-    const day = new Date(o.createdAt||o.updatedAt||0);
-    day.setHours(0,0,0,0);
-    const dayKey=day.getTime();
-
-    (o.items||[]).forEach(it=>{
-      const qty = Number(it.qty||1);
-      const unit = Number(it.price||0);
-      const lineRev = round2(qty*unit);
-
-      const itemKey = (it.name||'Unknown') + '|' + (it.station||'');
-      const cur = byItem.get(itemKey) || { key:itemKey, name:it.name||'Unknown', station:it.station||'', qty:0, revenue:0, avg:0, mods:{} };
-      cur.qty += qty; cur.revenue = round2(cur.revenue + lineRev);
-
-      (it.mods||[]).forEach(g=>{
-        (g.options||[]).forEach(opt=>{
-          const mk = g.groupName+'|'+opt.name;
-          cur.mods[mk] = (cur.mods[mk]||{group:g.groupName, option:opt.name, qty:0, revenue:0});
-          cur.mods[mk].qty += qty;
-          cur.mods[mk].revenue = round2(cur.mods[mk].revenue + qty*Number(opt.price||0));
-        });
-      });
-      byItem.set(itemKey, cur);
+  function renderStationChips(){
+    stationChips.innerHTML=STATIONS.map(s=>`<span class="chip ${selectedStations.has(s)?'active':''}" data-st="${s}">${s}</span>`).join('') +
+      (selectedStations.has('Unassigned') || STATIONS.includes('Unassigned')
+        ? ` <span class="chip ${selectedStations.has('Unassigned')?'active':''}" data-st="Unassigned">Unassigned</span>` : '');
+    stationChips.querySelectorAll('.chip').forEach(c=>{
+      c.onclick=()=>{ const s=c.dataset.st; selectedStations.has(s)?selectedStations.delete(s):selectedStations.add(s); renderStationChips(); };
     });
-
-    const orderRev = (o.items||[]).reduce((a,it)=> a + Number(it.qty||1)*Number(it.price||0), 0);
-    byDay.set(dayKey, round2((byDay.get(dayKey)||0) + orderRev));
-  });
-
-  aggItems = Array.from(byItem.values()).map(v=>({
-    id:v.key, name:v.name, station:v.station, qty:v.qty, revenue:v.revenue,
-    avg: v.qty? round2(v.revenue/v.qty):0, mods:v.mods
-  }));
-  dailySeries = Array.from(byDay.entries()).sort((a,b)=>a[0]-b[0]).map(([k,v])=>({day:new Date(Number(k)), revenue:v}));
-}
-
-function renderTotals(){
-  const revenue = orders.reduce((a,o)=> a + (o.items||[]).reduce((s,it)=> s + Number(it.qty||1)*Number(it.price||0), 0), 0);
-  const items   = orders.reduce((a,o)=> a + (o.items||[]).reduce((s,it)=> s + Number(it.qty||1), 0), 0);
-  const orderCt = orders.length;
-  tRevenue.textContent = fmt$(revenue);
-  tItems.textContent   = String(items);
-  tOrders.textContent  = String(orderCt);
-}
-
-/* ---------- Items table ---------- */
-function renderTable(){
-  rowSelection.clear();
-  renderSelectedBar();
-
-  const q=(itemSearch.value||'').trim().toLowerCase();
-  const rows = q ? aggItems.filter(r => (r.name||'').toLowerCase().includes(q)) : aggItems.slice();
-
-  thead.innerHTML = `
-    <tr>
-      <th style="width:44px"><input type="checkbox" id="selAll"></th>
-      <th>Item</th>
-      <th>Station</th>
-      <th class="num">Qty</th>
-      <th class="num">Revenue</th>
-      <th class="num">Avg Price</th>
-      <th>Options (modifiers)</th>
-    </tr>`;
-  tbody.innerHTML = rows.map(r=>`
-    <tr data-id="${esc(r.id)}">
-      <td><input type="checkbox" class="sel"></td>
-      <td><strong>${esc(r.name)}</strong></td>
-      <td>${esc(r.station||'')}</td>
-      <td class="num">${r.qty}</td>
-      <td class="num">${fmt$(r.revenue)}</td>
-      <td class="num">${fmt$(r.avg)}</td>
-      <td>${modsSummaryHTML(r.mods)}</td>
-    </tr>
-  `).join('');
-
-  wireSelection();
-}
-itemSearch.oninput = ()=> renderTable();
-
-function wireSelection(){
-  const selAll=$('#selAll');
-  const boxes=[...tbody.querySelectorAll('input.sel')];
-  selAll.onclick=()=>{ boxes.forEach(b=>{ b.checked=selAll.checked; toggleRow(b.closest('tr').dataset.id, b.checked); }); renderSelectedBar(); };
-  boxes.forEach(b=>{
-    b.onchange=()=>{ toggleRow(b.closest('tr').dataset.id, b.checked); renderSelectedBar(); };
-  });
-}
-
-/* ---------- Modifiers summary ---------- */
-function modsSummaryHTML(modsObj){
-  const arr = Object.values(modsObj||{});
-  if(!arr.length) return '<span class="muted">—</span>';
-
-  arr.sort((a,b)=> b.qty - a.qty);
-  const top = arr.slice(0,3).map(m=> `${esc(m.group)}: ${esc(m.option)} <span class="muted">(${m.qty})</span>`).join(' • ');
-
-  const detailRows = arr.map(m=>`
-    <div class="optrow">
-      <div>${esc(m.group)} → <strong>${esc(m.option)}</strong></div>
-      <div class="num" style="min-width:80px">${m.qty}</div>
-      <div class="num" style="min-width:100px">${fmt$(m.revenue)}</div>
-    </div>
-  `).join('');
-
-  const details = `
-    <details style="margin-top:6px">
-      <summary>details (${arr.length})</summary>
-      <div style="margin-top:6px">${detailRows}</div>
-    </details>`;
-
-  return top + (arr.length>3 ? ' • …' : '') + details;
-}
-
-/* ---------- Selected totals ---------- */
-function toggleRow(id, checked){ if(checked) rowSelection.add(id); else rowSelection.delete(id); }
-function renderSelectedBar(){
-  if(rowSelection.size===0){ selBar.style.display='none'; exportCsvSel.style.display='none'; return; }
-  exportCsvSel.style.display='inline-block';
-
-  let items=0, revenue=0;
-  aggItems.forEach(r=>{ if(rowSelection.has(r.id)){ items += r.qty; revenue += r.revenue; }});
-  selRevenue.textContent = fmt$(revenue);
-  selItems.textContent   = `${items} items`;
-  selBar.style.display='block';
-}
-clearSelection.onclick=()=>{ rowSelection.clear(); [...tbody.querySelectorAll('input.sel')].forEach(b=> b.checked=false); renderSelectedBar(); };
-
-/* ---------- Chart (simple canvas) ---------- */
-function drawDailyChart(){
-  const ctx=chartDaily.getContext('2d');
-  ctx.clearRect(0,0,chartDaily.width,chartDaily.height);
-
-  const W=chartDaily.width, H=chartDaily.height, P=28;
-  ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(P,H-P); ctx.lineTo(W-P,H-P); ctx.lineTo(W-P,P); ctx.stroke();
-
-  if(!dailySeries.length) return;
-
-  const xs=dailySeries.map(d=>d.day.getTime());
-  const ys=dailySeries.map(d=>d.revenue);
-  const xmin = Math.min(...xs), xmax=Math.max(...xs);
-  const ymin = 0, ymax=Math.max(...ys)*1.1 || 1;
-  const xscale=t=> P + ( (t-xmin)/(xmax-xmin||1) )*(W-2*P);
-  const yscale=v=> (H-P) - ( (v-ymin)/(ymax-ymin||1) )*(H-2*P);
-
-  ctx.fillStyle='#0f172a'; ctx.font='14px system-ui';
-  const steps=Math.min(10, dailySeries.length);
-  for(let i=0;i<=steps;i++){
-    const t=xmin + (i/steps)*(xmax-xmin);
-    const x=xscale(t);
-    ctx.strokeStyle='#e2e8f0'; ctx.beginPath(); ctx.moveTo(x,H-P); ctx.lineTo(x,P); ctx.stroke();
-    const d=new Date(t); ctx.fillText((d.getMonth()+1)+'/'+d.getDate(), x-16, H-6);
   }
 
-  ctx.strokeStyle='#1f6feb'; ctx.lineWidth=2;
-  ctx.beginPath();
-  dailySeries.forEach((pt,i)=>{ const x=xscale(pt.day.getTime()); const y=yscale(pt.revenue); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
-  ctx.stroke();
-  ctx.fillStyle='#1f6feb';
-  dailySeries.forEach(pt=>{ const x=xscale(pt.day.getTime()); const y=yscale(pt.revenue); ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill(); });
+  /* ---------- Fetch + Aggregate (Items only) ---------- */
+  refreshBtn.onclick=runReport;
+  async function runReport(){
+    rowSelection.clear(); renderSelectedBar();
+
+    const startMS=new Date(startDate.value+'T00:00:00').getTime();
+    const endMS=new Date(endDate.value+'T23:59:59').getTime();
+
+    const snap=await db.collection('orders')
+      .where('createdAt','>=', startMS)
+      .where('createdAt','<=', endMS)
+      .orderBy('createdAt','asc')
+      .get();
+
+    // include all non-refunded/non-archived (ready orders are counted)
+    const base=snap.docs.map(d=>({id:d.id, ...d.data()})).filter(o=>!o.refunded && !o.archived);
+
+    // diagnostics
+    const rawSeen=new Map();
+    base.forEach(o=>(o.items||[]).forEach(it=>{
+      const raw=(it.station??'').toString();
+      rawSeen.set(raw,(rawSeen.get(raw)||0)+1);
+    }));
+    if(rawSeen.size){
+      console.group('[Analytics] Stations seen (raw → canonical)');
+      [...rawSeen.keys()].forEach(raw=>{
+        const label=canonicalStationLabel(raw) || '(unassigned)';
+        console.log(`  "${raw}" → "${label}"`);
+      });
+      console.groupEnd();
+    }else{
+      console.log('[Analytics] No items in selected orders/date range.');
+    }
+
+    const stationCounts=new Map();
+    base.forEach(o=>(o.items||[]).forEach(it=>{
+      const label=canonicalStationLabel(it.station) || 'Unassigned';
+      stationCounts.set(label,(stationCounts.get(label)||0)+1);
+    }));
+    console.group('[Analytics] Item counts per station');
+    [...stationCounts.entries()].forEach(([label,ct])=>console.log(`  ${label}: ${ct}`));
+    console.groupEnd();
+
+    if(stationCounts.has('Unassigned') && !STATIONS.includes('Unassigned')){
+      STATIONS=[...STATIONS,'Unassigned']; renderStationChips();
+    }
+
+    const allowedNorm=new Set([...selectedStations].map(normKey));
+    orders = base.map(o=>{
+      const items=(o.items||[]).map(it=>{
+        const label=canonicalStationLabel(it.station) || 'Unassigned';
+        return {...it, station:label};
+      }).filter(it=>allowedNorm.has(normKey(it.station)));
+      return {...o, items};
+    }).filter(o=>(o.items||[]).length>0);
+
+    aggregate();
+    renderTotals();
+    renderTable();
+    drawDailyChart();
+  }
+
+  function aggregate(){
+    const byItem=new Map(); const byDay=new Map();
+    orders.forEach(o=>{
+      const day=new Date(o.createdAt||o.updatedAt||0); day.setHours(0,0,0,0);
+      const dayKey=day.getTime();
+
+      (o.items||[]).forEach(it=>{
+        const qty=Number(it.qty||1), unit=Number(it.price||0), line=round2(qty*unit);
+        const key=(it.name||'Unknown')+'|'+(it.station||'');
+        const cur=byItem.get(key)||{key,name:it.name||'Unknown',station:it.station||'',qty:0,revenue:0,avg:0,mods:{}};
+        cur.qty+=qty; cur.revenue=round2(cur.revenue+line);
+        (it.mods||[]).forEach(g=> (g.options||[]).forEach(opt=>{
+          const mk=g.groupName+'|'+opt.name;
+          cur.mods[mk]=(cur.mods[mk]||{group:g.groupName,option:opt.name,qty:0,revenue:0});
+          cur.mods[mk].qty+=qty;
+          cur.mods[mk].revenue=round2(cur.mods[mk].revenue+qty*Number(opt.price||0));
+        }));
+        byItem.set(key,cur);
+      });
+
+      const oRev=(o.items||[]).reduce((a,it)=>a+Number(it.qty||1)*Number(it.price||0),0);
+      byDay.set(dayKey, round2((byDay.get(dayKey)||0)+oRev));
+    });
+
+    aggItems=Array.from(byItem.values()).map(v=>({
+      id:v.key, name:v.name, station:v.station, qty:v.qty, revenue:v.revenue,
+      avg:v.qty?round2(v.revenue/v.qty):0, mods:v.mods
+    }));
+    dailySeries=Array.from(byDay.entries()).sort((a,b)=>a[0]-b[0]).map(([k,v])=>({day:new Date(Number(k)),revenue:v}));
+  }
+
+  function renderTotals(){
+    const revenue=orders.reduce((a,o)=>a+(o.items||[]).reduce((s,it)=>s+Number(it.qty||1)*Number(it.price||0),0),0);
+    const items=orders.reduce((a,o)=>a+(o.items||[]).reduce((s,it)=>s+Number(it.qty||1),0),0);
+    tRevenue.textContent=fmt$(revenue);
+    tItems.textContent=String(items);
+    tOrders.textContent=String(orders.length);
+  }
+
+  /* ---------- Items table ---------- */
+  function renderTable(){
+    rowSelection.clear(); renderSelectedBar();
+    const q=(itemSearch.value||'').trim().toLowerCase();
+    const rows=q? aggItems.filter(r=>(r.name||'').toLowerCase().includes(q)) : aggItems.slice();
+
+    thead.innerHTML=`
+      <tr>
+        <th style="width:44px"><input type="checkbox" id="selAll"></th>
+        <th>Item</th>
+        <th>Station</th>
+        <th class="num">Qty</th>
+        <th class="num">Revenue</th>
+        <th class="num">Avg Price</th>
+        <th>Options (modifiers)</th>
+      </tr>`;
+    tbody.innerHTML=rows.map(r=>`
+      <tr data-id="${esc(r.id)}">
+        <td><input type="checkbox" class="sel"></td>
+        <td><strong>${esc(r.name)}</strong></td>
+        <td>${esc(r.station||'')}</td>
+        <td class="num">${r.qty}</td>
+        <td class="num">${fmt$(r.revenue)}</td>
+        <td class="num">${fmt$(r.avg)}</td>
+        <td>${modsSummaryHTML(r.mods)}</td>
+      </tr>
+    `).join('');
+    wireSelection();
+  }
+  itemSearch.oninput=()=>renderTable();
+
+  function wireSelection(){
+    const selAll=$('#selAll');
+    const boxes=[...tbody.querySelectorAll('input.sel')];
+    selAll.onclick=()=>{ boxes.forEach(b=>{ b.checked=selAll.checked; toggleRow(b.closest('tr').dataset.id, b.checked); }); renderSelectedBar(); };
+    boxes.forEach(b=> b.onchange=()=>{ toggleRow(b.closest('tr').dataset.id, b.checked); renderSelectedBar(); });
+  }
+
+  function modsSummaryHTML(modsObj){
+    const arr=Object.values(modsObj||{});
+    if(!arr.length) return '<span class="muted">—</span>';
+    arr.sort((a,b)=>b.qty-a.qty);
+    const top=arr.slice(0,3).map(m=>`${esc(m.group)}: ${esc(m.option)} <span class="muted">(${m.qty})</span>`).join(' • ');
+    const detailRows=arr.map(m=>`
+      <div class="optrow">
+        <div>${esc(m.group)} → <strong>${esc(m.option)}</strong></div>
+        <div class="num" style="min-width:80px">${m.qty}</div>
+        <div class="num" style="min-width:100px">${fmt$(m.revenue)}</div>
+      </div>`).join('');
+    return top + (arr.length>3?' • …':'') + `
+      <details style="margin-top:6px">
+        <summary>details (${arr.length})</summary>
+        <div style="margin-top:6px">${detailRows}</div>
+      </details>`;
+  }
+
+  /* ---------- Selected totals ---------- */
+  function toggleRow(id,checked){ if(checked) rowSelection.add(id); else rowSelection.delete(id); }
+  function renderSelectedBar(){
+    if(rowSelection.size===0){ selBar.style.display='none'; exportCsvSel.style.display='none'; return; }
+    exportCsvSel.style.display='inline-block';
+    let items=0, revenue=0;
+    aggItems.forEach(r=>{ if(rowSelection.has(r.id)){ items+=r.qty; revenue+=r.revenue; }});
+    selRevenue.textContent=fmt$(revenue);
+    selItems.textContent=`${items} items`;
+    selBar.style.display='block';
+  }
+  clearSelection.onclick=()=>{ rowSelection.clear(); [...tbody.querySelectorAll('input.sel')].forEach(b=>b.checked=false); renderSelectedBar(); };
+
+  /* ---------- Chart ---------- */
+  function drawDailyChart(){
+    const ctx=chartDaily.getContext('2d');
+    ctx.clearRect(0,0,chartDaily.width,chartDaily.height);
+    const W=chartDaily.width,H=chartDaily.height,P=28;
+    ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(P,H-P); ctx.lineTo(W-P,H-P); ctx.lineTo(W-P,P); ctx.stroke();
+    if(!dailySeries.length) return;
+
+    const xs=dailySeries.map(d=>d.day.getTime());
+    const ys=dailySeries.map(d=>d.revenue);
+    const xmin=Math.min(...xs), xmax=Math.max(...xs);
+    const ymin=0, ymax=Math.max(...ys)*1.1||1;
+    const xscale=t=>P+((t-xmin)/(xmax-xmin||1))*(W-2*P);
+    const yscale=v=>(H-P)-((v-ymin)/(ymax-ymin||1))*(H-2*P);
+
+    ctx.fillStyle='#0f172a'; ctx.font='14px system-ui';
+    const steps=Math.min(10,dailySeries.length);
+    for(let i=0;i<=steps;i++){
+      const t=xmin+(i/steps)*(xmax-xmin); const x=xscale(t);
+      ctx.strokeStyle='#e2e8f0'; ctx.beginPath(); ctx.moveTo(x,H-P); ctx.lineTo(x,P); ctx.stroke();
+      const d=new Date(t); ctx.fillText((d.getMonth()+1)+'/'+d.getDate(), x-16, H-6);
+    }
+    ctx.strokeStyle='#1f6feb'; ctx.lineWidth=2;
+    ctx.beginPath();
+    dailySeries.forEach((pt,i)=>{ const x=xscale(pt.day.getTime()); const y=yscale(pt.revenue); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+    ctx.stroke(); ctx.fillStyle='#1f6feb';
+    dailySeries.forEach(pt=>{ const x=xscale(pt.day.getTime()); const y=yscale(pt.revenue); ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill(); });
+  }
+
+  /* ---------- CSV ---------- */
+  exportCsv.onclick=()=> exportCurrent(false);
+  exportCsvSel.onclick=()=> exportCurrent(true);
+  function exportCurrent(onlySelected){
+    const data=onlySelected? aggItems.filter(r=>rowSelection.has(r.id)) : aggItems;
+    const headers=['Item','Station','Qty','Revenue','Avg Price'];
+    const rows=data.map(r=>[r.name,r.station||'',r.qty,r.revenue.toFixed(2),r.avg.toFixed(2)]);
+    const csv=[headers.join(','), ...rows.map(r=>r.map(csvEsc).join(','))].join('\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    const url=URL.createObjectURL(blob); const a=document.createElement('a');
+    a.href=url; a.download='sales_by_items.csv'; document.body.appendChild(a); a.click(); URL.revokeObjectURL(url); a.remove();
+  }
+
+  /* ---------- Helpers ---------- */
+  function round2(n){ return Math.round((+n||0)*100)/100; }
+  function fmt$(n){ return '$'+(round2(n)).toFixed(2); }
+  function esc(s){ return (s??'').toString().replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+  function csvEsc(x){ const s=String(x??''); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; }
+
+  /* ---------- Boot analytics after auth ---------- */
+  loadStations();
 }
-
-/* ---------- CSV Export ---------- */
-exportCsv.onclick=()=> exportCurrent(false);
-exportCsvSel.onclick=()=> exportCurrent(true);
-function exportCurrent(onlySelected){
-  const data = onlySelected ? aggItems.filter(r=>rowSelection.has(r.id)) : aggItems;
-  const headers=['Item','Station','Qty','Revenue','Avg Price'];
-  const rows = data.map(r=> [r.name, r.station||'', r.qty, r.revenue.toFixed(2), r.avg.toFixed(2)]);
-  const csv = [headers.join(','), ...rows.map(r=>r.map(csvEsc).join(','))].join('\n');
-  const blob=new Blob([csv], {type:'text/csv;charset=utf-8;'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url; a.download = 'sales_by_items.csv';
-  document.body.appendChild(a); a.click(); URL.revokeObjectURL(url); a.remove();
-}
-
-/* ---------- Helpers ---------- */
-function round2(n){ return Math.round((+n||0)*100)/100; }
-function fmt$(n){ return '$'+(round2(n)).toFixed(2); }
-function esc(s){ return (s??'').toString().replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
-function csvEsc(x){ const s=String(x??''); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; }
-
-/* ---------- Boot ---------- */
-loadStations();
 </script>
 </body>
 </html>
