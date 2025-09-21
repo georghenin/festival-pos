@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Order Number Admin</title>
+<style>
+  :root{--bg:#fff;--fg:#111;--muted:#667085;--card:#f5f5f7;--border:#d7dbe2;--accent:#2563eb;--danger:#dc2626}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;font-size:18px}
+  .wrap{max-width:760px;margin:0 auto;padding:16px}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
+  .pill{border:1px solid var(--border);border-radius:999px;padding:8px 12px;background:#fff;font-weight:700}
+  .btn{border:1px solid var(--border);border-radius:12px;padding:10px 14px;background:#fff;font-weight:700;cursor:pointer}
+  .btn.primary{background:var(--accent);border-color:transparent;color:#fff}
+  .btn.danger{background:#fee2e2;border-color:#fecaca;color:#7f1d1d}
+  .btn.gray{background:#eef2f7}
+  input{font:inherit;border:1px solid var(--border);border-radius:12px;background:#fff;color:#111;padding:12px}
+  h1{margin:0 0 8px 0;font-size:24px}
+  .muted{color:var(--muted)}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="row" style="justify-content:space-between;margin-bottom:10px">
+    <h1>Order Number Admin</h1>
+    <div class="row">
+      <a class="btn gray" href="index.html">← Back to Home</a>
+      <span id="who" class="pill">Checking sign-in…</span>
+      <button id="signOut" class="btn gray hidden">Sign out</button>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="authBox" class="card">
+    <div class="row">
+      <input id="email" type="email" placeholder="Email" style="min-width:240px">
+      <input id="pass" type="password" placeholder="Password" style="min-width:200px">
+      <button id="signIn" class="btn primary">Sign in</button>
+    </div>
+    <div id="authMsg" class="muted" style="margin-top:8px"></div>
+  </div>
+
+  <!-- NOT ADMIN -->
+  <div id="notAdmin" class="card hidden">
+    <strong>Signed in but not an admin.</strong>
+    <div class="muted" style="margin-top:6px">Ask an admin to add your email to the allow-list.</div>
+  </div>
+
+  <!-- ADMIN TOOLS -->
+  <div id="appBox" class="card hidden">
+    <h2 style="margin:0 0 10px 0">Order Number Tools</h2>
+    <div class="row" style="align-items:flex-end">
+      <div>
+        <div class="muted" style="margin-bottom:6px">Current value</div>
+        <span id="seqVal" class="pill">—</span>
+        <button id="seqRefresh" class="btn gray">Refresh</button>
+      </div>
+      <div>
+        <div class="muted" style="margin-bottom:6px">Set to</div>
+        <div class="row" style="gap:10px">
+          <input id="seqInput" type="number" placeholder="e.g. 0, 100, 501" style="width:180px">
+          <button id="seqSet" class="btn primary">Set</button>
+        </div>
+      </div>
+      <div class="row" style="gap:10px">
+        <button id="seqDec" class="btn">–1</button>
+        <button id="seqInc" class="btn">+1</button>
+        <button id="seqReset" class="btn danger">Reset to 0</button>
+      </div>
+    </div>
+    <div class="muted" style="margin-top:8px">Tip: setting to <strong>0</strong> makes the next order become <strong>1</strong>.</div>
+    <div id="seqMsg" class="muted" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyBu-Ux4lvGn6-pnBngmJzL0BAtW1uIfOKM",
+  authDomain:"churchfestivalpos.firebaseapp.com",
+  projectId:"churchfestivalpos"
+});
+const auth=firebase.auth(), db=firebase.firestore();
+
+/* Admin allow-list */
+const ADMINS=new Set(["smsmofri@gmail.com","george.henin98@gmail.com"].map(x=>x.toLowerCase()));
+
+/* DOM */
+const $=s=>document.querySelector(s);
+const who=$('#who'), signOut=$('#signOut');
+const authBox=$('#authBox'), notAdmin=$('#notAdmin'), appBox=$('#appBox');
+const email=$('#email'), pass=$('#pass'), signIn=$('#signIn'), authMsg=$('#authMsg');
+const seqVal=$('#seqVal'), seqMsg=$('#seqMsg'), seqInput=$('#seqInput');
+const seqRefresh=$('#seqRefresh'), seqSet=$('#seqSet'), seqInc=$('#seqInc'), seqDec=$('#seqDec'), seqReset=$('#seqReset');
+
+/* Gate */
+auth.onAuthStateChanged(user=>{
+  if(!user){
+    who.textContent='Signed out';
+    authBox.classList.remove('hidden');
+    notAdmin.classList.add('hidden');
+    appBox.classList.add('hidden');
+    signOut.classList.add('hidden');
+    return;
+  }
+  who.textContent=user.email||'Signed in';
+  signOut.classList.remove('hidden');
+
+  const ok=ADMINS.has((user.email||'').toLowerCase());
+  if(!ok){
+    authBox.classList.add('hidden');
+    notAdmin.classList.remove('hidden');
+    appBox.classList.add('hidden');
+    return;
+  }
+  authBox.classList.add('hidden');
+  notAdmin.classList.add('hidden');
+  appBox.classList.remove('hidden');
+  refreshSeq();
+});
+
+signIn.onclick=async ()=>{
+  authMsg.textContent='';
+  const e=(email.value||'').trim(), p=pass.value||'';
+  if(!e||!p){ authMsg.textContent='Enter email and password.'; return; }
+  signIn.disabled=true; signIn.textContent='Signing in…';
+  try{ await auth.signInWithEmailAndPassword(e,p); authMsg.textContent=''; }
+  catch(err){ authMsg.textContent=err.message||'Sign-in failed.'; }
+  finally{ signIn.disabled=false; signIn.textContent='Sign in'; }
+};
+signOut.onclick=()=> auth.signOut();
+
+/* Sequence helpers */
+const SEQ_REF=db.collection('meta').doc('order_seq');
+async function getSeq(){ const s=await SEQ_REF.get(); return s.exists&&typeof s.data().value==='number'?s.data().value:0; }
+function setMsg(t){ seqMsg.textContent=t||''; }
+async function refreshSeq(){ try{ setMsg(''); seqVal.textContent='…'; seqVal.textContent=String(await getSeq()); }catch(e){ setMsg('Error: '+e.message); seqVal.textContent='—'; } }
+async function setSeq(v){ await db.runTransaction(async tx=>{ tx.set(SEQ_REF,{value:Number(v)||0},{merge:true}); }); }
+
+seqRefresh.onclick=refreshSeq;
+seqSet.onclick=async ()=>{
+  const v=Number(seqInput.value);
+  if(!Number.isFinite(v)||v<0){ setMsg('Enter a non-negative number.'); return; }
+  if(!confirm(`Set order number to ${v}? Next order will be ${v+1}.`)) return;
+  try{ await setSeq(v); await refreshSeq(); setMsg('Updated.'); }catch(e){ setMsg('Error: '+e.message); }
+};
+seqInc.onclick=async ()=>{ try{ await db.runTransaction(async tx=>{const s=await tx.get(SEQ_REF);const cur=s.exists&&typeof s.data().value==='number'?s.data().value:0;tx.set(SEQ_REF,{value:cur+1},{merge:true});}); await refreshSeq(); setMsg('Incremented by 1.'); }catch(e){ setMsg('Error: '+e.message); } };
+seqDec.onclick=async ()=>{ try{ await db.runTransaction(async tx=>{const s=await tx.get(SEQ_REF);const cur=s.exists&&typeof s.data().value==='number'?s.data().value:0;tx.set(SEQ_REF,{value:Math.max(0,cur-1)},{merge:true});}); await refreshSeq(); setMsg('Decremented by 1.'); }catch(e){ setMsg('Error: '+e.message); } };
+seqReset.onclick=async ()=>{ if(!confirm('Really reset to 0? Next order will be 1.')) return; try{ await setSeq(0); await refreshSeq(); setMsg('Reset to 0.'); }catch(e){ setMsg('Error: '+e.message); } };
+
+/* Enter to submit login */
+[email,pass].forEach(inp=> inp.addEventListener('keydown',ev=>{ if(ev.key==='Enter') signIn.click(); }));
+</script>
+</body>
+</html>
