@@ -4,112 +4,58 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Festival POS</title>
 <style>
-  /* ===== Light, high-contrast theme for outdoor use ===== */
   :root{
-    --bg:#ffffff;        /* page background */
-    --fg:#111111;        /* primary text */
-    --muted:#555555;     /* secondary text */
-    --card:#f5f7fb;      /* panels/cards */
-    --border:#d0d7e2;    /* borders/dividers */
-    --accent:#2563eb;    /* primary action */
-    --ok:#15a46b;        /* success/ok */
-    --warn:#d97706;      /* warning */
-    --danger:#dc2626;    /* danger */
+    --bg:#ffffff;--fg:#111;--muted:#667085;--card:#f5f5f7;--border:#d7dbe2;
+    --accent:#2563eb;--ok:#16a34a;--warn:#f59e0b;--danger:#dc2626
   }
   *{box-sizing:border-box}
-  html,body{
-    margin:0;background:var(--bg);color:var(--fg);
-    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
-    font-size:18px;      /* +2 for readability */
-    line-height:1.25;
-  }
-  .wrap{max-width:1200px;margin:0 auto;padding:16px}
-  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  .left-right{display:grid;grid-template-columns:1fr 420px;gap:14px}
-
-  .card{
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:18px;
-    padding:14px
-  }
-
+  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;font-size:18px}
+  .wrap{max-width:1200px;margin:0 auto;padding:14px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .left-right{display:grid;grid-template-columns:1fr 380px;gap:12px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px}
   input,select,button{font:inherit}
-  input,select{
-    background:#ffffff;color:#111;
-    border:1px solid var(--border);
-    border-radius:12px;padding:12px 14px
-  }
-  button{
-    border:1px solid var(--border);
-    border-radius:12px;padding:12px 14px;cursor:pointer;
-    background:#ffffff;color:#111;font-weight:700
-  }
-  .btn{background:var(--accent);border-color:transparent;color:#fff}
-  .btn.ok{background:var(--ok);border-color:transparent;color:#fff}
-  .btn.warn{background:var(--warn);border-color:transparent;color:#fff}
-  .btn.gray{background:#f1f5f9}
-  .btn.danger{background:var(--danger);border-color:transparent;color:#fff}
-
-  .pill{
-    border:1px solid var(--border);
-    border-radius:999px;padding:8px 12px;
-    color:#374151;background:#ffffff;font-weight:700
-  }
-
-  .tabs{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0}
-  .tab{
-    border:1px solid var(--border);border-radius:999px;
-    padding:8px 12px;background:#ffffff;color:#111;cursor:pointer;font-weight:700
-  }
+  input,select{background:#fff;color:#111;border:1px solid var(--border);border-radius:10px;padding:12px}
+  button{border:none;border-radius:10px;padding:12px;cursor:pointer}
+  .btn{background:var(--accent);color:#fff;font-weight:800}
+  .btn.ok{background:var(--ok);color:#fff}
+  .btn.warn{background:var(--warn);color:#111}
+  .btn.gray{background:#eef2f7;color:#111}
+  .btn.danger{background:#fee2e2;color:#7f1d1d;border:1px solid #fecaca}
+  .pill{border:1px solid var(--border);border-radius:999px;padding:8px 12px;color:#111;background:#fff;font-weight:700}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+  .tab{border:1px solid var(--border);border-radius:999px;padding:8px 12px;background:#fff;color:#111;cursor:pointer;font-weight:700}
   .tab.active{outline:3px solid var(--ok)}
-
-  .menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
-  .item{
-    background:#ffffff;border:1px solid var(--border);border-radius:16px;
-    padding:10px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start
-  }
-  .item img{
-    width:100%;height:110px;object-fit:cover;border-radius:12px;
-    margin-bottom:8px;background:#f8fafc;border:1px solid var(--border)
-  }
-  .item .nm{font-weight:800;font-size:18px}
-  .item .pr{color:#111;font-size:16px}
-
-  table{width:100%;border-collapse:collapse;font-size:18px}
+  .menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+  .item{background:#fff;border:1px solid var(--border);border-radius:14px;padding:10px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start}
+  .item img{width:100%;height:110px;object-fit:cover;border-radius:10px;margin-bottom:6px;background:#fff;border:1px solid var(--border)}
+  .item .nm{font-weight:800}
+  .item .pr{color:#334155;font-size:14px}
+  table{width:100%;border-collapse:collapse}
   th,td{border-bottom:1px solid var(--border);padding:10px;text-align:left;vertical-align:top}
-  th{font-weight:800;color:#111}
-  .right .card{position:sticky;top:12px}
+  .right .card{position:sticky;top:10px}
+  .total{display:flex;justify-content:space-between;font-weight:900;margin-top:8px}
+  .qbtn{padding:6px 10px;border-radius:8px;background:#eef2f7;color:#111;font-weight:800}
+  .muted{color:var(--muted);font-size:14px}
 
-  .total{display:flex;justify-content:space-between;font-weight:800;margin-top:10px;font-size:20px}
-
-  .qbtn{
-    padding:6px 10px;border-radius:10px;background:#eef2f7;color:#111;border:1px solid var(--border);
-    font-weight:800;min-width:36px
-  }
-
-  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50}
-  .modal{
-    background:#ffffff;border:1px solid var(--border);border-radius:16px;padding:16px;max-width:560px;width:92%
-  }
-  .opt{
-    display:flex;justify-content:space-between;align-items:center;padding:8px 0;
-    border-bottom:1px dashed var(--border);font-size:18px
-  }
-  .muted{color:var(--muted);font-size:16px}
-
-  /* Header layout tweaks */
-  .hdr{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+  /* Header */
+  .hdr{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
   .hdr-title{font-size:24px;font-weight:900}
-  .hdr-right{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-  .customer-wrap{margin-top:10px}
-  #customer{
-    width:100%;font-size:22px;padding:16px;border-radius:14px
-  }
+  .hdr-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .customer-wrap{margin-top:8px}
+  #customer{width:100%;font-size:20px;padding:14px 16px;border-radius:12px}
 
-  @media (max-width:900px){
-    .left-right{grid-template-columns:1fr}
-  }
+  /* Modal (modifiers) */
+  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50}
+  .modal{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px;max-width:560px;width:92%}
+  .opt{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed var(--border)}
+
+  /* Thank-you modal */
+  .thanks{background:#fff;border:2px solid var(--ok);border-radius:16px;padding:18px;max-width:520px;width:92%;text-align:center}
+  .big{font-size:52px;font-weight:900;margin:6px 0}
+  .sub{color:#334155}
+
+  @media (max-width:900px){ .left-right{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -128,38 +74,38 @@
     </div>
   </div>
 
-  <!-- Big customer name field (required) -->
+  <!-- Customer name -->
   <div class="customer-wrap">
     <input id="customer" placeholder="Customer name (required)">
   </div>
 
-  <div class="left-right" style="margin-top:12px">
-    <!-- MENU SIDE -->
+  <div class="left-right" style="margin-top:10px">
+    <!-- MENU -->
     <div>
       <div class="card">
         <div class="row" style="justify-content:space-between;align-items:center">
           <div class="tabs" id="stationTabs"><button class="tab active" data-st="__ALL__">All</button></div>
-          <input id="search" placeholder="Search items…" style="min-width:240px">
+          <input id="search" placeholder="Search items…" style="min-width:220px">
         </div>
         <div id="menu" class="menu-grid"></div>
         <div id="menuEmpty" class="muted" style="display:none;margin-top:8px">No items.</div>
       </div>
     </div>
 
-    <!-- CART SIDE -->
+    <!-- CART -->
     <div class="right">
       <div class="card">
-        <h3 style="margin:0 0 8px 0;font-size:20px">Order</h3>
+        <h3 style="margin:0 0 8px 0">Order</h3>
         <table id="cartTable">
           <thead><tr><th>Item</th><th>Qty</th><th>Each</th><th>Line</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
         <div class="total"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
-        <div class="row" style="justify-content:space-between;margin-top:12px">
+        <div class="row" style="justify-content:space-between;margin-top:10px">
           <button id="clearCart" class="btn gray">Clear</button>
           <button id="submitOrder" class="btn ok">Submit Order</button>
         </div>
-        <div id="msg" class="muted" style="margin-top:10px"></div>
+        <div id="msg" class="muted" style="margin-top:8px"></div>
       </div>
     </div>
   </div>
@@ -168,11 +114,23 @@
 <!-- Modifier Modal -->
 <div id="modMask" class="modal-mask" style="display:none">
   <div class="modal">
-    <h3 id="modTitle" style="margin:0 0 6px 0;font-size:20px">Customize</h3>
+    <h3 id="modTitle" style="margin:0 0 6px 0">Customize</h3>
     <div id="modBody"></div>
-    <div class="row" style="justify-content:flex-end;margin-top:12px">
+    <div class="row" style="justify-content:flex-end;margin-top:10px">
       <button id="modCancel" class="btn gray">Cancel</button>
       <button id="modAdd" class="btn ok">Add to Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- Thank You Modal -->
+<div id="thanksMask" class="modal-mask" style="display:none">
+  <div class="thanks">
+    <div class="sub">Thank you! Your order number is</div>
+    <div id="thanksNum" class="big">—</div>
+    <div class="sub">Please tell the customer this number.</div>
+    <div class="row" style="justify-content:center;margin-top:12px">
+      <button id="thanksOk" class="btn ok">OK</button>
     </div>
   </div>
 </div>
@@ -203,14 +161,15 @@ const me=$('#me'), loginBtn=$('#loginBtn'), logoutBtn=$('#logoutBtn');
 const stationsBadge=$('#stationsBadge');
 
 const modMask=$('#modMask'), modTitle=$('#modTitle'), modBody=$('#modBody'), modCancel=$('#modCancel'), modAdd=$('#modAdd');
+const thanksMask=$('#thanksMask'), thanksNum=$('#thanksNum'), thanksOk=$('#thanksOk');
 
 // ---------- State ----------
 const ADMINS = new Set(["smsmofri@gmail.com","george.henin98@gmail.com"].map(x=>x.toLowerCase()));
-let STATIONS_ALL=['Grill','Fryer','Drinks','Pizza']; // fallback
+let STATIONS_ALL=['Grill','Fryer','Drinks','Pizza']; // fallback if config missing
 let FILTER_STATION='__ALL__';
 let MENU=[];      // {id, name, price, station, active, img?, modGroupIds?}
-let MOD_GROUPS=new Map(); // id -> {name, selectType, maxPicks, options:[{name, price}]}
-let CART=[];      // lines with mods & pricing
+let MOD_GROUPS=new Map();
+let CART=[];
 
 // ---------- Auth UI ----------
 auth.onAuthStateChanged(u=>{
@@ -224,14 +183,13 @@ loginBtn.onclick=async()=>{
 };
 logoutBtn.onclick=()=> auth.signOut();
 
-// ---------- Load stations (dynamic) ----------
+// ---------- Load stations ----------
 async function loadStations(){
   try{
     const snap=await db.collection('settings').doc('config').get();
     const conf=snap.data();
     if(conf && Array.isArray(conf.stations) && conf.stations.length) STATIONS_ALL=conf.stations;
   }catch(e){}
-  // Build tabs
   stationTabs.innerHTML = `<button class="tab active" data-st="__ALL__">All</button>` +
     STATIONS_ALL.map(s=>`<button class="tab" data-st="${s}">${s}</button>`).join('');
   stationTabs.querySelectorAll('.tab').forEach(btn=>{
@@ -254,8 +212,7 @@ function loadMenu(){
 }
 function loadModGroups(){
   db.collection('mod_groups').onSnapshot(snap=>{
-    MOD_GROUPS.clear();
-    snap.forEach(d=> MOD_GROUPS.set(d.id, { id:d.id, ...d.data() }) );
+    MOD_GROUPS.clear(); snap.forEach(d=> MOD_GROUPS.set(d.id, { id:d.id, ...d.data() }) );
   });
 }
 
@@ -280,7 +237,7 @@ function renderMenu(){
 }
 search.oninput=renderMenu;
 
-// ---------- Add to cart flow (with modifiers) ----------
+// ---------- Add to cart (with modifiers) ----------
 function onMenuClick(menuId){
   const m = MENU.find(x=>x.id===menuId);
   if(!m) return;
@@ -292,7 +249,6 @@ function onMenuClick(menuId){
   }
   openModifierModal(m, groupIds);
 }
-
 function openModifierModal(menuItem, groupIds){
   modTitle.textContent = `Customize: ${menuItem.name}`;
   modBody.innerHTML = '';
@@ -301,11 +257,10 @@ function openModifierModal(menuItem, groupIds){
     addLine({menuId:menuItem.id, name:menuItem.name, station:menuItem.station, basePrice:+menuItem.price||0, mods:[]});
     return;
   }
-
   groups.forEach((g, idx)=>{
     const gid = `g${idx}`;
     const row = document.createElement('div');
-    row.innerHTML = `<div style="margin:8px 0 6px 0;font-weight:800">${g.name}</div>`;
+    row.innerHTML = `<div style="margin:6px 0 4px 0;font-weight:800">${g.name}</div>`;
     const box = document.createElement('div');
     (g.options||[]).forEach((opt, i)=>{
       const optId = `${gid}_opt_${i}`;
@@ -327,8 +282,7 @@ function openModifierModal(menuItem, groupIds){
     });
     if(g.selectType==='multi' && g.maxPicks){
       const info=document.createElement('div');
-      info.className='muted';
-      info.style.marginTop='6px';
+      info.className='muted'; info.style.marginTop='4px';
       info.textContent = `Pick up to ${g.maxPicks}`;
       box.appendChild(info);
       box.addEventListener('change', ()=>{
@@ -345,7 +299,6 @@ function openModifierModal(menuItem, groupIds){
 
   modMask.style.display='flex';
   modCancel.onclick = ()=> { modMask.style.display='none'; };
-
   modAdd.onclick = ()=>{
     const selection = [];
     let addPrice = 0;
@@ -379,42 +332,35 @@ function openModifierModal(menuItem, groupIds){
     modMask.style.display='none';
   };
 }
-
 function addLine({menuId, name, station, basePrice, mods}){
   const modSum = (mods||[]).flatMap(g=>g.options||[]).reduce((a,b)=> a + (+b.price||0), 0);
   const each = (+basePrice||0) + modSum;
-
   const keyMods = JSON.stringify(mods||[]);
   const existing = CART.find(l => l.menuId===menuId && JSON.stringify(l.mods||[])===keyMods);
   if(existing){
-    existing.qty += 1;
-    existing.eachPrice = each;
-    existing.lineTotal = existing.qty * each;
+    existing.qty += 1; existing.eachPrice = each; existing.lineTotal = existing.qty * each;
   }else{
-    CART.push({
-      menuId, name, station, qty:1, basePrice:+basePrice||0,
-      mods: mods||[], eachPrice: each, lineTotal: each
-    });
+    CART.push({ menuId, name, station, qty:1, basePrice:+basePrice||0, mods:mods||[], eachPrice:each, lineTotal:each });
   }
   renderCart();
 }
 
-// ---------- Cart render / actions ----------
+// ---------- Cart render ----------
 function renderCart(){
   cartTBody.innerHTML = CART.map((l, idx)=>{
     const modsHtml = (l.mods&&l.mods.length)
-      ? `<div class="muted" style="font-size:14px;margin-top:4px">
+      ? `<div class="muted" style="font-size:13px;margin-top:2px">
            ${l.mods.map(g=>`${g.groupName}: ${g.options.map(o=>o.name).join(', ')}`).join(' • ')}
          </div>` : '';
     return `<tr>
       <td>
         <div style="font-weight:800">${l.name}</div>
         ${modsHtml}
-        <div class="muted" style="font-size:13px">${l.station||''}</div>
+        <div class="muted" style="font-size:12px">${l.station||''}</div>
       </td>
       <td>
         <button class="qbtn" data-dec="${idx}">−</button>
-        <span style="display:inline-block;width:30px;text-align:center;font-weight:800">${l.qty}</span>
+        <span style="display:inline-block;width:28px;text-align:center;font-weight:900">${l.qty}</span>
         <button class="qbtn" data-inc="${idx}">+</button>
       </td>
       <td>$${l.eachPrice.toFixed(2)}</td>
@@ -422,54 +368,36 @@ function renderCart(){
       <td><button class="btn danger" data-del="${idx}">Remove</button></td>
     </tr>`;
   }).join('');
-
-  cartTBody.querySelectorAll('[data-inc]').forEach(b=>{
-    b.onclick=()=>{ CART[+b.dataset.inc].qty++; renderCart(); };
-  });
-  cartTBody.querySelectorAll('[data-dec]').forEach(b=>{
-    b.onclick=()=>{
-      const i=+b.dataset.dec;
-      CART[i].qty--;
-      if(CART[i].qty<=0){ CART.splice(i,1); }
-      renderCart();
-    };
-  });
-  cartTBody.querySelectorAll('[data-del]').forEach(b=>{
-    b.onclick=()=>{ CART.splice(+b.dataset.del,1); renderCart(); };
-  });
-
+  cartTBody.querySelectorAll('[data-inc]').forEach(b=> b.onclick=()=>{ CART[+b.dataset.inc].qty++; renderCart(); });
+  cartTBody.querySelectorAll('[data-dec]').forEach(b=> b.onclick=()=>{ const i=+b.dataset.dec; CART[i].qty--; if(CART[i].qty<=0){ CART.splice(i,1); } renderCart(); });
+  cartTBody.querySelectorAll('[data-del]').forEach(b=> b.onclick=()=>{ CART.splice(+b.dataset.del,1); renderCart(); });
   recalc();
 }
 function recalc(){
   CART.forEach(l=> l.lineTotal = l.qty * l.eachPrice);
-  const sub = CART.reduce((a,b)=> a + lRound(b.lineTotal), 0);
+  const sub = CART.reduce((a,b)=> a + Math.round(b.lineTotal*100)/100, 0);
   subtotalEl.textContent = `$${sub.toFixed(2)}`;
 }
-function lRound(n){ return Math.round(n*100)/100; }
 
-// ---------- Submit order ----------
+$('#clearCart').onclick=()=>{ CART=[]; renderCart(); };
+
+// ---------- Order numbering ----------
 async function nextOrderNumber(){
   const ref = db.collection('meta').doc('order_seq');
   const num = await db.runTransaction(async tx=>{
     const snap = await tx.get(ref);
     let v = (snap.exists && typeof snap.data().value==='number') ? snap.data().value : 0;
-    v = v + 1;
-    tx.set(ref, {value:v}, {merge:true});
-    return v;
+    v = v + 1; tx.set(ref, {value:v}, {merge:true}); return v;
   });
   return num;
 }
 
-$('#clearCart').onclick=()=>{ CART=[]; renderCart(); };
-
+// ---------- Submit order ----------
 $('#submitOrder').onclick = async ()=>{
   if(!CART.length){ alert('Cart is empty'); return; }
   const cust = (customer.value||'').trim();
-  if(!cust){
-    alert('Please enter the customer name.');
-    customer.focus();
-    return;
-  }
+  if(!cust){ alert('Please enter the customer name.'); customer.focus(); return; }
+
   try{
     msg.textContent='Submitting...';
     const number = await nextOrderNumber();
@@ -494,12 +422,20 @@ $('#submitOrder').onclick = async ()=>{
       }))
     };
     await db.collection('orders').add(order);
-    CART=[]; renderCart(); customer.value=''; msg.textContent=`Order #${number} placed!`;
-    setTimeout(()=> msg.textContent='', 2000);
+
+    // Clear UI
+    CART=[]; renderCart(); customer.value=''; msg.textContent=`Order #${number} placed!`; setTimeout(()=> msg.textContent='', 1200);
+
+    // Show Thank-you popup with big order number
+    thanksNum.textContent = String(number);
+    thanksMask.style.display = 'flex';
   }catch(e){
     msg.textContent = 'Error: ' + e.message;
   }
 };
+
+// dismiss thank-you
+thanksOk.onclick = ()=>{ thanksMask.style.display='none'; };
 
 // ---------- Boot ----------
 loadStations();
