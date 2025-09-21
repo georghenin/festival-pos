@@ -3,50 +3,28 @@
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Pickup Manager</title>
 <style>
-  :root{
-    --bg:#ffffff; --fg:#000000; --muted:#555555;
-    --card:#f5f5f5; --border:#cccccc;
-    --ok:#15a46b; --accent:#2563eb;
-  }
+  :root{--bg:#ffffff;--fg:#111;--muted:#667085;--card:#f5f5f7;--border:#d7dbe2;--ok:#16a34a;--accent:#2563eb}
   *{box-sizing:border-box}
-  html,body{margin:0;background:var(--bg);color:var(--fg);
-    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;font-size:18px;line-height:1.25}
-  .wrap{max-width:1200px;margin:0 auto;padding:16px}
-  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  .pill{border:1px solid var(--border);border-radius:999px;padding:8px 12px;
-    color:#111;background:#fff;font-size:16px;font-weight:700}
-  .btn{border:1px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;
-    font-size:16px;font-weight:700;background:#fff;color:#111}
-  .btn.ok{background:var(--ok);border-color:transparent;color:#fff}
-  .btn.gray{background:#f1f5f9}
-  .btn.accent{background:var(--accent);border-color:transparent;color:#fff}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:16px}
-  .chips{display:flex;gap:10px;flex-wrap:wrap}
-  .chip{border:1px solid var(--border);background:#ffffff;color:#000;border-radius:999px;padding:8px 12px;cursor:pointer;font-size:16px;font-weight:700}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;font-size:18px;line-height:1.25}
+  .wrap{max-width:1200px;margin:0 auto;padding:14px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .pill{border:1px solid var(--border);border-radius:999px;padding:8px 12px;background:#fff;color:#111;font-weight:800}
+  .btn{border:none;border-radius:12px;padding:12px;cursor:pointer;font-weight:800}
+  .btn.ok{background:var(--ok);color:#fff}
+  .btn.gray{background:#eef2f7;color:#111}
+  .btn.ac{background:var(--accent);color:#fff}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{border:1px solid var(--border);background:#fff;color:#111;border-radius:999px;padding:8px 12px;cursor:pointer;font-weight:800}
   .chip.active{outline:3px solid var(--ok)}
-  .ticket{border:2px solid var(--border);background:#fff;border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.08)}
+  .ticket{border:1px solid var(--border);background:#fff;border-radius:14px;padding:12px;margin-bottom:10px}
   .hdr{display:flex;justify-content:space-between;gap:10px;align-items:center}
   .customer{font-weight:900;font-size:20px}
-  .colhdr{margin-top:8px;color:#333;font-size:15px;text-transform:uppercase;letter-spacing:.04em;font-weight:700}
-  .line{border-top:1px dashed #bbb;padding:8px 0;font-size:16px}
-  .mods{color:#444;font-size:15px;margin-top:4px;font-weight:600}
+  .colhdr{margin-top:8px;color:#334155;font-size:12px;text-transform:uppercase;letter-spacing:.04em;font-weight:900}
+  .line{border-top:1px dashed var(--border);padding:6px 0}
+  .mods{color:#334155;font-size:14px;margin-top:2px;font-weight:700}
   .muted{color:var(--muted);font-size:14px}
-  .history{margin-top:12px;display:none}
-  input[type="checkbox"]{transform:scale(1.15);margin-right:6px}
-
-  /* Search input */
-  .searchbox{position:relative;display:flex;align-items:center;gap:8px}
-  #orderSearch{
-    border:1px solid var(--border); border-radius:12px; padding:10px 40px 10px 12px;
-    min-width:220px; background:#fff; color:#111; font-size:18px;
-  }
-  .clear-x{
-    position:absolute; right:8px; background:#f1f5f9; border:1px solid var(--border);
-    border-radius:999px; width:28px; height:28px; display:flex; align-items:center; justify-content:center;
-    cursor:pointer; font-weight:900; color:#111;
-  }
-  .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef2ff;border:1px solid #c7d2fe;color:#111;font-size:13px;font-weight:800}
-  .note{padding:8px;border:1px dashed var(--border);border-radius:10px;background:#fafafa;color:#444;margin-top:8px;font-size:14px}
+  input{font:inherit;border:1px solid var(--border);border-radius:12px;background:#fff;color:#111;padding:12px}
 </style>
 </head>
 <body>
@@ -54,62 +32,51 @@
 
   <div class="row" style="justify-content:space-between">
     <div class="row">
-      <strong style="font-size:24px">Pickup Manager</strong>
+      <strong style="font-size:22px">Pickup Manager</strong>
       <span id="stationBadge" class="pill">Stations: loading…</span>
     </div>
     <div class="row">
-      <label class="pill"><input id="sound" type="checkbox"> Sound on new ready</label>
+      <label class="pill"><input id="sound" type="checkbox" style="margin-right:6px"> Sound on new/ready</label>
       <span id="me" class="pill">Not signed in</span>
       <button id="login" class="btn gray">Sign in</button>
       <button id="logout" class="btn gray">Sign out</button>
     </div>
   </div>
 
-  <!-- Station filters (determine which orders appear AND which items show) -->
-  <div class="card" style="margin-top:14px">
-    <div class="row" style="justify-content:space-between">
-      <div>
-        <div class="muted" style="margin-bottom:6px">Only show orders that include items from these stations:</div>
+  <!-- Filters / Tools -->
+  <div class="card" style="margin-top:10px">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div class="row" style="gap:10px;align-items:center">
+        <div class="muted">Show orders with items from stations:</div>
         <div class="chips" id="chips"></div>
-      </div>
-      <div class="row">
         <button id="selectAll" class="btn gray">Select all</button>
         <button id="savePref" class="btn ok">Save to this iPad</button>
       </div>
+      <div class="row" style="gap:8px">
+        <input id="searchNum" type="number" placeholder="Find order #…" style="width:180px">
+        <button id="findBtn" class="btn ac">Find</button>
+      </div>
     </div>
   </div>
 
-  <!-- Active orders -->
-  <div class="card" style="margin-top:14px">
-    <div class="row" style="justify-content:space-between; align-items:center">
-      <h3 style="margin:0;font-size:22px">Active Orders (new • partial • ready)</h3>
-
-      <!-- NEW: search order # -->
-      <div class="searchbox">
-        <input id="orderSearch" placeholder="Search order # (e.g. 127)">
-        <span id="clearSearch" class="clear-x" title="Clear" style="display:none">×</span>
-      </div>
-
-      <button id="toggleHist" class="btn gray">Show history</button>
+  <!-- Orders -->
+  <div class="card" style="margin-top:10px">
+    <div class="row" style="justify-content:space-between">
+      <h3 style="margin:0">Live Orders</h3>
+      <label class="muted"><input id="showHistory" type="checkbox" style="margin-right:6px"> Show history (picked-up today)</label>
     </div>
+    <div id="live"></div>
+    <div id="emptyLive" class="muted" style="display:none">No live orders.</div>
 
-    <div id="active"></div>
-    <div id="emptyActive" class="muted" style="display:none">No active orders.</div>
-
-    <!-- History (picked_up) -->
-    <div id="hist" class="history">
-      <div class="row" style="justify-content:space-between;margin-top:8px">
-        <h3 style="margin:0;font-size:22px">Picked Up (today)</h3>
-        <button id="showAll" class="btn gray">Show all history</button>
-      </div>
+    <div id="histBox" style="display:none;margin-top:10px">
+      <h3 style="margin:0 0 6px 0">Picked Up (today)</h3>
       <div id="picked"></div>
-      <div id="emptyPicked" class="muted" style="display:none">No picked orders.</div>
+      <div id="emptyPicked" class="muted" style="display:none">No picked orders today.</div>
     </div>
   </div>
-
 </div>
 
-<!-- Bell sound -->
+<!-- Sound -->
 <audio id="ding" preload="auto"></audio>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.4/firebase-app-compat.js"></script>
@@ -126,26 +93,25 @@ const db=firebase.firestore(), auth=firebase.auth();
 const $=s=>document.querySelector(s);
 const me=$('#me'), login=$('#login'), logout=$('#logout');
 const stationBadge=$('#stationBadge'), chips=$('#chips'), selectAll=$('#selectAll'), savePref=$('#savePref');
-const active=$('#active'), picked=$('#picked'), emptyActive=$('#emptyActive'), emptyPicked=$('#emptyPicked');
-const toggleHist=$('#toggleHist'), histBox=$('#hist'), showAll=$('#showAll');
-const orderSearch=$('#orderSearch'), clearSearch=$('#clearSearch');
+const live=$('#live'), emptyLive=$('#emptyLive');
+const histBox=$('#histBox'), showHistory=$('#showHistory'), picked=$('#picked'), emptyPicked=$('#emptyPicked');
+const searchNum=$('#searchNum'), findBtn=$('#findBtn');
 
-// ====== SOUND (only when selected-station items become ready) ======
-const SOUND_URL = "https://georghenin.github.io/festival-pos/mixkit-bell-notification-933.wav";
-const dingEl=document.getElementById('ding'); dingEl.src = SOUND_URL;
-const soundCb=document.getElementById('sound');
-let lastReadySoundTs = Number(localStorage.getItem('pickupLastSoundTs')||'0');
-function armAudioOnce(){ window.removeEventListener('click',armAudioOnce,true); try{dingEl.volume=1.0; dingEl.play().then(()=>dingEl.pause()).catch(()=>{});}catch(_){} }
+// ====== SOUND ======
+const SOUND_URL="https://georghenin.github.io/festival-pos/mixkit-bell-notification-933.wav";
+const dingEl=$('#ding'); dingEl.src=SOUND_URL;
+const soundCb=$('#sound');
+let lastSoundTs=Number(localStorage.getItem('pickupLastSoundTs')||'0');
+function armAudioOnce(){ window.removeEventListener('click',armAudioOnce,true); try{dingEl.play().then(()=>dingEl.pause()).catch(()=>{});}catch(_){} }
 window.addEventListener('click',armAudioOnce,true);
-function playDing(){ if(!soundCb.checked) return; try{dingEl.currentTime=0; dingEl.volume=1.0; dingEl.play().catch(()=>{});}catch(_){} }
-function newestReadyTs(orders){
+function playDing(){ if(!soundCb.checked) return; try{dingEl.currentTime=0; dingEl.play().catch(()=>{});}catch(_){} }
+function newestRelevantTs(orders){
   let max=0;
   for(const o of orders){
+    const t = Number(o.updatedAt||o.createdAt||0);
+    if(t>max) max=t;
     for(const it of (o.items||[])){
-      if(itemMatchesStations(it) && it.ready){
-        const ts=Number(it.readyAt || o.updatedAt || o.createdAt || 0);
-        if(ts>max) max=ts;
-      }
+      if(it.ready && it.readyAt && it.readyAt>max) max=it.readyAt;
     }
   }
   return max;
@@ -153,17 +119,20 @@ function newestReadyTs(orders){
 
 // ===== Auth =====
 auth.onAuthStateChanged(u=>{ me.textContent=u?u.email:'Not signed in'; });
-login.onclick=async()=>{ const e=prompt('Email:'); if(!e) return; const p=prompt('Password'); if(p===null) return; try{await auth.signInWithEmailAndPassword(e.trim(),p);}catch(err){alert(err.message);} };
+login.onclick=async()=>{ const e=prompt('Email:'); if(!e) return; const p=prompt('Password:'); if(p===null) return; try{await auth.signInWithEmailAndPassword(e.trim(),p);}catch(err){alert(err.message);} };
 logout.onclick=()=>auth.signOut();
 
-// ===== Stations (config + persistence) =====
+// ===== Stations from config =====
 let STATIONS=[];
 let selected=new Set(JSON.parse(localStorage.getItem('pickupStations')||'[]'));
+function norm(s){ return (s||'').toString(); }
 
 db.collection('settings').doc('config').onSnapshot(s=>{
   const conf=s.data()||{}; const arr=Array.isArray(conf.stations)?conf.stations.filter(Boolean):[];
   if(arr.length) STATIONS=arr.slice();
-  renderChips(); stationBadge.textContent='Stations: '+(STATIONS.length?STATIONS.join(', '):'—');
+  if(!selected.size && STATIONS.length){ STATIONS.forEach(s=>selected.add(s)); }
+  renderChips();
+  stationBadge.textContent='Stations: '+(STATIONS.length?STATIONS.join(', '):'—');
 });
 
 function renderChips(){
@@ -173,183 +142,149 @@ function renderChips(){
   chips.querySelectorAll('.chip').forEach(c=>{
     c.onclick=()=>{ const s=c.dataset.st; if(selected.has(s)) selected.delete(s); else selected.add(s); renderChips(); renderLists(); };
   });
-  if(!selected.size && STATIONS.length){ STATIONS.forEach(s=>selected.add(s)); }
 }
 selectAll.onclick=()=>{ STATIONS.forEach(s=>selected.add(s)); renderChips(); renderLists(); };
 savePref.onclick=()=>{ localStorage.setItem('pickupStations', JSON.stringify([...selected])); alert('Saved on this iPad.'); };
 
 // ===== Helpers =====
-const isHiddenOrder = (o)=> (o?.archived === true || o?.status === 'refunded' || o?.status === 'picked_up');
-const itemMatchesStations = (it)=>{
-  if(!it?.station) return false;            // require explicit station to match
-  return selected.has(it.station);
-};
-const orderMatchesSelectedStations = (o)=> (o.items||[]).some(itemMatchesStations);
-const orderAllReady = (o)=> (o.items||[]).length && (o.items||[]).every(it=>it.ready);
-function modsHTML(mods){ const names=(mods||[]).flatMap(g=>(g.options||[]).map(o=>o.name)).filter(Boolean); return names.length? `<div class="mods">${names.join(', ')}</div>`:''; }
+const itemMatchesStation = (it)=> !it.station || selected.has(norm(it.station));
+const orderMatchesStations = (o)=> (o.items||[]).some(itemMatchesStation);
 
-// ===== Data listeners =====
-let unsubActive=null, unsubPicked=null;
-let activeDocs=[], pickedDocs=[];
-let fetchedBySearch=null;  // holds a server-fetched order when not in activeDocs
-
-function resubscribePicked(){
-  if (unsubPicked) unsubPicked();
-  const start=new Date(); start.setHours(0,0,0,0);
-  unsubPicked = db.collection('orders')
-    .where('updatedAt','>=', start.getTime())
-    .where('status','==','picked_up')
-    .orderBy('updatedAt','desc').limit(200)
-    .onSnapshot(s=>{
-      pickedDocs = s.docs.map(d=>({id:d.id, ...d.data()}))
-        .filter(orderMatchesSelectedStations); // history respects station filter when not searching
-      if(histBox.style.display!=='none') renderLists();
-    });
-}
+// ===== Data listeners (show ALL live orders automatically) =====
+let unsubLive=null, unsubPicked=null;
+let liveDocs=[], pickedDocs=[];
 
 function subscribe(){
-  if (unsubActive) unsubActive();
-  resubscribePicked();
+  if(unsubLive) unsubLive(); if(unsubPicked) unsubPicked();
 
-  const start=new Date(); start.setHours(0,0,0,0);
-  unsubActive = db.collection('orders')
-    .where('updatedAt','>=', start.getTime())
-    .where('status','in',['new','partial','ready'])
-    .orderBy('updatedAt','desc')
-    .limit(200)
+  // Live: most recent 500 orders; client-filter out picked/refunded/archived
+  unsubLive = db.collection('orders').orderBy('createdAt','desc').limit(500)
     .onSnapshot(s=>{
-      activeDocs = s.docs.map(d=>({id:d.id, ...d.data()}))
-        .filter(o => !isHiddenOrder(o))
-        .filter(orderMatchesSelectedStations);  // default card-level filtering
+      liveDocs = s.docs.map(d=>({id:d.id, ...d.data()}))
+        .filter(o => o.status!=='picked_up' && !o.refunded && !o.archived);
+      // Ensure station discovery (if new stations appear mid-day)
+      autoDiscoverStations(liveDocs);
       renderLists();
+    });
+
+  // History: picked up today
+  const start=new Date(); start.setHours(0,0,0,0);
+  unsubPicked = db.collection('orders')
+    .where('status','==','picked_up')
+    .where('updatedAt','>=', start.getTime())
+    .orderBy('updatedAt','desc')
+    .onSnapshot(s=>{
+      pickedDocs = s.docs.map(d=>({id:d.id, ...d.data()}));
+      autoDiscoverStations(pickedDocs);
+      if(showHistory.checked) renderLists();
     });
 }
 subscribe();
 
-// ===== Search (client filter + enter-to-fetch) =====
-let searchTimer=null;
-orderSearch.addEventListener('input', ()=>{
-  clearTimeout(searchTimer);
-  fetchedBySearch = null;  // clear server result when typing
-  const raw = orderSearch.value || '';
-  clearSearch.style.display = raw ? 'flex' : 'none';
-  searchTimer = setTimeout(renderLists, 200);
-});
-orderSearch.addEventListener('keydown', (e)=>{
-  if(e.key === 'Enter'){
-    const n = parseInt((orderSearch.value||'').replace(/\D/g,''), 10);
-    if(!Number.isFinite(n)) return;
-    // If already visible in activeDocs (even if filtered by station), skip fetch
-    const existsInActive = activeDocs.some(o=> Number(o.number)===n);
-    if(!existsInActive){
-      db.collection('orders').where('number','==', n).limit(1).get().then(s=>{
-        fetchedBySearch = s.empty ? {__notFound:n} : {id:s.docs[0].id, ...s.docs[0].data(), __fetched:true};
-        renderLists();
-      }).catch(()=>{ fetchedBySearch = {__notFound:n}; renderLists(); });
-    }else{
-      fetchedBySearch = null;
-      renderLists();
-    }
-  }
-});
-clearSearch.onclick=()=>{ orderSearch.value=''; fetchedBySearch=null; clearSearch.style.display='none'; renderLists(); };
+function autoDiscoverStations(arr){
+  const seen=new Set(STATIONS);
+  arr.forEach(o => (o.items||[]).forEach(it=>{ if(it.station) seen.add(norm(it.station)); }));
+  if(seen.size!==STATIONS.length){ STATIONS=[...seen]; renderChips(); stationBadge.textContent='Stations: '+STATIONS.join(', '); }
+}
 
-// ===== Rendering =====
-function orderCardHTML(o, {showBadge=false, searching=false}={}){
-  // When searching, we show the card even if no items match the selected stations.
-  const rItems=(o.items||[]).filter(it=>itemMatchesStations(it) && it.ready);
-  const pItems=(o.items||[]).filter(it=>itemMatchesStations(it) && !it.ready);
+// ===== Render =====
+function modsHTML(mods){
+  const names=(mods||[]).flatMap(g=>(g.options||[]).map(o=>o.name)).filter(Boolean);
+  return names.length? `<div class="mods">${names.join(', ')}</div>` : '';
+}
 
-  const rHTML = rItems.map(it=>`
-    <div class="line"><div><strong>${it.qty||1}× ${it.name}</strong> <span class="muted">• ${it.station||''}</span></div>${modsHTML(it.mods)}</div>
-  `).join('');
-  const pHTML = pItems.map(it=>`
-    <div class="line"><div><strong>${it.qty||1}× ${it.name}</strong> <span class="muted">• ${it.station||''}</span></div>${modsHTML(it.mods)}</div>
-  `).join('');
+function orderHTML(o){
+  const readyItems=(o.items||[]).filter(it=> itemMatchesStation(it) && it.ready);
+  const prepItems =(o.items||[]).filter(it=> itemMatchesStation(it) && !it.ready);
 
-  const allReady = orderAllReady(o); // whole order ready
+  const allReady = (o.items||[]).length && (o.items||[]).every(it=>it.ready);
   const btn = allReady
     ? `<button class="btn ok" data-act="picked" data-id="${o.id}">Mark Picked Up</button>`
-    : `<button class="btn gray" disabled title="Whole order must be ready">Mark Picked Up</button>`;
-
-  const badge = showBadge ? ` <span class="badge">fetched</span>` : '';
-
-  let inner = '';
-  if (rItems.length) inner += `<div class="colhdr">Ready Items</div>${rHTML}`;
-  if (pItems.length) inner += `<div class="colhdr">Still Preparing</div>${pHTML}`;
-  if (!inner && searching){
-    inner = `<div class="note">No items from selected stations.</div>`;
-  }
+    : `<button class="btn gray" disabled title="Whole order not ready yet">Mark Picked Up</button>`;
 
   return `
-  <div class="ticket">
+  <div class="ticket" data-order="${o.id}">
     <div class="hdr">
       <div>
-        <div class="customer">${o.customer||'No name'} <span class="muted">#${o.number||''}</span>${badge}</div>
-        <div class="muted">${new Date((o.updatedAt||o.createdAt)||Date.now()).toLocaleTimeString()}</div>
+        <div class="customer">${o.customer||'No name'} <span class="muted">#${o.number||''}</span></div>
+        <div class="muted">Submitted ${new Date(o.createdAt||Date.now()).toLocaleTimeString()}</div>
       </div>
       <div>${btn}</div>
     </div>
-    ${inner}
+    ${readyItems.length? `<div class="colhdr">Ready Items</div>${readyItems.map(it=>`
+      <div class="line"><div><strong>${it.qty||1}× ${it.name}</strong> <span class="muted">• ${it.station||''}</span></div>${modsHTML(it.mods)}</div>`).join('')}`:''}
+    ${prepItems.length? `<div class="colhdr">Still Preparing</div>${prepItems.map(it=>`
+      <div class="line"><div><strong>${it.qty||1}× ${it.name}</strong> <span class="muted">• ${it.station||''}</span></div>${modsHTML(it.mods)}</div>`).join('')}`:''}
   </div>`;
 }
 
 function renderLists(){
-  const qRaw = (orderSearch.value||'').trim();
-  const qNum = parseInt(qRaw.replace(/\D/g,''), 10);
-  const searching = !!qRaw.length && Number.isFinite(qNum);
+  const list = liveDocs.filter(orderMatchesStations);
+  live.innerHTML = list.map(orderHTML).join('');
+  emptyLive.style.display = list.length? 'none':'block';
 
-  if (searching){
-    // Show card even if it doesn't match station filter; search overrides card-level filter
-    let list = activeDocs; // activeDocs already card-filtered by station—so expand to include all in-memory
-    // To include any order in memory regardless of station, rebuild from the base snapshot is heavier.
-    // Simpler approach: if not found in activeDocs, rely on Enter to fetch.
-    let match = list.find(o=> Number(o.number)===qNum);
+  // sound on new/ready
+  const newest = newestRelevantTs(list);
+  if(newest && newest>lastSoundTs){ playDing(); lastSoundTs=newest; localStorage.setItem('pickupLastSoundTs', String(lastSoundTs)); }
 
-    let html='';
-    if (match){
-      html = orderCardHTML(match, {searching:true});
-    }else if (fetchedBySearch){
-      if (fetchedBySearch.__notFound){
-        html = `<div class="muted">No order #${fetchedBySearch.__notFound} found.</div>`;
-      }else{
-        html = orderCardHTML(fetchedBySearch, {showBadge:true, searching:true});
-      }
-    }else{
-      html = `<div class="muted">Order #${qNum} not in current list. Press Enter to fetch.</div>`;
-    }
-    active.innerHTML = html;
-    emptyActive.style.display = 'none';
-  }else{
-    // Normal list, card-level station filter applies
-    active.innerHTML = activeDocs.map(o=> orderCardHTML(o)).join('');
-    emptyActive.style.display = activeDocs.length? 'none':'block';
-  }
+  // wire actions
+  live.querySelectorAll('[data-act="picked"]').forEach(b=> b.onclick=()=> setStatus(b.dataset.id,'picked_up'));
 
-  const newest = newestReadyTs(activeDocs);
-  if(newest && newest > lastReadySoundTs){ playDing(); lastReadySoundTs=newest; localStorage.setItem('pickupLastSoundTs', String(lastReadySoundTs)); }
-
-  // History (unchanged; respects station filter when not searching)
-  if(histBox.style.display!=='none'){
-    picked.innerHTML = pickedDocs.map(o=> orderCardHTML(o)).join('');
-    emptyPicked.style.display = pickedDocs.length? 'none':'block';
+  if(showHistory.checked){
+    const p = pickedDocs.filter(orderMatchesStations);
+    picked.innerHTML = p.map(o=>`
+      <div class="ticket">
+        <div class="hdr">
+          <div>
+            <div class="customer">${o.customer||'No name'} <span class="muted">#${o.number||''}</span></div>
+            <div class="muted">${new Date(o.updatedAt||o.createdAt||Date.now()).toLocaleTimeString()}</div>
+          </div>
+          <div><button class="btn gray" data-act="undo" data-id="${o.id}">Undo</button></div>
+        </div>
+        ${(o.items||[]).filter(itemMatchesStation).map(it=>`
+          <div class="line"><div><strong>${it.qty||1}× ${it.name}</strong> <span class="muted">• ${it.station||''}</span></div>${modsHTML(it.mods)}</div>
+        `).join('')}
+      </div>`).join('');
+    emptyPicked.style.display = p.length? 'none':'block';
     picked.querySelectorAll('[data-act="undo"]').forEach(b=> b.onclick=()=> setStatus(b.dataset.id,'ready'));
+  }else{
+    histBox.style.display='none';
   }
-
-  // wire pickup buttons
-  active.querySelectorAll('[data-act="picked"]').forEach(b=> b.onclick=()=> setStatus(b.dataset.id,'picked_up'));
 }
+showHistory.onchange=()=>{ histBox.style.display = showHistory.checked? 'block':'none'; renderLists(); };
 
+// ===== Actions =====
 async function setStatus(id, status){
   try{ await db.collection('orders').doc(id).update({status, updatedAt: Date.now()}); }
   catch(e){ alert(e.message); }
 }
 
-toggleHist.onclick=()=>{
-  const open = histBox.style.display!=='none';
-  histBox.style.display = open ? 'none' : 'block';
-  toggleHist.textContent = open ? 'Show history' : 'Hide history';
-  if(!open) renderLists();
+// ===== Order number search =====
+function scrollToOrder(orderId){
+  const el = live.querySelector(`[data-order="${orderId}"]`);
+  if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.style.outline='3px solid #2563eb'; setTimeout(()=> el.style.outline='none', 1500); }
+}
+findBtn.onclick = async ()=>{
+  const n = Number(searchNum.value||'');
+  if(!Number.isFinite(n)) return;
+  // first try to find in current list
+  const inList = liveDocs.find(o=>Number(o.number)===n);
+  if(inList){ scrollToOrder(inList.id); return; }
+  // minimal fetch by number (if indexed)
+  try{
+    const q=await db.collection('orders').where('number','==', n).limit(1).get();
+    if(!q.empty){
+      const doc=q.docs[0]; const o={id:doc.id, ...doc.data()};
+      // render a temporary card at the top so you can see it even if station filters would hide it
+      live.insertAdjacentHTML('afterbegin', orderHTML(o));
+      scrollToOrder(o.id);
+    }else{
+      alert('Order not found.');
+    }
+  }catch(e){
+    alert('Search error: '+e.message);
+  }
 };
+searchNum.addEventListener('keydown', (e)=>{ if(e.key==='Enter') findBtn.click(); });
 </script>
 </body></html>
