@@ -45,7 +45,7 @@
     <div id="authMsg" class="muted" style="margin-top:8px"></div>
   </div>
 
-  <!-- APP LINKS -->
+  <!-- APP LINKS (signed-in users) -->
   <div id="appBox" class="hidden">
     <div class="card" style="margin-top:12px">
       <h2>Point of Sale</h2>
@@ -71,11 +71,15 @@
       </div>
     </div>
 
-    <!-- Admin-only tools (link only) -->
+    <!-- ADMIN-ONLY -->
     <div id="adminLinks" class="card hidden" style="margin-top:12px">
-      <h2>Admin Utilities</h2>
+      <h2>Admin</h2>
       <div class="grid">
         <a class="link" href="order-seq-admin.html"><strong>Order Number Admin</strong><div class="muted">View / set / reset counter</div></a>
+        <a class="link" href="menu-admin.html"><strong>Menu Admin</strong><div class="muted">Manage items</div></a>
+        <a class="link" href="mod-groups-admin.html"><strong>Modifier Groups Admin</strong><div class="muted">Options / upsells</div></a>
+        <a class="link" href="menu-importer-min.html"><strong>Menu Importer</strong><div class="muted">CSV → menu</div></a>
+        <a class="link" href="stations-admin.html"><strong>Stations Admin</strong><div class="muted">Manage station list</div></a>
       </div>
     </div>
   </div>
@@ -108,7 +112,7 @@ auth.onAuthStateChanged(user=>{
     signOut.classList.remove('hidden');
 
     const isAdmin=ADMINS.has((user.email||'').toLowerCase());
-    if(isAdmin) adminLinks.classList.remove('hidden'); else adminLinks.classList.add('hidden');
+    adminLinks.classList.toggle('hidden', !isAdmin);
   }else{
     who.textContent='Signed out';
     appBox.classList.add('hidden');
